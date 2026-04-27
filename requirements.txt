@@ -1,0 +1,9 @@
+chromadb
+sentence-transformers
+networkx
+sqlalchemy
+pandas
+pydantic
+pyyaml
+pytest
+python-dotenv
