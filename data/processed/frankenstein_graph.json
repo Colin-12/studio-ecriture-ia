@@ -1,0 +1,292 @@
+{
+  "directed": true,
+  "multigraph": true,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "character",
+      "role": "family",
+      "description": null,
+      "id": "Agatha De Lacey"
+    },
+    {
+      "node_type": "character",
+      "role": "family",
+      "description": null,
+      "id": "Alphonse Frankenstein"
+    },
+    {
+      "node_type": "character",
+      "role": "patriarch",
+      "description": null,
+      "id": "De Lacey"
+    },
+    {
+      "node_type": "character",
+      "role": "family",
+      "description": null,
+      "id": "Elizabeth Lavenza"
+    },
+    {
+      "node_type": "character",
+      "role": "family",
+      "description": null,
+      "id": "Felix De Lacey"
+    },
+    {
+      "node_type": "character",
+      "role": "friend",
+      "description": null,
+      "id": "Henry Clerval"
+    },
+    {
+      "node_type": "character",
+      "role": "family servant",
+      "description": null,
+      "id": "Justine Moritz"
+    },
+    {
+      "node_type": "character",
+      "role": "narrator",
+      "description": null,
+      "id": "Robert Walton"
+    },
+    {
+      "node_type": "character",
+      "role": "visitor",
+      "description": null,
+      "id": "Safie"
+    },
+    {
+      "node_type": "character",
+      "role": "creature",
+      "description": null,
+      "id": "The Creature"
+    },
+    {
+      "node_type": "character",
+      "role": "protagonist",
+      "description": null,
+      "id": "Victor Frankenstein"
+    },
+    {
+      "node_type": "character",
+      "role": "family",
+      "description": null,
+      "id": "William Frankenstein"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "Arctic Ocean"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "Geneva"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "Ingolstadt"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "Mont Blanc"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "Orkney Islands"
+    },
+    {
+      "node_type": "location",
+      "description": null,
+      "id": "The De Lacey cottage"
+    },
+    {
+      "node_type": "event",
+      "description": "Victor becomes absorbed in natural philosophy and early scientific study.",
+      "chapter_number": 2,
+      "title": "Victor studies natural philosophy",
+      "sqlite_event_id": 1,
+      "sequence_order": 1,
+      "id": "event-1"
+    },
+    {
+      "node_type": "event",
+      "description": "Victor identifies the principle he believes can animate lifeless matter.",
+      "chapter_number": 4,
+      "title": "Victor discovers the principle of life",
+      "sqlite_event_id": 2,
+      "sequence_order": 2,
+      "id": "event-2"
+    },
+    {
+      "node_type": "event",
+      "description": "Victor brings the creature to life during his experiments.",
+      "chapter_number": 5,
+      "title": "Victor creates the creature",
+      "sqlite_event_id": 3,
+      "sequence_order": 3,
+      "id": "event-3"
+    },
+    {
+      "node_type": "event",
+      "description": "William Frankenstein is found murdered after disappearing near Geneva.",
+      "chapter_number": 7,
+      "title": "William is murdered",
+      "sqlite_event_id": 4,
+      "sequence_order": 4,
+      "id": "event-4"
+    },
+    {
+      "node_type": "event",
+      "description": "Justine Moritz is condemned and executed for William's murder.",
+      "chapter_number": 8,
+      "title": "Justine is executed",
+      "sqlite_event_id": 5,
+      "sequence_order": 5,
+      "id": "event-5"
+    },
+    {
+      "node_type": "event",
+      "description": "The creature secretly watches the De Lacey family from his shelter.",
+      "chapter_number": 12,
+      "title": "The creature observes the De Lacey family",
+      "sqlite_event_id": 6,
+      "sequence_order": 6,
+      "id": "event-6"
+    },
+    {
+      "node_type": "event",
+      "description": "The creature gradually learns language by listening to the De Laceys.",
+      "chapter_number": 13,
+      "title": "The creature learns language",
+      "sqlite_event_id": 7,
+      "sequence_order": 7,
+      "id": "event-7"
+    },
+    {
+      "node_type": "event",
+      "description": "Victor destroys the unfinished female creature before animation.",
+      "chapter_number": 20,
+      "title": "Victor destroys the female creature",
+      "sqlite_event_id": 8,
+      "sequence_order": 8,
+      "id": "event-8"
+    },
+    {
+      "node_type": "event",
+      "description": "Elizabeth is murdered on the wedding night.",
+      "chapter_number": 23,
+      "title": "Elizabeth is murdered",
+      "sqlite_event_id": 9,
+      "sequence_order": 9,
+      "id": "event-9"
+    },
+    {
+      "node_type": "event",
+      "description": "Victor pursues the creature northward in a final act of revenge.",
+      "chapter_number": 24,
+      "title": "Victor pursues the creature",
+      "sqlite_event_id": 10,
+      "sequence_order": 10,
+      "id": "event-10"
+    }
+  ],
+  "edges": [
+    {
+      "label": "observes",
+      "chapter_number": 12,
+      "source": "The Creature",
+      "target": "De Lacey",
+      "key": 0
+    },
+    {
+      "label": "pursues_or_confronts",
+      "chapter_number": 24,
+      "source": "The Creature",
+      "target": "Victor Frankenstein",
+      "key": 0
+    },
+    {
+      "label": "creator_of",
+      "chapter_number": 5,
+      "source": "Victor Frankenstein",
+      "target": "The Creature",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 2,
+      "source": "event-1",
+      "target": "Geneva",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 4,
+      "source": "event-2",
+      "target": "Ingolstadt",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 5,
+      "source": "event-3",
+      "target": "Ingolstadt",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 7,
+      "source": "event-4",
+      "target": "Geneva",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 8,
+      "source": "event-5",
+      "target": "Geneva",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 12,
+      "source": "event-6",
+      "target": "The De Lacey cottage",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 13,
+      "source": "event-7",
+      "target": "The De Lacey cottage",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 20,
+      "source": "event-8",
+      "target": "Orkney Islands",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 23,
+      "source": "event-9",
+      "target": "Geneva",
+      "key": 0
+    },
+    {
+      "label": "happens_in",
+      "chapter_number": 24,
+      "source": "event-10",
+      "target": "Arctic Ocean",
+      "key": 0
+    }
+  ]
+}
