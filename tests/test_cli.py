@@ -31,3 +31,19 @@ def test_build_parser_parses_search_command() -> None:
     assert args.command == "search"
     assert args.query == "memoire"
     assert args.n_results == 3
+
+
+def test_build_parser_parses_ingest_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["ingest"])
+
+    assert args.command == "ingest"
+
+
+def test_build_parser_parses_index_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["index"])
+
+    assert args.command == "index"

@@ -35,6 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    subparsers.add_parser("ingest", help="Load markdown chapters into SQLite.")
+    subparsers.add_parser("index", help="Index stored chapters into ChromaDB.")
     subparsers.add_parser("show-novel", help="Show the current novel metadata.")
     subparsers.add_parser("list-chapters", help="List stored chapters.")
 
@@ -48,6 +50,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _ingest_chapters(source_novel_dir: str | Path, db_path: str | Path) -> int:
+    from src.ingest.markdown_loader import load_chapters_to_db
+
+    novel = load_chapters_to_db(
+        source_dir=source_novel_dir,
+        db_path=db_path,
+        novel_title="Frankenstein",
+        author="Mary Shelley",
+        language="en",
+    )
+    print(
+        f"Ingestion complete for '{novel.title}' "
+        f"from {Path(source_novel_dir)} into {Path(db_path)}."
+    )
+    return 0
+
+
+def _index_chapters(db_path: str | Path, chroma_dir: str | Path, collection_name: str) -> int:
+    from src.retrieval.vector_store import index_chapters
+
+    chunk_count = index_chapters(
+        db_path=db_path,
+        persist_dir=chroma_dir,
+        collection_name=collection_name,
+    )
+    print(f"Indexed {chunk_count} chunks into '{collection_name}'.")
+    return 0
 
 
 def _show_novel(db_path: str | Path) -> int:
@@ -134,7 +165,12 @@ def main(argv: list[str] | None = None) -> int:
     db_path = settings["db_path"]
     chroma_dir = settings["chroma_dir"]
     collection_name = settings["collection_name"]
+    source_novel_dir = settings["source_novel_dir"]
 
+    if args.command == "ingest":
+        return _ingest_chapters(source_novel_dir, db_path)
+    if args.command == "index":
+        return _index_chapters(db_path, chroma_dir, collection_name)
     if args.command == "show-novel":
         return _show_novel(db_path)
     if args.command == "list-chapters":
