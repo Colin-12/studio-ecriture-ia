@@ -18,6 +18,7 @@ class Novel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     author: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    language: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     chapters: Mapped[List["Chapter"]] = relationship(
@@ -42,8 +43,11 @@ class Chapter(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id"), nullable=False)
-    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_text: Mapped[str] = mapped_column(Text, nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     novel: Mapped["Novel"] = relationship(back_populates="chapters")
