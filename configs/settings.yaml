@@ -1,0 +1,4 @@
+db_path: db/novel_memory.sqlite
+chroma_dir: data/chroma
+collection_name: novel_memory
+source_novel_dir: manuscript/source_novel
