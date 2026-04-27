@@ -47,3 +47,27 @@ def test_build_parser_parses_index_command() -> None:
     args = parser.parse_args(["index"])
 
     assert args.command == "index"
+
+
+def test_build_parser_parses_list_characters_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["list-characters"])
+
+    assert args.command == "list-characters"
+
+
+def test_build_parser_parses_list_locations_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["list-locations"])
+
+    assert args.command == "list-locations"
+
+
+def test_build_parser_parses_list_events_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["list-events"])
+
+    assert args.command == "list-events"

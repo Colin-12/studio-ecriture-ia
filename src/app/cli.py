@@ -8,9 +8,10 @@ from typing import Any
 
 import yaml
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.memory.database import get_session
-from src.memory.models import Chapter, Novel
+from src.memory.models import Chapter, Character, Event, Location, Novel
 
 
 DEFAULT_SETTINGS_PATH = Path("configs/settings.yaml")
@@ -39,6 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("index", help="Index stored chapters into ChromaDB.")
     subparsers.add_parser("show-novel", help="Show the current novel metadata.")
     subparsers.add_parser("list-chapters", help="List stored chapters.")
+    subparsers.add_parser("list-characters", help="List stored characters.")
+    subparsers.add_parser("list-locations", help="List stored locations.")
+    subparsers.add_parser("list-events", help="List stored events.")
 
     search_parser = subparsers.add_parser("search", help="Run a semantic search.")
     search_parser.add_argument("query", help="Search query text.")
@@ -98,6 +102,11 @@ def _show_novel(db_path: str | Path) -> int:
         session.close()
 
 
+def _get_first_novel(session) -> Novel | None:
+    """Return the first stored novel, if any."""
+    return session.execute(select(Novel).order_by(Novel.id)).scalar_one_or_none()
+
+
 def _list_chapters(db_path: str | Path) -> int:
     session = get_session(db_path)
     try:
@@ -112,6 +121,99 @@ def _list_chapters(db_path: str | Path) -> int:
                 f"Chapter {chapter_number}: {chapter.title} "
                 f"({chapter.word_count} words) [{chapter.file_path}]"
             )
+        return 0
+    finally:
+        session.close()
+
+
+def _list_characters(db_path: str | Path) -> int:
+    session = get_session(db_path)
+    try:
+        novel = _get_first_novel(session)
+        if novel is None:
+            print("No novel found in the database.")
+            return 1
+
+        characters = session.execute(
+            select(Character)
+            .where(Character.novel_id == novel.id)
+            .order_by(Character.name)
+        ).scalars().all()
+        if not characters:
+            print("No characters found in the database.")
+            return 1
+
+        for character in characters:
+            details = [character.name]
+            if character.role:
+                details.append(f"role={character.role}")
+            if character.description:
+                details.append(f"description={character.description}")
+            print(" | ".join(details))
+        return 0
+    finally:
+        session.close()
+
+
+def _list_locations(db_path: str | Path) -> int:
+    session = get_session(db_path)
+    try:
+        novel = _get_first_novel(session)
+        if novel is None:
+            print("No novel found in the database.")
+            return 1
+
+        locations = session.execute(
+            select(Location)
+            .where(Location.novel_id == novel.id)
+            .order_by(Location.name)
+        ).scalars().all()
+        if not locations:
+            print("No locations found in the database.")
+            return 1
+
+        for location in locations:
+            if location.description:
+                print(f"{location.name} | description={location.description}")
+            else:
+                print(location.name)
+        return 0
+    finally:
+        session.close()
+
+
+def _list_events(db_path: str | Path) -> int:
+    session = get_session(db_path)
+    try:
+        novel = _get_first_novel(session)
+        if novel is None:
+            print("No novel found in the database.")
+            return 1
+
+        events = session.execute(
+            select(Event)
+            .options(selectinload(Event.chapter))
+            .where(Event.novel_id == novel.id)
+            .order_by(Event.chapter_id, Event.sequence_order, Event.id)
+        ).scalars().all()
+        if not events:
+            print("No events found in the database.")
+            return 1
+
+        events.sort(
+            key=lambda event: (
+                event.chapter.number if event.chapter.number is not None else 10**9,
+                event.sequence_order if event.sequence_order is not None else 10**9,
+                event.id,
+            )
+        )
+
+        for event in events:
+            chapter_number = event.chapter.number if event.chapter.number is not None else "?"
+            if event.description:
+                print(f"Chapter {chapter_number} | {event.title} | {event.description}")
+            else:
+                print(f"Chapter {chapter_number} | {event.title}")
         return 0
     finally:
         session.close()
@@ -175,6 +277,12 @@ def main(argv: list[str] | None = None) -> int:
         return _show_novel(db_path)
     if args.command == "list-chapters":
         return _list_chapters(db_path)
+    if args.command == "list-characters":
+        return _list_characters(db_path)
+    if args.command == "list-locations":
+        return _list_locations(db_path)
+    if args.command == "list-events":
+        return _list_events(db_path)
     if args.command == "search":
         return _search_memory(chroma_dir, collection_name, args.query, args.n_results)
 
