@@ -60,6 +60,50 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Demo locale Phase 1
+
+Cette sequence permet de tester la memoire localement sur un roman source en Markdown.
+
+### 1. Initialiser la base SQLite
+
+```bash
+python -m src.memory.init_db
+```
+
+### 2. Ingerer les chapitres Markdown
+
+Les fichiers `.md` doivent etre places dans `manuscript/source_novel/`.
+
+```bash
+python -c "from src.ingest.markdown_loader import load_chapters_to_db; load_chapters_to_db(source_dir='manuscript/source_novel', db_path='db/novel_memory.sqlite', novel_title='Mon Roman', author='Auteur', language='fr')"
+```
+
+### 3. Lister les chapitres avec la CLI
+
+```bash
+python -m src.app.cli list-chapters
+```
+
+### 4. Indexer les chapitres dans ChromaDB
+
+```bash
+python -c "from src.retrieval.vector_store import index_chapters; count = index_chapters(db_path='db/novel_memory.sqlite', persist_dir='data/chroma', collection_name='novel_memory'); print(f'Indexed {count} chunks')"
+```
+
+### 5. Lancer une recherche semantique
+
+Exemple avec la requete `cle rouillee` :
+
+```bash
+python -m src.app.cli search "cle rouillee"
+```
+
+### 6. Lancer les tests
+
+```bash
+python -m pytest -q
+```
+
 ## Etat actuel
 
 Le depot contient maintenant le squelette propre de la Phase 1 du systeme de memoire. Les prochaines etapes pourront ajouter les modules d'ingestion, de stockage, d'indexation et de retrieval sans sur-ingenierie.
