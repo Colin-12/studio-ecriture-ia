@@ -75,7 +75,7 @@ python -m src.memory.init_db
 Les fichiers `.md` doivent etre places dans `manuscript/source_novel/`.
 
 ```bash
-python -c "from src.ingest.markdown_loader import load_chapters_to_db; load_chapters_to_db(source_dir='manuscript/source_novel', db_path='db/novel_memory.sqlite', novel_title='Mon Roman', author='Auteur', language='fr')"
+python -m src.app.cli ingest
 ```
 
 ### 3. Lister les chapitres avec la CLI
@@ -87,15 +87,15 @@ python -m src.app.cli list-chapters
 ### 4. Indexer les chapitres dans ChromaDB
 
 ```bash
-python -c "from src.retrieval.vector_store import index_chapters; count = index_chapters(db_path='db/novel_memory.sqlite', persist_dir='data/chroma', collection_name='novel_memory'); print(f'Indexed {count} chunks')"
+python -m src.app.cli index
 ```
 
 ### 5. Lancer une recherche semantique
 
-Exemple avec la requete `cle rouillee` :
+Exemple avec la requete `the creation of the being` :
 
 ```bash
-python -m src.app.cli search "cle rouillee"
+python -m src.app.cli search "the creation of the being"
 ```
 
 ### 6. Lancer les tests
