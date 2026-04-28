@@ -106,6 +106,12 @@ Exemple avec la question `where does the creature learn language?` :
 python -m src.app.cli continuity "where does the creature learn language?"
 ```
 
+Cette commande affiche :
+
+- les passages semantiques retrouves
+- les evenements structures pertinents
+- une conclusion courte et deterministe, sans `LLM`
+
 ### 7. Lancer les tests
 
 ```bash

@@ -31,5 +31,6 @@ La requete `where does the creature learn language?` retourne :
 
 - des preuves textuelles pertinentes dans les chapitres `12-13`
 - l'evenement structure pertinent : `The creature learns language`
+- la conclusion observee : `Structured memory points to: The creature learns language in chapter 13.`
 
 Le croisement `ChromaDB + SQLite` et l'amelioration du ranking reduisent les evenements parasites qui remontaient auparavant sur des actions de Victor.

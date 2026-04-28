@@ -14,6 +14,7 @@ Le depot est deja pousse sur GitHub et a jour.
 - indexation semantique `ChromaDB` operationnelle avec `245` chunks
 - donnees structurees SQLite disponibles : `12` personnages, `6` lieux, `10` evenements
 - Continuiste enrichi disponible, sans `LLM`, pour croiser les preuves textuelles `ChromaDB` et les evenements structures `SQLite`
+- conclusion deterministe disponible dans le Continuiste enrichi, sans synthese `LLM`
 - filtrage et ranking des evenements structures ameliores pour reduire les resultats parasites
 - interface `CLI` disponible pour :
   `ingest`, `index`, `search`, `continuity`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
