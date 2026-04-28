@@ -5,6 +5,7 @@ import pytest
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.editor_agent import EditorAgent
+from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
 from src.agents.visionary_agent import VisionaryAgent
@@ -98,6 +99,29 @@ def test_visionary_agent_returns_dict() -> None:
     assert len(result["alternatives"]) >= 2
     assert "strongest_angle" in result
     assert "symbolic_layer" in result
+
+
+def test_quality_evaluator_agent_returns_dict() -> None:
+    agent = QualityEvaluatorAgent()
+
+    result = agent.run(
+        {
+            "draft_text": "Scene goal: Marie decouvre une lettre cachee.\nConflict: a hidden truth creates tension.",
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "required_context": "Context needed",
+                "conflict": "A hidden truth creates tension.",
+            },
+            "editor_result": {"has_draft": True},
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "originality" in result
+    assert "narrative_tension" in result
+    assert "reader_potential" in result
+    assert "needs_revision" in result
+    assert "revision_targets" in result
 
 
 def test_stylist_agent_returns_dict() -> None:
@@ -349,6 +373,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "continuity" in result
     assert "draft" in result
     assert "editor_checklist" in result
+    assert "quality_evaluation" in result
     assert result["story_mode"] == "existing_novel"
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True

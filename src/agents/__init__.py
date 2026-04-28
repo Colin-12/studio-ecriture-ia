@@ -4,6 +4,7 @@ from .base import BaseAgent
 from .continuity_agent import ContinuityAgent
 from .devil_advocate_agent import DevilAdvocateAgent
 from .editor_agent import EditorAgent
+from .quality_evaluator_agent import QualityEvaluatorAgent
 from .scene_architect_agent import SceneArchitectAgent
 from .stylist_agent import StylistAgent
 from .visionary_agent import VisionaryAgent
@@ -14,6 +15,7 @@ __all__ = [
     "ContinuityAgent",
     "DevilAdvocateAgent",
     "EditorAgent",
+    "QualityEvaluatorAgent",
     "SceneArchitectAgent",
     "StylistAgent",
     "VisionaryAgent",

@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.editor_agent import EditorAgent
+from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
 from src.agents.visionary_agent import VisionaryAgent
@@ -30,6 +31,7 @@ def run_scene_workflow(
     continuity = ContinuityAgent()
     stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
     editor = EditorAgent()
+    quality_evaluator = QualityEvaluatorAgent()
 
     scene_brief = architect.run(
         {
@@ -85,6 +87,13 @@ def run_scene_workflow(
             "draft_text": stylist_result["draft_text"],
         }
     )
+    quality_result = quality_evaluator.run(
+        {
+            "draft_text": stylist_result["draft_text"],
+            "scene_brief": scene_brief,
+            "editor_result": editor_result,
+        }
+    )
 
     return {
         "scene_idea": scene_idea,
@@ -95,4 +104,5 @@ def run_scene_workflow(
         "continuity": continuity_result,
         "draft": stylist_result,
         "editor_checklist": editor_result,
+        "quality_evaluation": quality_result,
     }

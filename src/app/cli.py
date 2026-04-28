@@ -422,6 +422,26 @@ def _run_scene_workflow(
     for note in result["editor_checklist"]["notes"]:
         print(f"   {note}")
 
+    print("Quality evaluation:")
+    for criterion in [
+        "originality",
+        "narrative_tension",
+        "emotion",
+        "coherence",
+        "style",
+        "reader_potential",
+    ]:
+        entry = result["quality_evaluation"][criterion]
+        print(f"   {criterion}: {entry['score']}/5 - {entry['note']}")
+    print(f"   needs_revision={result['quality_evaluation']['needs_revision']}")
+    if result["quality_evaluation"]["revision_targets"]:
+        print(
+            "   revision_targets="
+            + ", ".join(result["quality_evaluation"]["revision_targets"])
+        )
+    else:
+        print("   revision_targets=none")
+
     return 0
 
 
