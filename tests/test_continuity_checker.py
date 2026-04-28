@@ -100,6 +100,36 @@ def test_answer_with_evidence_includes_structured_events(tmp_path, monkeypatch) 
             sequence_order=2,
         )
     )
+    session.add(
+        Event(
+            novel_id=novel.id,
+            chapter_id=chapter_13.id,
+            location_id=None,
+            title="Victor creates the creature",
+            description="Victor brings the creature to life.",
+            sequence_order=3,
+        )
+    )
+    session.add(
+        Event(
+            novel_id=novel.id,
+            chapter_id=chapter_13.id,
+            location_id=None,
+            title="Victor destroys the female creature",
+            description="Victor destroys his second experiment.",
+            sequence_order=4,
+        )
+    )
+    session.add(
+        Event(
+            novel_id=novel.id,
+            chapter_id=chapter_13.id,
+            location_id=None,
+            title="Victor pursues the creature",
+            description="Victor hunts the creature.",
+            sequence_order=5,
+        )
+    )
     session.commit()
     session.close()
 
@@ -129,7 +159,18 @@ def test_answer_with_evidence_includes_structured_events(tmp_path, monkeypatch) 
         n_results=1,
     )
 
-    assert len(result["structured_events"]) == 2
-    assert result["structured_events"][0]["title"] == "The creature observes the De Lacey family"
-    assert result["structured_events"][1]["title"] == "The creature learns language"
-    assert result["structured_events"][1]["chapter_number"] == 13
+    assert result["structured_events"][0]["title"] == "The creature learns language"
+    assert result["structured_events"][0]["chapter_number"] == 13
+    assert result["structured_events"][0]["title"] == "The creature learns language"
+    assert all(
+        event["title"] != "Victor creates the creature"
+        for event in result["structured_events"]
+    )
+    assert all(
+        event["title"] != "Victor destroys the female creature"
+        for event in result["structured_events"]
+    )
+    assert all(
+        event["title"] != "Victor pursues the creature"
+        for event in result["structured_events"]
+    )

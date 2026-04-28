@@ -17,21 +17,40 @@ STOPWORDS = {
     "a",
     "an",
     "and",
+    "at",
+    "creature",
+    "did",
+    "do",
     "does",
+    "how",
     "in",
     "is",
     "of",
+    "on",
     "or",
     "the",
     "to",
-    "what",
+    "victor",
+    "when",
     "where",
+    "what",
     "who",
+    "why",
 }
 
 
+def _normalize_word(word: str) -> str:
+    if len(word) > 4 and word.endswith("ies"):
+        return f"{word[:-3]}y"
+    if len(word) > 4 and word.endswith("es"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
+
+
 def _extract_significant_words(text: str) -> set[str]:
-    words = set(re.findall(r"[a-zA-Z]+", text.lower()))
+    words = {_normalize_word(word) for word in re.findall(r"[a-zA-Z]+", text.lower())}
     return {word for word in words if word not in STOPWORDS and len(word) > 2}
 
 
@@ -66,32 +85,62 @@ def _get_structured_events(
 
     query_words = _extract_significant_words(query)
     result_chapters = {chapter for chapter in chapter_numbers if chapter is not None}
-    matched_events: list[dict[str, Any]] = []
+    strict_matches: list[tuple[int, int, int, int, dict[str, Any]]] = []
+    fallback_matches: list[tuple[int, int, int, dict[str, Any]]] = []
     seen_titles: set[str] = set()
 
     for event in events:
         title_words = _extract_significant_words(event.title)
+        description_words = _extract_significant_words(event.description or "")
         chapter_number = event.chapter.number if event.chapter.number is not None else None
+        title_matches = query_words.intersection(title_words)
+        description_matches = query_words.intersection(description_words)
+        matched_word_count = len(title_matches.union(description_matches))
+        match_score = (2 * len(title_matches)) + len(description_matches)
+        narrative_chapter = chapter_number if chapter_number is not None else 10**9
+        narrative_sequence = (
+            event.sequence_order if event.sequence_order is not None else 10**9
+        )
 
-        include_event = False
-        if query_words and query_words.intersection(title_words):
-            include_event = True
-        elif chapter_number in result_chapters:
-            include_event = True
-
-        if not include_event or event.title in seen_titles:
+        if event.title in seen_titles:
             continue
 
-        matched_events.append(
-            {
-                "title": event.title,
-                "description": event.description,
-                "chapter_number": chapter_number,
-            }
-        )
-        seen_titles.add(event.title)
+        event_payload = {
+            "title": event.title,
+            "description": event.description,
+            "chapter_number": chapter_number,
+        }
 
-    return matched_events
+        if matched_word_count >= 2:
+            strict_matches.append(
+                (
+                    -match_score,
+                    narrative_chapter,
+                    narrative_sequence,
+                    event.id,
+                    event_payload,
+                )
+            )
+            seen_titles.add(event.title)
+            continue
+
+        if chapter_number in result_chapters:
+            fallback_matches.append(
+                (
+                    narrative_chapter,
+                    narrative_sequence,
+                    event.id,
+                    event_payload,
+                )
+            )
+            seen_titles.add(event.title)
+
+    if strict_matches:
+        strict_matches.sort()
+        return [payload for _, _, _, _, payload in strict_matches]
+
+    fallback_matches.sort()
+    return [payload for _, _, _, payload in fallback_matches]
 
 
 def answer_with_evidence(
