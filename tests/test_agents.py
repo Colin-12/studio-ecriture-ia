@@ -1,3 +1,7 @@
+import json
+
+import pytest
+
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
@@ -84,6 +88,49 @@ def test_stylist_agent_with_llm_returns_mock_response() -> None:
 
     assert result["draft_text"].startswith("[MOCK LLM RESPONSE] ")
     assert "Mock LLM mode was used for this draft." in result["style_notes"]
+
+
+def test_llm_client_ollama_mode_returns_response(monkeypatch) -> None:
+    client = LLMClient(mode="ollama")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "Ollama reply"}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        assert http_request.full_url == "http://localhost:11434/api/generate"
+        assert timeout == 30.0
+        payload = json.loads(http_request.data.decode("utf-8"))
+        assert payload["model"] == "qwen2.5:3b"
+        assert payload["prompt"] == "Prompt Ollama"
+        assert payload["stream"] is False
+        return FakeResponse()
+
+    monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
+
+    result = client.generate("Prompt Ollama")
+
+    assert result == "Ollama reply"
+
+
+def test_llm_client_ollama_mode_raises_clear_error_when_unavailable(monkeypatch) -> None:
+    client = LLMClient(mode="ollama")
+
+    def fake_urlopen(http_request, timeout):
+        raise error.URLError("connection refused")
+
+    from urllib import error
+
+    monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
+
+    with pytest.raises(RuntimeError, match="Ollama is not available"):
+        client.generate("Prompt Ollama")
 
 
 def test_continuity_agent_returns_dict(monkeypatch) -> None:
