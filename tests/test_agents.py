@@ -3,6 +3,7 @@ from src.agents.editor_agent import EditorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
 from src.agents.workflow import run_scene_workflow
+from src.llm.client import LLMClient
 
 
 def test_scene_architect_agent_returns_dict() -> None:
@@ -55,6 +56,34 @@ def test_stylist_agent_returns_dict() -> None:
     assert "draft_text" in result
     assert "style_notes" in result
     assert "Marie decouvre une lettre cachee" in result["draft_text"]
+
+
+def test_llm_client_mock_mode_returns_predictable_text() -> None:
+    client = LLMClient(mode="mock")
+
+    result = client.generate("Prompt de test")
+
+    assert result == "[MOCK LLM RESPONSE] Prompt de test"
+
+
+def test_stylist_agent_with_llm_returns_mock_response() -> None:
+    agent = StylistAgent(use_llm=True)
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "expected_output": "A coherent draft.",
+            },
+            "continuity": {
+                "conclusion": "Structured memory points to: The creature learns language in chapter 13."
+            },
+        }
+    )
+
+    assert result["draft_text"].startswith("[MOCK LLM RESPONSE] ")
+    assert "Mock LLM mode was used for this draft." in result["style_notes"]
 
 
 def test_continuity_agent_returns_dict(monkeypatch) -> None:
