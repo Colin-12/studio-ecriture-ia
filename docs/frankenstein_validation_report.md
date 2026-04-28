@@ -24,3 +24,12 @@
 Les premiers tests montrent que la memoire semantique retrouve correctement certains passages importants du roman.
 
 Les resultats dependent toutefois clairement de la formulation des requetes et du vocabulaire reellement present dans le texte source.
+
+## Validation du Continuiste enrichi
+
+La requete `where does the creature learn language?` retourne :
+
+- des preuves textuelles pertinentes dans les chapitres `12-13`
+- l'evenement structure pertinent : `The creature learns language`
+
+Le croisement `ChromaDB + SQLite` et l'amelioration du ranking reduisent les evenements parasites qui remontaient auparavant sur des actions de Victor.

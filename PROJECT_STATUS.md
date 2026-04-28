@@ -13,12 +13,13 @@ Le depot est deja pousse sur GitHub et a jour.
 - ingestion `SQLite` operationnelle via `SQLAlchemy`
 - indexation semantique `ChromaDB` operationnelle avec `245` chunks
 - donnees structurees SQLite disponibles : `12` personnages, `6` lieux, `10` evenements
-- Continuiste simple disponible, sans `LLM`, pour recuperer des preuves textuelles via `ChromaDB`
+- Continuiste enrichi disponible, sans `LLM`, pour croiser les preuves textuelles `ChromaDB` et les evenements structures `SQLite`
+- filtrage et ranking des evenements structures ameliores pour reduire les resultats parasites
 - interface `CLI` disponible pour :
   `ingest`, `index`, `search`, `continuity`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `18 passed`
+- tests locaux passes : `19 passed`
 
 ## Limites actuelles
 
