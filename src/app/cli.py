@@ -70,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the minimal deterministic scene workflow.",
     )
     run_scene_parser.add_argument("scene_idea", help="Scene idea to prepare.")
+    run_scene_parser.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Use the mock LLM path in StylistAgent.",
+    )
 
     return parser
 
@@ -331,6 +336,7 @@ def _run_scene_workflow(
     db_path: str | Path,
     chroma_dir: str | Path,
     collection_name: str,
+    use_llm: bool = False,
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -339,6 +345,7 @@ def _run_scene_workflow(
         db_path=str(db_path),
         chroma_dir=str(chroma_dir),
         collection_name=collection_name,
+        use_llm=use_llm,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
@@ -408,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
             db_path,
             chroma_dir,
             collection_name,
+            use_llm=args.use_llm,
         )
 
     parser.error(f"Unknown command: {args.command}")

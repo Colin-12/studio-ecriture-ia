@@ -151,3 +151,28 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True
     assert "draft_text" in result["draft"]
+
+
+def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [{"text": "sample passage", "chapter_number": 12}],
+            "chapters": [12],
+            "scores": [0.1],
+            "sources": ["/tmp/chapter_12.md"],
+            "structured_events": [],
+            "conclusion": "Textual evidence was found in chapters: 12.",
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Victor comprend que sa creation lui echappe",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+    )
+
+    assert result["draft"]["draft_text"].startswith("[MOCK LLM RESPONSE] ")

@@ -50,6 +50,17 @@ def test_build_parser_parses_run_scene_command() -> None:
 
     assert args.command == "run-scene"
     assert args.scene_idea == "Marie decouvre une lettre cachee"
+    assert args.use_llm is False
+
+
+def test_build_parser_parses_run_scene_with_use_llm() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["run-scene", "Victor comprend que sa creation lui echappe", "--use-llm"])
+
+    assert args.command == "run-scene"
+    assert args.scene_idea == "Victor comprend que sa creation lui echappe"
+    assert args.use_llm is True
 
 
 def test_build_parser_parses_ingest_command() -> None:
