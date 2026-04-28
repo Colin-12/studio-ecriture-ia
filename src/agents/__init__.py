@@ -2,16 +2,20 @@
 
 from .base import BaseAgent
 from .continuity_agent import ContinuityAgent
+from .devil_advocate_agent import DevilAdvocateAgent
 from .editor_agent import EditorAgent
 from .scene_architect_agent import SceneArchitectAgent
 from .stylist_agent import StylistAgent
+from .visionary_agent import VisionaryAgent
 from .workflow import run_scene_workflow
 
 __all__ = [
     "BaseAgent",
     "ContinuityAgent",
+    "DevilAdvocateAgent",
     "EditorAgent",
     "SceneArchitectAgent",
     "StylistAgent",
+    "VisionaryAgent",
     "run_scene_workflow",
 ]

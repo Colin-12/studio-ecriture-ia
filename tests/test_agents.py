@@ -3,9 +3,11 @@ import json
 import pytest
 
 from src.agents.continuity_agent import ContinuityAgent
+from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
+from src.agents.visionary_agent import VisionaryAgent
 from src.agents.workflow import run_scene_workflow
 from src.llm.client import LLMClient
 
@@ -41,6 +43,44 @@ def test_editor_agent_returns_dict() -> None:
     assert result["has_draft"] is True
 
 
+def test_devil_advocate_agent_returns_dict() -> None:
+    agent = DevilAdvocateAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "A hidden truth creates tension.",
+            }
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "risks" in result
+    assert "objections" in result
+    assert "revision_advice" in result
+
+
+def test_visionary_agent_returns_dict() -> None:
+    agent = VisionaryAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+            },
+            "devil_advocate": {
+                "revision_advice": "Strengthen the turning point.",
+            },
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert len(result["alternatives"]) >= 2
+    assert "strongest_angle" in result
+    assert "symbolic_layer" in result
+
+
 def test_stylist_agent_returns_dict() -> None:
     agent = StylistAgent()
 
@@ -53,6 +93,10 @@ def test_stylist_agent_returns_dict() -> None:
             "continuity": {
                 "conclusion": "Structured memory points to: The creature learns language in chapter 13."
             },
+            "visionary": {
+                "strongest_angle": "Center the scene on the consequence of the discovery.",
+                "symbolic_layer": "Use shadow and paper as motifs.",
+            },
         }
     )
 
@@ -60,6 +104,7 @@ def test_stylist_agent_returns_dict() -> None:
     assert "draft_text" in result
     assert "style_notes" in result
     assert "Marie decouvre une lettre cachee" in result["draft_text"]
+    assert "Strongest angle: Center the scene on the consequence of the discovery." in result["draft_text"]
 
 
 def test_llm_client_mock_mode_returns_predictable_text() -> None:
@@ -127,6 +172,10 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
         {
             "conclusion": "Structured memory points to: The creature learns language in chapter 13."
         },
+        {
+            "strongest_angle": "Center the scene on the consequence of the discovery.",
+            "symbolic_layer": "Use shadow and paper as motifs.",
+        }
     )
 
     assert "Write a short scene draft in 150-250 words." in prompt
@@ -136,6 +185,8 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
         "Continuity conclusion: Structured memory points to: "
         "The creature learns language in chapter 13."
     ) in prompt
+    assert "Strongest angle: Center the scene on the consequence of the discovery." in prompt
+    assert "Symbolic layer: Use shadow and paper as motifs." in prompt
     assert "Expected output:" not in prompt
 
 
@@ -241,6 +292,8 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
 
     assert isinstance(result, dict)
     assert "scene_brief" in result
+    assert "devil_advocate" in result
+    assert "visionary" in result
     assert "continuity" in result
     assert "draft" in result
     assert "editor_checklist" in result

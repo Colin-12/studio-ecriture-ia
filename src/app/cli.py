@@ -363,6 +363,19 @@ def _run_scene_workflow(
     print(f"   Conflict: {result['scene_brief']['conflict']}")
     print(f"   Expected output: {result['scene_brief']['expected_output']}")
 
+    print("Devil Advocate:")
+    for risk in result["devil_advocate"]["risks"]:
+        print(f"   Risk: {risk}")
+    for objection in result["devil_advocate"]["objections"]:
+        print(f"   Objection: {objection}")
+    print(f"   Revision advice: {result['devil_advocate']['revision_advice']}")
+
+    print("Visionary:")
+    for alternative in result["visionary"]["alternatives"]:
+        print(f"   Alternative: {alternative}")
+    print(f"   Strongest angle: {result['visionary']['strongest_angle']}")
+    print(f"   Symbolic layer: {result['visionary']['symbolic_layer']}")
+
     print("Continuity:")
     print(f"   Conclusion: {result['continuity']['conclusion']}")
 
