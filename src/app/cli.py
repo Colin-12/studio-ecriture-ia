@@ -303,6 +303,17 @@ def _continuity_check(
             print(f"   Source: {passage['source_file']}")
         print(f"   {passage['text']}")
 
+    print("Structured events:")
+    if not result["structured_events"]:
+        print("   No structured events found.")
+    else:
+        for event in result["structured_events"]:
+            chapter_number = event["chapter_number"] if event["chapter_number"] is not None else "?"
+            if event["description"]:
+                print(f"   Chapter {chapter_number} | {event['title']} | {event['description']}")
+            else:
+                print(f"   Chapter {chapter_number} | {event['title']}")
+
     return 0
 
 
