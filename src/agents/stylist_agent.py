@@ -20,20 +20,37 @@ class StylistAgent(BaseAgent):
         scene_brief: dict,
         continuity: dict,
         visionary: dict | None = None,
+        revision_targets: list[str] | None = None,
+        editor_notes: list[str] | None = None,
+        quality_evaluation: dict | None = None,
     ) -> str:
         visionary = visionary or {}
+        revision_targets = revision_targets or []
+        editor_notes = editor_notes or []
+        quality_evaluation = quality_evaluation or {}
+        revision_line = ""
+        if revision_targets:
+            revision_line = "Revise the draft focusing on: " + ", ".join(revision_targets) + "."
         return "\n".join(
             [
-                "Write a short scene draft in 150-250 words.",
-                f"Scene goal: {scene_brief.get('scene_goal', '')}",
-                f"Genre: {scene_brief.get('genre', '')}",
-                f"Tone: {scene_brief.get('tone', '')}",
-                f"POV: {scene_brief.get('pov', '')}",
-                f"Language: {scene_brief.get('language', '')}",
-                f"Conflict: {scene_brief.get('conflict', '')}",
-                f"Continuity conclusion: {continuity.get('conclusion', 'No evidence found.')}",
-                f"Strongest angle: {visionary.get('strongest_angle', '')}",
-                f"Symbolic layer: {visionary.get('symbolic_layer', '')}",
+                line
+                for line in [
+                    "Write a short scene draft in 150-250 words.",
+                    revision_line,
+                    f"Scene goal: {scene_brief.get('scene_goal', '')}",
+                    f"Genre: {scene_brief.get('genre', '')}",
+                    f"Tone: {scene_brief.get('tone', '')}",
+                    f"POV: {scene_brief.get('pov', '')}",
+                    f"Language: {scene_brief.get('language', '')}",
+                    f"Conflict: {scene_brief.get('conflict', '')}",
+                    f"Continuity conclusion: {continuity.get('conclusion', 'No evidence found.')}",
+                    f"Strongest angle: {visionary.get('strongest_angle', '')}",
+                    f"Symbolic layer: {visionary.get('symbolic_layer', '')}",
+                    f"Editor notes: {' | '.join(editor_notes)}",
+                    f"Quality revision targets: {', '.join(revision_targets)}",
+                    f"Needs revision: {quality_evaluation.get('needs_revision', False)}",
+                ]
+                if line
             ]
         )
 
@@ -41,6 +58,9 @@ class StylistAgent(BaseAgent):
         scene_brief = input_data.get("scene_brief") or {}
         continuity = input_data.get("continuity") or {}
         visionary = input_data.get("visionary") or {}
+        revision_targets = input_data.get("revision_targets") or []
+        editor_notes = input_data.get("editor_notes") or []
+        quality_evaluation = input_data.get("quality_evaluation") or {}
 
         scene_goal = scene_brief.get("scene_goal", "")
         conflict = scene_brief.get("conflict", "")
@@ -51,6 +71,7 @@ class StylistAgent(BaseAgent):
         tone = scene_brief.get("tone", "")
         pov = scene_brief.get("pov", "")
         language = scene_brief.get("language", "")
+        revision_focus = ", ".join(revision_targets)
 
         draft_parts = [
             f"Scene goal: {scene_goal}",
@@ -64,10 +85,21 @@ class StylistAgent(BaseAgent):
             f"Symbolic layer: {symbolic_layer}",
             "Expected movement: the scene should advance the immediate narrative situation.",
         ]
+        if revision_targets:
+            draft_parts.append(f"Revision focus: {revision_focus}")
+        if editor_notes:
+            draft_parts.append(f"Editor notes: {' | '.join(editor_notes)}")
 
         if self.use_llm:
             draft_text = self.llm_client.generate(
-                self._build_prompt(scene_brief, continuity, visionary)
+                self._build_prompt(
+                    scene_brief,
+                    continuity,
+                    visionary,
+                    revision_targets=revision_targets,
+                    editor_notes=editor_notes,
+                    quality_evaluation=quality_evaluation,
+                )
             )
             mode_note = "Mock LLM mode was used for this draft."
             if self.llm_mode == "ollama":

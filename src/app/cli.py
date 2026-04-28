@@ -91,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_scene_parser.add_argument("--tone", help="Narrative tone for the scene.")
     run_scene_parser.add_argument("--pov", help="Point of view for the scene.")
     run_scene_parser.add_argument("--language", help="Draft language for the scene.")
+    run_scene_parser.add_argument(
+        "--max-revision-rounds",
+        type=int,
+        default=1,
+        help="Maximum number of simple revision rounds to run.",
+    )
 
     return parser
 
@@ -359,6 +365,7 @@ def _run_scene_workflow(
     tone: str | None = None,
     pov: str | None = None,
     language: str | None = None,
+    max_revision_rounds: int = 1,
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -374,6 +381,7 @@ def _run_scene_workflow(
         tone=tone,
         pov=pov,
         language=language,
+        max_revision_rounds=max_revision_rounds,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
@@ -442,6 +450,26 @@ def _run_scene_workflow(
     else:
         print("   revision_targets=none")
 
+    if result["revised_draft"] is not None:
+        print("Revised draft:")
+        print(f"   {result['revised_draft']['draft_text']}")
+        print("Revised editor checklist:")
+        print(f"   has_goal={result['revised_editor']['has_goal']}")
+        print(f"   has_conflict={result['revised_editor']['has_conflict']}")
+        print(f"   has_context={result['revised_editor']['has_context']}")
+        print(f"   has_draft={result['revised_editor']['has_draft']}")
+        print("Revised quality evaluation:")
+        for criterion in [
+            "originality",
+            "narrative_tension",
+            "emotion",
+            "coherence",
+            "style",
+            "reader_potential",
+        ]:
+            entry = result["revised_quality_evaluation"][criterion]
+            print(f"   {criterion}: {entry['score']}/5 - {entry['note']}")
+
     return 0
 
 
@@ -492,6 +520,7 @@ def main(argv: list[str] | None = None) -> int:
             tone=args.tone,
             pov=args.pov,
             language=args.language,
+            max_revision_rounds=args.max_revision_rounds,
         )
 
     parser.error(f"Unknown command: {args.command}")

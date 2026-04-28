@@ -179,6 +179,26 @@ def test_stylist_agent_integrates_narrative_parameters() -> None:
     assert "Language: fr" in result["draft_text"]
 
 
+def test_stylist_agent_can_include_revision_focus() -> None:
+    agent = StylistAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+            "revision_targets": ["style", "reader_potential"],
+            "editor_notes": ["Missing draft text."],
+            "quality_evaluation": {"needs_revision": True},
+        }
+    )
+
+    assert "Revision focus: style, reader_potential" in result["draft_text"]
+    assert "Editor notes: Missing draft text." in result["draft_text"]
+
+
 def test_llm_client_mock_mode_returns_predictable_text() -> None:
     client = LLMClient(mode="mock")
 
@@ -374,6 +394,9 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "draft" in result
     assert "editor_checklist" in result
     assert "quality_evaluation" in result
+    assert "revised_draft" in result
+    assert "revised_editor" in result
+    assert "revised_quality_evaluation" in result
     assert result["story_mode"] == "existing_novel"
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True
@@ -468,3 +491,69 @@ def test_run_scene_workflow_can_propagate_narrative_parameters(monkeypatch) -> N
     assert result["scene_brief"]["pov"] == "first_person"
     assert result["scene_brief"]["language"] == "fr"
     assert "Genre: thriller" in result["draft"]["draft_text"]
+
+
+def test_run_scene_workflow_can_produce_revision(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    quality_calls = {"count": 0}
+
+    def fake_quality_run(self, input_data):
+        quality_calls["count"] += 1
+        if quality_calls["count"] == 1:
+            return {
+                "agent": self.name,
+                "originality": {"score": 3, "note": "Base draft is acceptable."},
+                "narrative_tension": {"score": 2, "note": "Tension needs reinforcement."},
+                "emotion": {"score": 3, "note": "Emotion is present but thin."},
+                "coherence": {"score": 4, "note": "The brief is coherent."},
+                "style": {"score": 2, "note": "Style needs more texture."},
+                "reader_potential": {"score": 2, "note": "The scene needs stronger pull."},
+                "needs_revision": True,
+                "revision_targets": ["narrative_tension", "style", "reader_potential"],
+            }
+        return {
+            "agent": self.name,
+            "originality": {"score": 3, "note": "Base draft is acceptable."},
+            "narrative_tension": {"score": 3, "note": "Tension improved."},
+            "emotion": {"score": 3, "note": "Emotion is stable."},
+            "coherence": {"score": 4, "note": "The brief is coherent."},
+            "style": {"score": 3, "note": "Style improved."},
+            "reader_potential": {"score": 3, "note": "Reader pull improved."},
+            "needs_revision": False,
+            "revision_targets": [],
+        }
+
+    monkeypatch.setattr(
+        "src.agents.quality_evaluator_agent.QualityEvaluatorAgent.run",
+        fake_quality_run,
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        max_revision_rounds=1,
+    )
+
+    assert result["quality_evaluation"]["needs_revision"] is True
+    assert result["revised_draft"] is not None
+    assert result["revised_editor"] is not None
+    assert result["revised_quality_evaluation"] is not None
+    assert result["revised_quality_evaluation"]["needs_revision"] is False
+    assert (
+        "Revision focus: narrative_tension, style, reader_potential"
+        in result["revised_draft"]["draft_text"]
+    )

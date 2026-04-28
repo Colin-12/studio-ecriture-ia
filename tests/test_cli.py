@@ -52,6 +52,7 @@ def test_build_parser_parses_run_scene_command() -> None:
     assert args.scene_idea == "Marie decouvre une lettre cachee"
     assert args.use_llm is False
     assert args.story_mode == "existing_novel"
+    assert args.max_revision_rounds == 1
 
 
 def test_build_parser_parses_run_scene_with_use_llm() -> None:
@@ -122,6 +123,8 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
             "--use-llm",
             "--llm-mode",
             "mock",
+            "--max-revision-rounds",
+            "2",
         ]
     )
 
@@ -133,6 +136,7 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.language == "fr"
     assert args.use_llm is True
     assert args.llm_mode == "mock"
+    assert args.max_revision_rounds == 2
 
 
 def test_build_parser_parses_ingest_command() -> None:

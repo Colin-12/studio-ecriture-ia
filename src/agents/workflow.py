@@ -23,6 +23,7 @@ def run_scene_workflow(
     tone: str | None = None,
     pov: str | None = None,
     language: str | None = None,
+    max_revision_rounds: int = 1,
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
@@ -95,6 +96,36 @@ def run_scene_workflow(
         }
     )
 
+    revised_draft = None
+    revised_editor = None
+    revised_quality_evaluation = None
+    if quality_result["needs_revision"] and max_revision_rounds > 0:
+        revised_draft = stylist.run(
+            {
+                "scene_brief": scene_brief,
+                "devil_advocate": devil_advocate_result,
+                "visionary": visionary_result,
+                "continuity": continuity_result,
+                "revision_targets": quality_result["revision_targets"],
+                "editor_notes": editor_result["notes"],
+                "quality_evaluation": quality_result,
+            }
+        )
+        revised_editor = editor.run(
+            {
+                "brief": scene_brief,
+                "text": scene_idea,
+                "draft_text": revised_draft["draft_text"],
+            }
+        )
+        revised_quality_evaluation = quality_evaluator.run(
+            {
+                "draft_text": revised_draft["draft_text"],
+                "scene_brief": scene_brief,
+                "editor_result": revised_editor,
+            }
+        )
+
     return {
         "scene_idea": scene_idea,
         "story_mode": story_mode,
@@ -105,4 +136,7 @@ def run_scene_workflow(
         "draft": stylist_result,
         "editor_checklist": editor_result,
         "quality_evaluation": quality_result,
+        "revised_draft": revised_draft,
+        "revised_editor": revised_editor,
+        "revised_quality_evaluation": revised_quality_evaluation,
     }
