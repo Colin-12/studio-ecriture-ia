@@ -351,10 +351,17 @@ def _run_scene_workflow(
     print("Continuity:")
     print(f"   Conclusion: {result['continuity']['conclusion']}")
 
+    print("Draft:")
+    print(f"   {result['draft']['draft_text']}")
+    print("Style notes:")
+    for note in result["draft"]["style_notes"]:
+        print(f"   {note}")
+
     print("Editor checklist:")
     print(f"   has_goal={result['editor_checklist']['has_goal']}")
     print(f"   has_conflict={result['editor_checklist']['has_conflict']}")
     print(f"   has_context={result['editor_checklist']['has_context']}")
+    print(f"   has_draft={result['editor_checklist']['has_draft']}")
     for note in result["editor_checklist"]["notes"]:
         print(f"   {note}")
 

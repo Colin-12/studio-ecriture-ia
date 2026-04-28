@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
+from src.agents.stylist_agent import StylistAgent
 
 
 def run_scene_workflow(
@@ -13,9 +14,10 @@ def run_scene_workflow(
     chroma_dir: str,
     collection_name: str,
 ) -> dict:
-    """Run a minimal scene workflow across architect, continuity, and editor agents."""
+    """Run a minimal scene workflow across architect, continuity, stylist, and editor agents."""
     architect = SceneArchitectAgent()
     continuity = ContinuityAgent()
+    stylist = StylistAgent()
     editor = EditorAgent()
 
     scene_brief = architect.run({"scene_idea": scene_idea})
@@ -28,11 +30,24 @@ def run_scene_workflow(
             "collection_name": collection_name,
         }
     )
-    editor_result = editor.run({"brief": scene_brief, "text": scene_idea})
+    stylist_result = stylist.run(
+        {
+            "scene_brief": scene_brief,
+            "continuity": continuity_result,
+        }
+    )
+    editor_result = editor.run(
+        {
+            "brief": scene_brief,
+            "text": scene_idea,
+            "draft_text": stylist_result["draft_text"],
+        }
+    )
 
     return {
         "scene_idea": scene_idea,
         "scene_brief": scene_brief,
         "continuity": continuity_result,
+        "draft": stylist_result,
         "editor_checklist": editor_result,
     }

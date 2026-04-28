@@ -1,6 +1,7 @@
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
+from src.agents.stylist_agent import StylistAgent
 from src.agents.workflow import run_scene_workflow
 
 
@@ -23,7 +24,8 @@ def test_editor_agent_returns_dict() -> None:
                 "scene_goal": "Marie decouvre une lettre cachee",
                 "required_context": "Context needed",
                 "conflict": "A hidden truth creates tension.",
-            }
+            },
+            "draft_text": "Scene goal: Marie decouvre une lettre cachee",
         }
     )
 
@@ -31,6 +33,28 @@ def test_editor_agent_returns_dict() -> None:
     assert result["has_goal"] is True
     assert result["has_conflict"] is True
     assert result["has_context"] is True
+    assert result["has_draft"] is True
+
+
+def test_stylist_agent_returns_dict() -> None:
+    agent = StylistAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+            },
+            "continuity": {
+                "conclusion": "Structured memory points to: The creature learns language in chapter 13."
+            },
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "draft_text" in result
+    assert "style_notes" in result
+    assert "Marie decouvre une lettre cachee" in result["draft_text"]
 
 
 def test_continuity_agent_returns_dict(monkeypatch) -> None:
@@ -93,5 +117,8 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert isinstance(result, dict)
     assert "scene_brief" in result
     assert "continuity" in result
+    assert "draft" in result
     assert "editor_checklist" in result
     assert result["editor_checklist"]["has_goal"] is True
+    assert result["editor_checklist"]["has_draft"] is True
+    assert "draft_text" in result["draft"]
