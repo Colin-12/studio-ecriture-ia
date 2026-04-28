@@ -12,15 +12,15 @@ class StylistAgent(BaseAgent):
     def __init__(self, use_llm: bool = False, llm_mode: str = "mock") -> None:
         super().__init__(name="StylistAgent", role="styling")
         self.use_llm = use_llm
+        self.llm_mode = llm_mode
         self.llm_client = LLMClient(mode=llm_mode)
 
     def _build_prompt(self, scene_brief: dict, continuity: dict) -> str:
         return "\n".join(
             [
-                "Write a short scene draft from this structured input.",
+                "Write a short scene draft in 150-250 words.",
                 f"Scene goal: {scene_brief.get('scene_goal', '')}",
                 f"Conflict: {scene_brief.get('conflict', '')}",
-                f"Expected output: {scene_brief.get('expected_output', '')}",
                 f"Continuity conclusion: {continuity.get('conclusion', 'No evidence found.')}",
             ]
         )
@@ -42,8 +42,11 @@ class StylistAgent(BaseAgent):
 
         if self.use_llm:
             draft_text = self.llm_client.generate(self._build_prompt(scene_brief, continuity))
+            mode_note = "Mock LLM mode was used for this draft."
+            if self.llm_mode == "ollama":
+                mode_note = "Ollama LLM mode was used for this draft."
             style_notes = [
-                "Mock LLM mode was used for this draft.",
+                mode_note,
                 "Replace the mock client with a real LLM client later.",
             ]
         else:

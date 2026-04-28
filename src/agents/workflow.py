@@ -14,11 +14,12 @@ def run_scene_workflow(
     chroma_dir: str,
     collection_name: str,
     use_llm: bool = False,
+    llm_mode: str = "mock",
 ) -> dict:
     """Run a minimal scene workflow across architect, continuity, stylist, and editor agents."""
     architect = SceneArchitectAgent()
     continuity = ContinuityAgent()
-    stylist = StylistAgent(use_llm=use_llm)
+    stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
     editor = EditorAgent()
 
     scene_brief = architect.run({"scene_idea": scene_idea})

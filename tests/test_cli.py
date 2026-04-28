@@ -56,11 +56,33 @@ def test_build_parser_parses_run_scene_command() -> None:
 def test_build_parser_parses_run_scene_with_use_llm() -> None:
     parser = build_parser()
 
-    args = parser.parse_args(["run-scene", "Victor comprend que sa creation lui echappe", "--use-llm"])
+    args = parser.parse_args(
+        ["run-scene", "Victor comprend que sa creation lui echappe", "--use-llm"]
+    )
 
     assert args.command == "run-scene"
     assert args.scene_idea == "Victor comprend que sa creation lui echappe"
     assert args.use_llm is True
+    assert args.llm_mode == "mock"
+
+
+def test_build_parser_parses_run_scene_with_ollama_mode() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Victor comprend que sa creation lui echappe",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.scene_idea == "Victor comprend que sa creation lui echappe"
+    assert args.use_llm is True
+    assert args.llm_mode == "ollama"
 
 
 def test_build_parser_parses_ingest_command() -> None:

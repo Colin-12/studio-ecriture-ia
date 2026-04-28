@@ -13,7 +13,7 @@ class LLMClient:
         self,
         mode: str = "mock",
         model: str = "qwen2.5:3b",
-        timeout: float = 30.0,
+        timeout: float = 120.0,
         base_url: str = "http://localhost:11434",
     ) -> None:
         self.mode = mode

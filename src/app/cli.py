@@ -75,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use the mock LLM path in StylistAgent.",
     )
+    run_scene_parser.add_argument(
+        "--llm-mode",
+        choices=["mock", "ollama"],
+        default="mock",
+        help="LLM backend to use when --use-llm is enabled.",
+    )
 
     return parser
 
@@ -337,6 +343,7 @@ def _run_scene_workflow(
     chroma_dir: str | Path,
     collection_name: str,
     use_llm: bool = False,
+    llm_mode: str = "mock",
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -346,6 +353,7 @@ def _run_scene_workflow(
         chroma_dir=str(chroma_dir),
         collection_name=collection_name,
         use_llm=use_llm,
+        llm_mode=llm_mode,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
@@ -416,6 +424,7 @@ def main(argv: list[str] | None = None) -> int:
             chroma_dir,
             collection_name,
             use_llm=args.use_llm,
+            llm_mode=args.llm_mode,
         )
 
     parser.error(f"Unknown command: {args.command}")

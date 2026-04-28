@@ -90,6 +90,55 @@ def test_stylist_agent_with_llm_returns_mock_response() -> None:
     assert "Mock LLM mode was used for this draft." in result["style_notes"]
 
 
+def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: "Ollama generated draft",
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Victor comprend que sa creation lui echappe",
+                "conflict": "The realization should create direct tension.",
+            },
+            "continuity": {
+                "conclusion": "Structured memory points to: Victor creates the creature in chapter 5."
+            },
+        }
+    )
+
+    assert result["draft_text"] == "Ollama generated draft"
+    assert "Ollama LLM mode was used for this draft." in result["style_notes"]
+
+
+def test_stylist_agent_builds_short_prompt_for_llm() -> None:
+    agent = StylistAgent(use_llm=True)
+
+    prompt = agent._build_prompt(
+        {
+            "scene_goal": "Marie decouvre une lettre cachee",
+            "conflict": "The discovery should create tension around hidden information.",
+            "expected_output": "This field should not be included in the prompt.",
+        },
+        {
+            "conclusion": "Structured memory points to: The creature learns language in chapter 13."
+        },
+    )
+
+    assert "Write a short scene draft in 150-250 words." in prompt
+    assert "Scene goal: Marie decouvre une lettre cachee" in prompt
+    assert "Conflict: The discovery should create tension around hidden information." in prompt
+    assert (
+        "Continuity conclusion: Structured memory points to: "
+        "The creature learns language in chapter 13."
+    ) in prompt
+    assert "Expected output:" not in prompt
+
+
 def test_llm_client_ollama_mode_returns_response(monkeypatch) -> None:
     client = LLMClient(mode="ollama")
 
@@ -105,7 +154,7 @@ def test_llm_client_ollama_mode_returns_response(monkeypatch) -> None:
 
     def fake_urlopen(http_request, timeout):
         assert http_request.full_url == "http://localhost:11434/api/generate"
-        assert timeout == 30.0
+        assert timeout == 120.0
         payload = json.loads(http_request.data.decode("utf-8"))
         assert payload["model"] == "qwen2.5:3b"
         assert payload["prompt"] == "Prompt Ollama"
@@ -220,6 +269,7 @@ def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
         chroma_dir="data/chroma",
         collection_name="novel_memory",
         use_llm=True,
+        llm_mode="mock",
     )
 
     assert result["draft"]["draft_text"].startswith("[MOCK LLM RESPONSE] ")
