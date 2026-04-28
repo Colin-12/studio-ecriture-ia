@@ -81,6 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="mock",
         help="LLM backend to use when --use-llm is enabled.",
     )
+    run_scene_parser.add_argument(
+        "--story-mode",
+        choices=["existing_novel", "original_story"],
+        default="existing_novel",
+        help="Use existing canon memory or start from an original story mode.",
+    )
 
     return parser
 
@@ -344,6 +350,7 @@ def _run_scene_workflow(
     collection_name: str,
     use_llm: bool = False,
     llm_mode: str = "mock",
+    story_mode: str = "existing_novel",
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -354,9 +361,11 @@ def _run_scene_workflow(
         collection_name=collection_name,
         use_llm=use_llm,
         llm_mode=llm_mode,
+        story_mode=story_mode,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
+    print(f"Story mode: {result['story_mode']}")
     print("Scene brief:")
     print(f"   Goal: {result['scene_brief']['scene_goal']}")
     print(f"   Context: {result['scene_brief']['required_context']}")
@@ -438,6 +447,7 @@ def main(argv: list[str] | None = None) -> int:
             collection_name,
             use_llm=args.use_llm,
             llm_mode=args.llm_mode,
+            story_mode=args.story_mode,
         )
 
     parser.error(f"Unknown command: {args.command}")

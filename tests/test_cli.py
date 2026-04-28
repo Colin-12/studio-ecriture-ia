@@ -51,6 +51,7 @@ def test_build_parser_parses_run_scene_command() -> None:
     assert args.command == "run-scene"
     assert args.scene_idea == "Marie decouvre une lettre cachee"
     assert args.use_llm is False
+    assert args.story_mode == "existing_novel"
 
 
 def test_build_parser_parses_run_scene_with_use_llm() -> None:
@@ -83,6 +84,22 @@ def test_build_parser_parses_run_scene_with_ollama_mode() -> None:
     assert args.scene_idea == "Victor comprend que sa creation lui echappe"
     assert args.use_llm is True
     assert args.llm_mode == "ollama"
+
+
+def test_build_parser_parses_run_scene_with_original_story_mode() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--story-mode",
+            "original_story",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.story_mode == "original_story"
 
 
 def test_build_parser_parses_ingest_command() -> None:

@@ -17,6 +17,7 @@ def run_scene_workflow(
     collection_name: str,
     use_llm: bool = False,
     llm_mode: str = "mock",
+    story_mode: str = "existing_novel",
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
@@ -34,15 +35,29 @@ def run_scene_workflow(
             "devil_advocate": devil_advocate_result,
         }
     )
-    continuity_result = continuity.run(
-        {
+    if story_mode == "existing_novel":
+        continuity_result = continuity.run(
+            {
+                "question": scene_idea,
+                "brief": scene_brief["required_context"],
+                "db_path": db_path,
+                "chroma_dir": chroma_dir,
+                "collection_name": collection_name,
+            }
+        )
+    elif story_mode == "original_story":
+        continuity_result = {
+            "agent": "ContinuityAgent",
             "question": scene_idea,
-            "brief": scene_brief["required_context"],
-            "db_path": db_path,
-            "chroma_dir": chroma_dir,
-            "collection_name": collection_name,
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "Original story mode: no existing canon memory was used.",
         }
-    )
+    else:
+        raise ValueError(f"Unsupported story_mode: {story_mode}")
     stylist_result = stylist.run(
         {
             "scene_brief": scene_brief,
@@ -61,6 +76,7 @@ def run_scene_workflow(
 
     return {
         "scene_idea": scene_idea,
+        "story_mode": story_mode,
         "scene_brief": scene_brief,
         "devil_advocate": devil_advocate_result,
         "visionary": visionary_result,

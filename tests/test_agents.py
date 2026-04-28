@@ -297,6 +297,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "continuity" in result
     assert "draft" in result
     assert "editor_checklist" in result
+    assert result["story_mode"] == "existing_novel"
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True
     assert "draft_text" in result["draft"]
@@ -326,3 +327,34 @@ def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
     )
 
     assert result["draft"]["draft_text"].startswith("[MOCK LLM RESPONSE] ")
+
+
+def test_run_scene_workflow_can_use_original_story_mode(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [{"text": "should not be used", "chapter_number": 1}],
+            "chapters": [1],
+            "scores": [0.1],
+            "sources": ["/tmp/chapter_01.md"],
+            "structured_events": [],
+            "conclusion": "Should not be used.",
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        story_mode="original_story",
+    )
+
+    assert result["story_mode"] == "original_story"
+    assert result["continuity"]["passages"] == []
+    assert result["continuity"]["structured_events"] == []
+    assert (
+        result["continuity"]["conclusion"]
+        == "Original story mode: no existing canon memory was used."
+    )
