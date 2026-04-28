@@ -98,7 +98,15 @@ Exemple avec la requete `the creation of the being` :
 python -m src.app.cli search "the creation of the being"
 ```
 
-### 6. Lancer les tests
+### 6. Interroger le Continuiste simple
+
+Exemple avec la question `where does the creature learn language?` :
+
+```bash
+python -m src.app.cli continuity "where does the creature learn language?"
+```
+
+### 7. Lancer les tests
 
 ```bash
 python -m pytest -q
