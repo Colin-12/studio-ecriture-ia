@@ -24,6 +24,7 @@ def run_scene_workflow(
     pov: str | None = None,
     language: str | None = None,
     max_revision_rounds: int = 1,
+    force_revision: bool = False,
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
@@ -99,14 +100,18 @@ def run_scene_workflow(
     revised_draft = None
     revised_editor = None
     revised_quality_evaluation = None
-    if quality_result["needs_revision"] and max_revision_rounds > 0:
+    should_revise = quality_result["needs_revision"] or force_revision
+    if should_revise and max_revision_rounds > 0:
+        revision_targets = quality_result["revision_targets"] or []
+        if force_revision and not revision_targets:
+            revision_targets = ["general_quality"]
         revised_draft = stylist.run(
             {
                 "scene_brief": scene_brief,
                 "devil_advocate": devil_advocate_result,
                 "visionary": visionary_result,
                 "continuity": continuity_result,
-                "revision_targets": quality_result["revision_targets"],
+                "revision_targets": revision_targets,
                 "editor_notes": editor_result["notes"],
                 "quality_evaluation": quality_result,
             }

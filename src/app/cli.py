@@ -97,6 +97,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Maximum number of simple revision rounds to run.",
     )
+    run_scene_parser.add_argument(
+        "--force-revision",
+        action="store_true",
+        help="Force one bounded revision cycle even if quality evaluation passes.",
+    )
 
     return parser
 
@@ -366,6 +371,7 @@ def _run_scene_workflow(
     pov: str | None = None,
     language: str | None = None,
     max_revision_rounds: int = 1,
+    force_revision: bool = False,
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -382,6 +388,7 @@ def _run_scene_workflow(
         pov=pov,
         language=language,
         max_revision_rounds=max_revision_rounds,
+        force_revision=force_revision,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
@@ -521,6 +528,7 @@ def main(argv: list[str] | None = None) -> int:
             pov=args.pov,
             language=args.language,
             max_revision_rounds=args.max_revision_rounds,
+            force_revision=args.force_revision,
         )
 
     parser.error(f"Unknown command: {args.command}")

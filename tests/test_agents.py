@@ -557,3 +557,88 @@ def test_run_scene_workflow_can_produce_revision(monkeypatch) -> None:
         "Revision focus: narrative_tension, style, reader_potential"
         in result["revised_draft"]["draft_text"]
     )
+
+
+def test_run_scene_workflow_can_force_revision_when_quality_passes(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    monkeypatch.setattr(
+        "src.agents.quality_evaluator_agent.QualityEvaluatorAgent.run",
+        lambda self, input_data: {
+            "agent": self.name,
+            "originality": {"score": 3, "note": "Acceptable."},
+            "narrative_tension": {"score": 3, "note": "Acceptable."},
+            "emotion": {"score": 3, "note": "Acceptable."},
+            "coherence": {"score": 3, "note": "Acceptable."},
+            "style": {"score": 3, "note": "Acceptable."},
+            "reader_potential": {"score": 3, "note": "Acceptable."},
+            "needs_revision": False,
+            "revision_targets": [],
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        force_revision=True,
+    )
+
+    assert result["quality_evaluation"]["needs_revision"] is False
+    assert result["revised_draft"] is not None
+    assert "Revision focus: general_quality" in result["revised_draft"]["draft_text"]
+
+
+def test_run_scene_workflow_respects_zero_revision_rounds(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    monkeypatch.setattr(
+        "src.agents.quality_evaluator_agent.QualityEvaluatorAgent.run",
+        lambda self, input_data: {
+            "agent": self.name,
+            "originality": {"score": 3, "note": "Acceptable."},
+            "narrative_tension": {"score": 3, "note": "Acceptable."},
+            "emotion": {"score": 3, "note": "Acceptable."},
+            "coherence": {"score": 3, "note": "Acceptable."},
+            "style": {"score": 3, "note": "Acceptable."},
+            "reader_potential": {"score": 3, "note": "Acceptable."},
+            "needs_revision": False,
+            "revision_targets": [],
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        force_revision=True,
+        max_revision_rounds=0,
+    )
+
+    assert result["revised_draft"] is None
+    assert result["revised_editor"] is None
+    assert result["revised_quality_evaluation"] is None
