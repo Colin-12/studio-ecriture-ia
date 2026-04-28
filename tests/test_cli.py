@@ -54,6 +54,7 @@ def test_build_parser_parses_run_scene_command() -> None:
     assert args.story_mode == "existing_novel"
     assert args.max_revision_rounds == 1
     assert args.force_revision is False
+    assert args.save_output is False
 
 
 def test_build_parser_parses_run_scene_with_use_llm() -> None:
@@ -127,6 +128,7 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
             "--max-revision-rounds",
             "2",
             "--force-revision",
+            "--save-output",
         ]
     )
 
@@ -140,6 +142,7 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.llm_mode == "mock"
     assert args.max_revision_rounds == 2
     assert args.force_revision is True
+    assert args.save_output is True
 
 
 def test_build_parser_parses_ingest_command() -> None:

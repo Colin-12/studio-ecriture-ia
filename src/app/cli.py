@@ -102,6 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Force one bounded revision cycle even if quality evaluation passes.",
     )
+    run_scene_parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save the scene workflow result as a Markdown file in outputs/.",
+    )
 
     return parser
 
@@ -372,6 +377,7 @@ def _run_scene_workflow(
     language: str | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
+    save_output: bool = False,
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -477,6 +483,12 @@ def _run_scene_workflow(
             entry = result["revised_quality_evaluation"][criterion]
             print(f"   {criterion}: {entry['score']}/5 - {entry['note']}")
 
+    if save_output:
+        from src.app.output_writer import save_scene_output
+
+        output_path = save_scene_output(result)
+        print(f"Saved output: {output_path}")
+
     return 0
 
 
@@ -529,6 +541,7 @@ def main(argv: list[str] | None = None) -> int:
             language=args.language,
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
+            save_output=args.save_output,
         )
 
     parser.error(f"Unknown command: {args.command}")
