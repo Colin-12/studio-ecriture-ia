@@ -112,7 +112,32 @@ Cette commande affiche :
 - les evenements structures pertinents
 - une conclusion courte et deterministe, sans `LLM`
 
-### 7. Lancer les tests
+### 7. Lancer le workflow run-scene
+
+Exemple complet :
+
+```bash
+python -m src.app.cli run-scene "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --force-revision --max-revision-rounds 1
+```
+
+Ce workflow utilise la chaine suivante :
+
+- `SceneArchitect`
+- `DevilAdvocate`
+- `Visionary`
+- `Continuity`
+- `Stylist`
+- `Editor`
+- `QualityEvaluator`
+- boucle de revision
+
+Notes :
+
+- `Ollama` est utilise localement, sans API payante
+- `--story-mode original_story` desactive l'usage d'un canon existant
+- `--max-revision-rounds` borne strictement la revision, donc sans boucle infinie
+
+### 8. Lancer les tests
 
 ```bash
 python -m pytest -q
