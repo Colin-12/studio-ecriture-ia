@@ -314,6 +314,9 @@ def _continuity_check(
             else:
                 print(f"   Chapter {chapter_number} | {event['title']}")
 
+    print("Conclusion:")
+    print(f"   {result['conclusion']}")
+
     return 0
 
 

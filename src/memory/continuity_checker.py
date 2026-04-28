@@ -178,6 +178,28 @@ def answer_with_evidence(
         )
 
     chapters = [passage["chapter_number"] for passage in passages]
+    structured_events = _get_structured_events(query, db_path, chapters)
+
+    if structured_events:
+        main_event = structured_events[0]
+        chapter_number = (
+            main_event["chapter_number"] if main_event["chapter_number"] is not None else "?"
+        )
+        conclusion = (
+            f"Structured memory points to: {main_event['title']} in chapter {chapter_number}."
+        )
+    elif passages:
+        unique_chapters: list[int | None] = []
+        for chapter in chapters:
+            if chapter not in unique_chapters:
+                unique_chapters.append(chapter)
+        chapter_list = ", ".join(
+            str(chapter) if chapter is not None else "?"
+            for chapter in unique_chapters
+        )
+        conclusion = f"Textual evidence was found in chapters: {chapter_list}."
+    else:
+        conclusion = "No evidence found."
 
     return {
         "question": query,
@@ -185,5 +207,6 @@ def answer_with_evidence(
         "chapters": chapters,
         "scores": [passage["score"] for passage in passages],
         "sources": [passage["source_file"] for passage in passages],
-        "structured_events": _get_structured_events(query, db_path, chapters),
+        "structured_events": structured_events,
+        "conclusion": conclusion,
     }

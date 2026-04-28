@@ -49,6 +49,7 @@ def test_answer_with_evidence_returns_expected_structure(monkeypatch) -> None:
     assert result["sources"] == ["/tmp/chapter_12.md", "/tmp/chapter_13.md"]
     assert result["passages"][0]["text"] == "passage one"
     assert result["structured_events"] == []
+    assert result["conclusion"] == "Textual evidence was found in chapters: 12, 13."
 
 
 def test_answer_with_evidence_includes_structured_events(tmp_path, monkeypatch) -> None:
@@ -173,4 +174,8 @@ def test_answer_with_evidence_includes_structured_events(tmp_path, monkeypatch) 
     assert all(
         event["title"] != "Victor pursues the creature"
         for event in result["structured_events"]
+    )
+    assert (
+        result["conclusion"]
+        == "Structured memory points to: The creature learns language in chapter 13."
     )
