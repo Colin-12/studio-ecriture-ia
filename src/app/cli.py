@@ -65,6 +65,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of semantic matches to return.",
     )
 
+    run_scene_parser = subparsers.add_parser(
+        "run-scene",
+        help="Run the minimal deterministic scene workflow.",
+    )
+    run_scene_parser.add_argument("scene_idea", help="Scene idea to prepare.")
+
     return parser
 
 
@@ -320,6 +326,41 @@ def _continuity_check(
     return 0
 
 
+def _run_scene_workflow(
+    scene_idea: str,
+    db_path: str | Path,
+    chroma_dir: str | Path,
+    collection_name: str,
+) -> int:
+    from src.agents.workflow import run_scene_workflow
+
+    result = run_scene_workflow(
+        scene_idea=scene_idea,
+        db_path=str(db_path),
+        chroma_dir=str(chroma_dir),
+        collection_name=collection_name,
+    )
+
+    print(f"Scene idea: {result['scene_idea']}")
+    print("Scene brief:")
+    print(f"   Goal: {result['scene_brief']['scene_goal']}")
+    print(f"   Context: {result['scene_brief']['required_context']}")
+    print(f"   Conflict: {result['scene_brief']['conflict']}")
+    print(f"   Expected output: {result['scene_brief']['expected_output']}")
+
+    print("Continuity:")
+    print(f"   Conclusion: {result['continuity']['conclusion']}")
+
+    print("Editor checklist:")
+    print(f"   has_goal={result['editor_checklist']['has_goal']}")
+    print(f"   has_conflict={result['editor_checklist']['has_conflict']}")
+    print(f"   has_context={result['editor_checklist']['has_context']}")
+    for note in result["editor_checklist"]["notes"]:
+        print(f"   {note}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -353,6 +394,13 @@ def main(argv: list[str] | None = None) -> int:
             collection_name,
             args.query,
             args.n_results,
+        )
+    if args.command == "run-scene":
+        return _run_scene_workflow(
+            args.scene_idea,
+            db_path,
+            chroma_dir,
+            collection_name,
         )
 
     parser.error(f"Unknown command: {args.command}")

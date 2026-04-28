@@ -43,6 +43,15 @@ def test_build_parser_parses_continuity_command() -> None:
     assert args.n_results == 4
 
 
+def test_build_parser_parses_run_scene_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["run-scene", "Marie decouvre une lettre cachee"])
+
+    assert args.command == "run-scene"
+    assert args.scene_idea == "Marie decouvre une lettre cachee"
+
+
 def test_build_parser_parses_ingest_command() -> None:
     parser = build_parser()
 
