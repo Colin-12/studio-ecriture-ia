@@ -33,6 +33,16 @@ def test_build_parser_parses_search_command() -> None:
     assert args.n_results == 3
 
 
+def test_build_parser_parses_continuity_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["continuity", "What does Victor know?", "--n-results", "4"])
+
+    assert args.command == "continuity"
+    assert args.query == "What does Victor know?"
+    assert args.n_results == 4
+
+
 def test_build_parser_parses_ingest_command() -> None:
     parser = build_parser()
 

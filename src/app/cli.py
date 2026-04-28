@@ -53,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of semantic matches to return.",
     )
 
+    continuity_parser = subparsers.add_parser(
+        "continuity",
+        help="Retrieve raw evidence for a continuity question.",
+    )
+    continuity_parser.add_argument("query", help="Continuity question text.")
+    continuity_parser.add_argument(
+        "--n-results",
+        type=int,
+        default=5,
+        help="Number of semantic matches to return.",
+    )
+
     return parser
 
 
@@ -259,6 +271,41 @@ def _search_memory(
     return 0
 
 
+def _continuity_check(
+    db_path: str | Path,
+    chroma_dir: str | Path,
+    collection_name: str,
+    query: str,
+    n_results: int,
+) -> int:
+    from src.memory.continuity_checker import answer_with_evidence
+
+    result = answer_with_evidence(
+        query=query,
+        db_path=db_path,
+        chroma_dir=chroma_dir,
+        collection_name=collection_name,
+        n_results=n_results,
+    )
+
+    print(f"Question: {result['question']}")
+    if not result["passages"]:
+        print("No evidence found.")
+        return 1
+
+    for index, passage in enumerate(result["passages"], start=1):
+        chapter_number = passage["chapter_number"] if passage["chapter_number"] is not None else "?"
+        chapter_title = passage["chapter_title"] or "Untitled"
+        print(f"{index}. Chapter {chapter_number} - {chapter_title}")
+        if passage["score"] is not None:
+            print(f"   Score: {passage['score']}")
+        if passage["source_file"]:
+            print(f"   Source: {passage['source_file']}")
+        print(f"   {passage['text']}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -285,6 +332,14 @@ def main(argv: list[str] | None = None) -> int:
         return _list_events(db_path)
     if args.command == "search":
         return _search_memory(chroma_dir, collection_name, args.query, args.n_results)
+    if args.command == "continuity":
+        return _continuity_check(
+            db_path,
+            chroma_dir,
+            collection_name,
+            args.query,
+            args.n_results,
+        )
 
     parser.error(f"Unknown command: {args.command}")
     return 2
