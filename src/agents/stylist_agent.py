@@ -26,6 +26,10 @@ class StylistAgent(BaseAgent):
             [
                 "Write a short scene draft in 150-250 words.",
                 f"Scene goal: {scene_brief.get('scene_goal', '')}",
+                f"Genre: {scene_brief.get('genre', '')}",
+                f"Tone: {scene_brief.get('tone', '')}",
+                f"POV: {scene_brief.get('pov', '')}",
+                f"Language: {scene_brief.get('language', '')}",
                 f"Conflict: {scene_brief.get('conflict', '')}",
                 f"Continuity conclusion: {continuity.get('conclusion', 'No evidence found.')}",
                 f"Strongest angle: {visionary.get('strongest_angle', '')}",
@@ -43,9 +47,17 @@ class StylistAgent(BaseAgent):
         continuity_conclusion = continuity.get("conclusion", "No evidence found.")
         strongest_angle = visionary.get("strongest_angle", "")
         symbolic_layer = visionary.get("symbolic_layer", "")
+        genre = scene_brief.get("genre", "")
+        tone = scene_brief.get("tone", "")
+        pov = scene_brief.get("pov", "")
+        language = scene_brief.get("language", "")
 
         draft_parts = [
             f"Scene goal: {scene_goal}",
+            f"Genre: {genre}",
+            f"Tone: {tone}",
+            f"POV: {pov}",
+            f"Language: {language}",
             f"Conflict: {conflict}",
             f"Continuity note: {continuity_conclusion}",
             f"Strongest angle: {strongest_angle}",

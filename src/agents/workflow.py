@@ -18,6 +18,10 @@ def run_scene_workflow(
     use_llm: bool = False,
     llm_mode: str = "mock",
     story_mode: str = "existing_novel",
+    genre: str | None = None,
+    tone: str | None = None,
+    pov: str | None = None,
+    language: str | None = None,
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
@@ -27,7 +31,15 @@ def run_scene_workflow(
     stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
     editor = EditorAgent()
 
-    scene_brief = architect.run({"scene_idea": scene_idea})
+    scene_brief = architect.run(
+        {
+            "scene_idea": scene_idea,
+            "genre": genre,
+            "tone": tone,
+            "pov": pov,
+            "language": language,
+        }
+    )
     devil_advocate_result = devil_advocate.run({"scene_brief": scene_brief})
     visionary_result = visionary.run(
         {

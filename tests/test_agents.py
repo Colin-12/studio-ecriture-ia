@@ -22,6 +22,25 @@ def test_scene_architect_agent_returns_dict() -> None:
     assert "conflict" in result
 
 
+def test_scene_architect_agent_includes_narrative_parameters() -> None:
+    agent = SceneArchitectAgent()
+
+    result = agent.run(
+        {
+            "scene_idea": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "genre": "thriller",
+            "tone": "sombre",
+            "pov": "first_person",
+            "language": "fr",
+        }
+    )
+
+    assert result["genre"] == "thriller"
+    assert result["tone"] == "sombre"
+    assert result["pov"] == "first_person"
+    assert result["language"] == "fr"
+
+
 def test_editor_agent_returns_dict() -> None:
     agent = EditorAgent()
 
@@ -107,6 +126,35 @@ def test_stylist_agent_returns_dict() -> None:
     assert "Strongest angle: Center the scene on the consequence of the discovery." in result["draft_text"]
 
 
+def test_stylist_agent_integrates_narrative_parameters() -> None:
+    agent = StylistAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+                "conflict": "The discovery should destabilize the character's sense of self.",
+            },
+            "continuity": {
+                "conclusion": "Original story mode: no existing canon memory was used."
+            },
+            "visionary": {
+                "strongest_angle": "Center the scene on the first memory that stops feeling trustworthy.",
+                "symbolic_layer": "Use glitches and repeated details as motifs.",
+            },
+        }
+    )
+
+    assert "Genre: thriller" in result["draft_text"]
+    assert "Tone: sombre" in result["draft_text"]
+    assert "POV: first_person" in result["draft_text"]
+    assert "Language: fr" in result["draft_text"]
+
+
 def test_llm_client_mock_mode_returns_predictable_text() -> None:
     client = LLMClient(mode="mock")
 
@@ -180,6 +228,10 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
 
     assert "Write a short scene draft in 150-250 words." in prompt
     assert "Scene goal: Marie decouvre une lettre cachee" in prompt
+    assert "Genre: " in prompt
+    assert "Tone: " in prompt
+    assert "POV: " in prompt
+    assert "Language: " in prompt
     assert "Conflict: The discovery should create tension around hidden information." in prompt
     assert (
         "Continuity conclusion: Structured memory points to: "
@@ -358,3 +410,36 @@ def test_run_scene_workflow_can_use_original_story_mode(monkeypatch) -> None:
         result["continuity"]["conclusion"]
         == "Original story mode: no existing canon memory was used."
     )
+
+
+def test_run_scene_workflow_can_propagate_narrative_parameters(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "Original story mode: no existing canon memory was used.",
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        story_mode="original_story",
+        genre="thriller",
+        tone="sombre",
+        pov="first_person",
+        language="fr",
+    )
+
+    assert result["scene_brief"]["genre"] == "thriller"
+    assert result["scene_brief"]["tone"] == "sombre"
+    assert result["scene_brief"]["pov"] == "first_person"
+    assert result["scene_brief"]["language"] == "fr"
+    assert "Genre: thriller" in result["draft"]["draft_text"]

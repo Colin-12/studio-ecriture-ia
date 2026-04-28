@@ -102,6 +102,39 @@ def test_build_parser_parses_run_scene_with_original_story_mode() -> None:
     assert args.story_mode == "original_story"
 
 
+def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--story-mode",
+            "original_story",
+            "--genre",
+            "thriller",
+            "--tone",
+            "sombre",
+            "--pov",
+            "first_person",
+            "--language",
+            "fr",
+            "--use-llm",
+            "--llm-mode",
+            "mock",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.story_mode == "original_story"
+    assert args.genre == "thriller"
+    assert args.tone == "sombre"
+    assert args.pov == "first_person"
+    assert args.language == "fr"
+    assert args.use_llm is True
+    assert args.llm_mode == "mock"
+
+
 def test_build_parser_parses_ingest_command() -> None:
     parser = build_parser()
 

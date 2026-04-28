@@ -87,6 +87,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="existing_novel",
         help="Use existing canon memory or start from an original story mode.",
     )
+    run_scene_parser.add_argument("--genre", help="Narrative genre for the scene.")
+    run_scene_parser.add_argument("--tone", help="Narrative tone for the scene.")
+    run_scene_parser.add_argument("--pov", help="Point of view for the scene.")
+    run_scene_parser.add_argument("--language", help="Draft language for the scene.")
 
     return parser
 
@@ -351,6 +355,10 @@ def _run_scene_workflow(
     use_llm: bool = False,
     llm_mode: str = "mock",
     story_mode: str = "existing_novel",
+    genre: str | None = None,
+    tone: str | None = None,
+    pov: str | None = None,
+    language: str | None = None,
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -362,10 +370,22 @@ def _run_scene_workflow(
         use_llm=use_llm,
         llm_mode=llm_mode,
         story_mode=story_mode,
+        genre=genre,
+        tone=tone,
+        pov=pov,
+        language=language,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
     print(f"Story mode: {result['story_mode']}")
+    if result["scene_brief"].get("genre"):
+        print(f"Genre: {result['scene_brief']['genre']}")
+    if result["scene_brief"].get("tone"):
+        print(f"Tone: {result['scene_brief']['tone']}")
+    if result["scene_brief"].get("pov"):
+        print(f"POV: {result['scene_brief']['pov']}")
+    if result["scene_brief"].get("language"):
+        print(f"Language: {result['scene_brief']['language']}")
     print("Scene brief:")
     print(f"   Goal: {result['scene_brief']['scene_goal']}")
     print(f"   Context: {result['scene_brief']['required_context']}")
@@ -448,6 +468,10 @@ def main(argv: list[str] | None = None) -> int:
             use_llm=args.use_llm,
             llm_mode=args.llm_mode,
             story_mode=args.story_mode,
+            genre=args.genre,
+            tone=args.tone,
+            pov=args.pov,
+            language=args.language,
         )
 
     parser.error(f"Unknown command: {args.command}")
