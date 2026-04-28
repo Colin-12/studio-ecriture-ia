@@ -111,6 +111,7 @@ def run_scene_workflow(
                 "devil_advocate": devil_advocate_result,
                 "visionary": visionary_result,
                 "continuity": continuity_result,
+                "previous_draft": stylist_result["draft_text"],
                 "revision_targets": revision_targets,
                 "editor_notes": editor_result["notes"],
                 "quality_evaluation": quality_result,

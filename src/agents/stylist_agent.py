@@ -54,6 +54,21 @@ class StylistAgent(BaseAgent):
             ]
         )
 
+    def _build_revision_prompt(
+        self,
+        previous_draft: str,
+        revision_targets: list[str],
+    ) -> str:
+        """Build a much shorter prompt for LLM revision calls."""
+        truncated_draft = previous_draft[:1200]
+        return "\n".join(
+            [
+                "Revise this scene in 120-180 words. Keep the same idea, improve only the listed targets.",
+                f"Revision targets: {', '.join(revision_targets)}",
+                f"Previous draft: {truncated_draft}",
+            ]
+        )
+
     def run(self, input_data: dict) -> dict:
         scene_brief = input_data.get("scene_brief") or {}
         continuity = input_data.get("continuity") or {}
@@ -61,6 +76,7 @@ class StylistAgent(BaseAgent):
         revision_targets = input_data.get("revision_targets") or []
         editor_notes = input_data.get("editor_notes") or []
         quality_evaluation = input_data.get("quality_evaluation") or {}
+        previous_draft = input_data.get("previous_draft") or ""
 
         scene_goal = scene_brief.get("scene_goal", "")
         conflict = scene_brief.get("conflict", "")
@@ -91,16 +107,17 @@ class StylistAgent(BaseAgent):
             draft_parts.append(f"Editor notes: {' | '.join(editor_notes)}")
 
         if self.use_llm:
-            draft_text = self.llm_client.generate(
-                self._build_prompt(
-                    scene_brief,
-                    continuity,
-                    visionary,
-                    revision_targets=revision_targets,
-                    editor_notes=editor_notes,
-                    quality_evaluation=quality_evaluation,
-                )
+            prompt = self._build_prompt(
+                scene_brief,
+                continuity,
+                visionary,
+                revision_targets=revision_targets,
+                editor_notes=editor_notes,
+                quality_evaluation=quality_evaluation,
             )
+            if revision_targets and previous_draft:
+                prompt = self._build_revision_prompt(previous_draft, revision_targets)
+            draft_text = self.llm_client.generate(prompt)
             mode_note = "Mock LLM mode was used for this draft."
             if self.llm_mode == "ollama":
                 mode_note = "Ollama LLM mode was used for this draft."
