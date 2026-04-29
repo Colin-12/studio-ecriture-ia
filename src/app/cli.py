@@ -502,6 +502,23 @@ def _run_scene_workflow(
     else:
         print("   revision_targets=none")
 
+    print("Commercial Editor:")
+    print(f"   hook_score={result['commercial_editor']['hook_score']}/5")
+    print(f"   Market angle: {result['commercial_editor']['market_angle']}")
+    print(
+        f"   Title suggestions: "
+        f"{', '.join(result['commercial_editor']['title_suggestions'])}"
+    )
+    print(
+        f"   Format suggestion: {result['commercial_editor']['format_suggestion']}"
+    )
+    print(
+        f"   Publication risk: {result['commercial_editor']['publication_risk']}"
+    )
+    print(
+        f"   Commercial notes: {result['commercial_editor']['commercial_notes']}"
+    )
+
     if result["revised_draft"] is not None:
         print("Revised draft:")
         print(f"   {result['revised_draft']['draft_text']}")

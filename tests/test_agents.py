@@ -3,6 +3,7 @@ import json
 import pytest
 
 from src.agents.beta_reader_agent import BetaReaderAgent
+from src.agents.commercial_editor_agent import CommercialEditorAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.emotion_guardian_agent import EmotionGuardianAgent
@@ -205,6 +206,37 @@ def test_beta_reader_agent_returns_dict() -> None:
     assert "revision_targets" in result
     assert "reduce_exposition" in result["revision_targets"]
     assert "style" in result["revision_targets"]
+
+
+def test_commercial_editor_agent_returns_dict() -> None:
+    agent = CommercialEditorAgent()
+
+    result = agent.run(
+        {
+            "scene_idea": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "scene_brief": {
+                "genre": "thriller",
+                "language": "fr",
+            },
+            "draft_text": "Une scene de revelation tendue ou le personnage comprend qu'on l'a manipule.",
+            "quality_evaluation": {
+                "reader_potential": {"score": 4, "note": "Strong pull."},
+            },
+            "beta_reader": {
+                "would_continue_reading": True,
+            },
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "hook_score" in result
+    assert "market_angle" in result
+    assert "title_suggestions" in result
+    assert "format_suggestion" in result
+    assert "publication_risk" in result
+    assert "commercial_notes" in result
+    assert result["hook_score"] >= 4
+    assert "suspense" in result["market_angle"].lower() or "revelation" in result["market_angle"].lower()
 
 
 def test_stylist_agent_returns_dict() -> None:
@@ -555,6 +587,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "editor_checklist" in result
     assert "quality_evaluation" in result
     assert "beta_reader" in result
+    assert "commercial_editor" in result
     assert "revised_draft" in result
     assert "revised_editor" in result
     assert "revised_quality_evaluation" in result
@@ -564,6 +597,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "draft_text" in result["draft"]
     assert "emotional_core" in result["emotion_guardian"]
     assert "would_continue_reading" in result["beta_reader"]
+    assert "hook_score" in result["commercial_editor"]
 
 
 def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:

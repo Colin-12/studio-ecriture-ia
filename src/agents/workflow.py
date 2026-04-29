@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.agents.beta_reader_agent import BetaReaderAgent
+from src.agents.commercial_editor_agent import CommercialEditorAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.emotion_guardian_agent import EmotionGuardianAgent
@@ -38,6 +39,7 @@ def run_scene_workflow(
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
     beta_reader = BetaReaderAgent()
+    commercial_editor = CommercialEditorAgent()
 
     scene_brief = architect.run(
         {
@@ -115,6 +117,15 @@ def run_scene_workflow(
             "quality_evaluation": quality_result,
         }
     )
+    commercial_editor_result = commercial_editor.run(
+        {
+            "scene_idea": scene_idea,
+            "scene_brief": scene_brief,
+            "draft_text": stylist_result["draft_text"],
+            "quality_evaluation": quality_result,
+            "beta_reader": beta_reader_result,
+        }
+    )
 
     revised_draft = None
     revised_editor = None
@@ -173,6 +184,7 @@ def run_scene_workflow(
         "editor_checklist": editor_result,
         "quality_evaluation": quality_result,
         "beta_reader": beta_reader_result,
+        "commercial_editor": commercial_editor_result,
         "revised_draft": revised_draft,
         "revised_editor": revised_editor,
         "revised_quality_evaluation": revised_quality_evaluation,

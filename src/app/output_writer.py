@@ -55,6 +55,7 @@ def save_scene_output(result: dict, output_dir: str | Path = "outputs") -> Path:
     visionary = result.get("visionary", {})
     continuity = result.get("continuity", {})
     draft = result.get("draft", {})
+    commercial_editor = result.get("commercial_editor", {})
 
     lines = [
         "# Scene Output",
@@ -133,6 +134,21 @@ def save_scene_output(result: dict, output_dir: str | Path = "outputs") -> Path:
         lines.append("")
 
     lines.extend(_format_quality_section("Quality evaluation", result.get("quality_evaluation")))
+
+    if commercial_editor:
+        lines.extend(
+            [
+                "## Commercial Editor",
+                f"- `hook_score`: {commercial_editor.get('hook_score', '')}/5",
+                f"- `market_angle`: {commercial_editor.get('market_angle', '')}",
+                "- `title_suggestions`: "
+                + ", ".join(commercial_editor.get("title_suggestions") or []),
+                f"- `format_suggestion`: {commercial_editor.get('format_suggestion', '')}",
+                f"- `publication_risk`: {commercial_editor.get('publication_risk', '')}",
+                f"- `commercial_notes`: {commercial_editor.get('commercial_notes', '')}",
+                "",
+            ]
+        )
 
     if result.get("revised_draft"):
         lines.extend(

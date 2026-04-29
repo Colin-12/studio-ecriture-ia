@@ -44,6 +44,14 @@ def test_save_scene_output_writes_markdown_file(tmp_path: Path) -> None:
             "needs_revision": False,
             "revision_targets": [],
         },
+        "commercial_editor": {
+            "hook_score": 4,
+            "market_angle": "Suspense / revelation angle.",
+            "title_suggestions": ["Une verite de trop", "La revelation sous pression"],
+            "format_suggestion": "Chapitre de roman ou extrait de soumission.",
+            "publication_risk": "Risque modere si la consequence tarde.",
+            "commercial_notes": "Le crochet fonctionne, mais il faut garder la tension nette.",
+        },
         "revised_draft": {
             "draft_text": "Revision focus: style. Marie listened before breaking the seal.",
         },
@@ -72,5 +80,7 @@ def test_save_scene_output_writes_markdown_file(tmp_path: Path) -> None:
     assert "## Continuity conclusion" in content
     assert "Original story mode: no existing canon memory was used." in content
     assert "## Draft" in content
+    assert "## Commercial Editor" in content
+    assert "Une verite de trop" in content
     assert "## Revised draft" in content
     assert "## Revised quality evaluation" in content

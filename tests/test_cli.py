@@ -205,6 +205,14 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
                 "reader_notes": "reader note",
                 "revision_targets": ["expand_scene"],
             },
+            "commercial_editor": {
+                "hook_score": 4,
+                "market_angle": "angle",
+                "title_suggestions": ["titre 1", "titre 2"],
+                "format_suggestion": "format",
+                "publication_risk": "risk",
+                "commercial_notes": "commercial note",
+            },
             "revised_draft": None,
             "revised_editor": None,
             "revised_quality_evaluation": None,
@@ -225,6 +233,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
     assert "Emotional core: coeur" in output
     assert "Beta Reader:" in output
     assert "Reader notes: reader note" in output
+    assert "Commercial Editor:" in output
+    assert "Commercial notes: commercial note" in output
 
 
 def test_build_parser_parses_ingest_command() -> None:

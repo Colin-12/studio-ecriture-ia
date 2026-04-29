@@ -2,6 +2,7 @@
 
 from .base import BaseAgent
 from .beta_reader_agent import BetaReaderAgent
+from .commercial_editor_agent import CommercialEditorAgent
 from .continuity_agent import ContinuityAgent
 from .devil_advocate_agent import DevilAdvocateAgent
 from .emotion_guardian_agent import EmotionGuardianAgent
@@ -15,6 +16,7 @@ from .workflow import run_scene_workflow
 __all__ = [
     "BaseAgent",
     "BetaReaderAgent",
+    "CommercialEditorAgent",
     "ContinuityAgent",
     "DevilAdvocateAgent",
     "EmotionGuardianAgent",
