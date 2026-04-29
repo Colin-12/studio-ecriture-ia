@@ -3,7 +3,7 @@
 ## Etat actuel
 
 Le projet `Studio d'ecriture IA par agents` est en `Phase 1 MVP`.
-Le projet dispose maintenant d'une base memoire Phase 1 exploitable et d'un premier workflow agentique local pour preparer des scenes.
+Le projet dispose maintenant d'une base memoire Phase 1 exploitable et d'un workflow agentique local pour preparer des scenes.
 
 Le depot est deja pousse sur GitHub et a jour.
 
@@ -17,10 +17,14 @@ Le depot est deja pousse sur GitHub et a jour.
 - conclusion deterministe disponible dans le Continuiste enrichi, sans synthese `LLM`
 - filtrage et ranking des evenements structures ameliores pour reduire les resultats parasites
 - workflow `writer's room` disponible :
-  `SceneArchitect -> DevilAdvocate -> Visionary -> EmotionGuardian -> Continuity -> Stylist/Ollama -> Editor -> QualityEvaluator -> Revision loop`
+  `SceneArchitect -> DevilAdvocate -> Visionary -> EmotionGuardian -> Continuity -> Stylist/Ollama -> Editor -> QualityEvaluator -> BetaReader -> CommercialEditor -> Revision loop -> Output Markdown`
 - `EmotionGuardianAgent` integre au workflow, avec :
   `emotional_core`, `internal_conflict`, `fear_or_desire`, `emotional_risk`, `suggested_emotional_beat`
 - `EmotionGuardianAgent` s'adapte a `genre`, `tone`, `pov` et `language`
+- `BetaReaderAgent` integre au workflow, avec :
+  `confusion_points`, `engagement_points`, `boredom_risks`, `would_continue_reading`, `reader_notes`, `revision_targets`
+- `CommercialEditorAgent` integre au workflow, avec :
+  `hook_score`, `market_angle`, `title_suggestions`, `format_suggestion`, `publication_risk`, `commercial_notes`
 - `story_mode` disponible :
   `existing_novel` ou `original_story`
 - `StylistAgent` peut fonctionner en mode deterministe, en mode `mock`, ou via `Ollama` local
@@ -32,16 +36,17 @@ Le depot est deja pousse sur GitHub et a jour.
 - revision supportee avec :
   `--max-revision-rounds` et `--force-revision`
 - la revision est bornee par `max_revision_rounds`, donc sans boucle infinie
+- `--save-output` sauvegarde les scenes en Markdown dans `outputs/`
 - interface `CLI` disponible pour :
   `ingest`, `index`, `search`, `continuity`, `run-scene`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `54 passed`
+- tests locaux passes : `57 passed`
 
 ## Limites actuelles
 
 - pas d'agents de generation
-- pas de `LLM`
+- pas de `LLM` distant ou payant
 - pas d'extraction automatique de personnages, lieux, evenements ou setups/payoffs depuis le texte
 - les donnees structurees sont encore seedees manuellement
 - les agents restent majoritairement deterministes hors usage explicite de `Ollama`
@@ -55,4 +60,4 @@ Points a verifier en priorite :
 
 - la robustesse du mode `original_story`
 - la qualite des drafts en mode `Ollama`
-- la pertinence de l'evaluation qualite et de la boucle de revision
+- la pertinence de l'evaluation qualite, du retour lecteur et de la boucle de revision

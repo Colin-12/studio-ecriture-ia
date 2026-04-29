@@ -117,7 +117,7 @@ Cette commande affiche :
 Exemple complet :
 
 ```bash
-python -m src.app.cli run-scene "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --force-revision --max-revision-rounds 1
+python -m src.app.cli run-scene "Un homme decouvre que ses souvenirs ont ete modifies par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --force-revision --max-revision-rounds 1 --save-output
 ```
 
 Ce workflow utilise la chaine suivante :
@@ -130,7 +130,10 @@ Ce workflow utilise la chaine suivante :
 - `Stylist`
 - `Editor`
 - `QualityEvaluator`
+- `BetaReader`
+- `CommercialEditor`
 - boucle de revision
+- sauvegarde Markdown optionnelle
 
 `EmotionGuardian` ajoute avant le draft :
 
@@ -140,11 +143,27 @@ Ce workflow utilise la chaine suivante :
 - `emotional_risk`
 - `suggested_emotional_beat`
 
+`BetaReader` ajoute une reaction lecteur simple avec :
+
+- `confusion_points`
+- `engagement_points`
+- `boredom_risks`
+- `would_continue_reading`
+
+`CommercialEditor` ajoute une lecture publication / marche avec :
+
+- `hook_score`
+- `market_angle`
+- `title_suggestions`
+- `format_suggestion`
+- `publication_risk`
+
 Notes :
 
 - `Ollama` est utilise localement, sans API payante
 - `--story-mode original_story` desactive l'usage d'un canon existant
 - `--max-revision-rounds` borne strictement la revision, donc sans boucle infinie
+- `--save-output` sauvegarde le resultat dans `outputs/` au format Markdown
 
 ### 8. Lancer les tests
 
