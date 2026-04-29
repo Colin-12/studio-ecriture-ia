@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.agents.documentalist_agent import DocumentalistAgent
 from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.workflow import run_scene_workflow
 
@@ -24,6 +25,7 @@ def run_story_workflow(
 ) -> dict:
     """Build a simple three-scene story from an original idea."""
     architect = StoryArchitectAgent()
+    documentalist = DocumentalistAgent()
     story_plan = architect.run(
         {
             "story_idea": story_idea,
@@ -70,9 +72,24 @@ def run_story_workflow(
             "moving from first disturbance to immediate consequence."
         )
 
+    story_memory = documentalist.run(
+        {
+            "story_plan": story_plan,
+            "scenes": scenes,
+            "narrative_params": {
+                "genre": genre,
+                "tone": tone,
+                "pov": pov,
+                "language": language,
+                "story_mode": story_mode,
+            },
+        }
+    )
+
     return {
         "story_idea": story_idea,
         "story_plan": story_plan,
         "scenes": scenes,
         "global_summary": global_summary,
+        "story_memory": story_memory,
     }

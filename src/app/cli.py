@@ -660,6 +660,14 @@ def _run_story_workflow(
     print("Global summary:")
     print(f"   {result['global_summary']}")
 
+    if result.get("story_memory"):
+        story_memory = result["story_memory"]
+        print("Story memory:")
+        print(f"   Canon summary: {story_memory['canon_summary']}")
+        print(f"   Characters: {len(story_memory['characters'])}")
+        print(f"   Events: {len(story_memory['events'])}")
+        print(f"   Decisions: {len(story_memory['decisions'])}")
+
     if save_output:
         from src.app.story_output_writer import save_story_output
 

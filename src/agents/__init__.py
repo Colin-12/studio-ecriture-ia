@@ -5,6 +5,7 @@ from .beta_reader_agent import BetaReaderAgent
 from .commercial_editor_agent import CommercialEditorAgent
 from .continuity_agent import ContinuityAgent
 from .devil_advocate_agent import DevilAdvocateAgent
+from .documentalist_agent import DocumentalistAgent
 from .emotion_guardian_agent import EmotionGuardianAgent
 from .editor_agent import EditorAgent
 from .quality_evaluator_agent import QualityEvaluatorAgent
@@ -21,6 +22,7 @@ __all__ = [
     "CommercialEditorAgent",
     "ContinuityAgent",
     "DevilAdvocateAgent",
+    "DocumentalistAgent",
     "EmotionGuardianAgent",
     "EditorAgent",
     "QualityEvaluatorAgent",

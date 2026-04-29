@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from src.agents.documentalist_agent import DocumentalistAgent
 from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.story_workflow import run_story_workflow
 from src.app.story_output_writer import save_story_output
@@ -28,6 +29,63 @@ def test_story_architect_agent_returns_three_scenes() -> None:
     assert result["scene_outline"][2]["scene_role"] == "decision"
     assert result["scene_outline"][0]["turning_point"]
     assert result["scene_outline"][1]["emotional_shift"]
+
+
+def test_documentalist_agent_returns_expected_fields() -> None:
+    agent = DocumentalistAgent()
+
+    result = agent.run(
+        {
+            "story_plan": {
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "main_character": "Character",
+                "central_conflict": "Conflict",
+                "scene_outline": [
+                    {
+                        "scene_number": 1,
+                        "scene_role": "trigger",
+                        "scene_goal": "Goal 1",
+                        "turning_point": "Turning 1",
+                    },
+                    {
+                        "scene_number": 2,
+                        "scene_role": "confrontation",
+                        "scene_goal": "Goal 2",
+                        "turning_point": "Turning 2",
+                    },
+                    {
+                        "scene_number": 3,
+                        "scene_role": "decision",
+                        "scene_goal": "Goal 3",
+                        "turning_point": "Turning 3",
+                    },
+                ],
+            },
+            "scenes": [
+                {"scene_idea": "Dans un appartement, tout vacille."},
+                {"scene_idea": "La rue devient menaçante."},
+                {"scene_idea": "Le bureau ferme sur une décision."},
+            ],
+            "narrative_params": {
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+                "story_mode": "original_story",
+            },
+        }
+    )
+
+    assert "canon_summary" in result
+    assert "characters" in result
+    assert "locations" in result
+    assert "events" in result
+    assert "decisions" in result
+    assert "continuity_notes" in result
+    assert len(result["events"]) == 3
+    assert result["characters"][0]["name"] == "Character"
+    assert len(result["locations"]) >= 1
 
 
 def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> None:
@@ -58,6 +116,8 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert len(result["scenes"]) == 3
     assert result["scenes"][0]["draft"]["draft_text"].startswith("Draft for ")
     assert result["scenes"][0]["story_scene"]["scene_role"] == "trigger"
+    assert "story_memory" in result
+    assert result["story_memory"]["events"]
     assert result["global_summary"]
 
 
@@ -185,6 +245,18 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
             },
         ],
         "global_summary": "Summary",
+        "story_memory": {
+            "canon_summary": "Canon",
+            "characters": [{"name": "Character", "role": "main_character"}],
+            "locations": [],
+            "events": [
+                {"scene_number": 1, "scene_role": "trigger", "scene_goal": "Goal 1", "turning_point": "Turning 1"},
+                {"scene_number": 2, "scene_role": "confrontation", "scene_goal": "Goal 2", "turning_point": "Turning 2"},
+                {"scene_number": 3, "scene_role": "decision", "scene_goal": "Goal 3", "turning_point": "Turning 3"},
+            ],
+            "decisions": [{"story_mode": "original_story"}],
+            "continuity_notes": ["Note 1", "Note 2"],
+        },
     }
 
     story_dir = save_story_output(result, output_dir=tmp_path / "stories")
@@ -200,8 +272,7 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
     assert "[trigger]" in plan_content
     assert "Turning point: Turning 1" in plan_content
     story_memory = json.loads((story_dir / "story_memory.json").read_text(encoding="utf-8"))
-    assert story_memory["title"] == "Recit bref - Test"
-    assert story_memory["premise"] == "Premise"
+    assert story_memory["canon_summary"] == "Canon"
     assert len(story_memory["events"]) == 3
     assert story_memory["events"][0]["scene_role"] == "trigger"
     assert story_memory["decisions"][0]["story_mode"] == "original_story"

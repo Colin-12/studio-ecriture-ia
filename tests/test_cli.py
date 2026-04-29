@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.app.cli import _run_scene_workflow, build_parser, load_settings
+from src.app.cli import _run_scene_workflow, _run_story_workflow, build_parser, load_settings
 
 
 def test_load_settings_reads_yaml_file(tmp_path: Path) -> None:
@@ -283,6 +283,52 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
     assert "Reader notes: reader note" in output
     assert "Commercial Editor:" in output
     assert "Commercial notes: commercial note" in output
+
+
+def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_story_workflow",
+        lambda **kwargs: {
+            "story_plan": {
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "central_conflict": "Conflict",
+            },
+            "scenes": [
+                {
+                    "scene_idea": "Scene 1",
+                    "scene_brief": {"scene_goal": "Goal 1"},
+                    "draft": {"draft_text": "Draft 1"},
+                    "story_scene": {
+                        "scene_number": 1,
+                        "scene_role": "trigger",
+                        "scene_idea": "Scene 1",
+                        "scene_goal": "Goal 1",
+                    },
+                }
+            ],
+            "global_summary": "Summary",
+            "story_memory": {
+                "canon_summary": "Canon summary",
+                "characters": [{"name": "Character"}],
+                "events": [{}, {}, {}],
+                "decisions": [{"story_mode": "original_story"}],
+            },
+        },
+    )
+
+    exit_code = _run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Story memory:" in output
+    assert "Canon summary: Canon summary" in output
+    assert "Events: 3" in output
 
 
 def test_build_parser_parses_ingest_command() -> None:
