@@ -410,6 +410,12 @@ def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
     assert "Ollama LLM mode was used for this draft." in result["style_notes"]
 
 
+def test_stylist_agent_accepts_custom_llm_timeout() -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama", llm_timeout=45.0)
+
+    assert agent.llm_client.timeout == 45.0
+
+
 def test_stylist_agent_uses_short_revision_prompt_in_llm_mode(monkeypatch) -> None:
     agent = StylistAgent(use_llm=True, llm_mode="mock")
     captured = {}
@@ -436,9 +442,10 @@ def test_stylist_agent_uses_short_revision_prompt_in_llm_mode(monkeypatch) -> No
 
     assert result["draft_text"] == "Revised draft"
     assert (
-        "Revise this scene in 120-180 words. Keep the same idea, improve only the listed targets."
+        "Revise this scene in 250-450 words. Keep the same core idea and improve only the listed targets."
         in captured["prompt"]
     )
+    assert "Remove meta phrasing and make the scene more embodied." in captured["prompt"]
     assert "Revision targets: style, reader_potential" in captured["prompt"]
     assert "Scene goal:" not in captured["prompt"]
     assert "Editor notes:" not in captured["prompt"]
@@ -466,7 +473,14 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
         },
     )
 
-    assert "Write a short scene draft in 150-250 words." in prompt
+    assert "Write the scene directly as fiction, not as commentary or explanation." in prompt
+    assert "Write 180-300 words." in prompt
+    assert "Show information through action, perception, dialogue, or inner thought." in prompt
+    assert (
+        "Do not use meta phrases such as 'This scene...', 'The character...', "
+        "'The first sign...', or 'The goal of the scene...'."
+        in prompt
+    )
     assert "Scene goal: Marie decouvre une lettre cachee" in prompt
     assert "Genre: " in prompt
     assert "Tone: " in prompt
@@ -484,6 +498,24 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     assert "Expected output:" not in prompt
 
 
+def test_stylist_agent_builds_french_llm_prompt_with_natural_prose_instruction() -> None:
+    agent = StylistAgent(use_llm=True)
+
+    prompt = agent._build_prompt(
+        {
+            "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "genre": "thriller",
+            "tone": "sombre",
+            "pov": "first_person",
+            "language": "fr",
+            "conflict": "La decouverte doit destabiliser son rapport au reel.",
+        },
+        {"conclusion": "Original story mode: no existing canon memory was used."},
+    )
+
+    assert "Use natural French prose." in prompt
+
+
 def test_stylist_agent_builds_shorter_revision_prompt() -> None:
     agent = StylistAgent(use_llm=True)
 
@@ -494,9 +526,10 @@ def test_stylist_agent_builds_shorter_revision_prompt() -> None:
     )
 
     assert (
-        "Revise this scene in 120-180 words. Keep the same idea, improve only the listed targets."
+        "Revise this scene in 250-450 words. Keep the same core idea and improve only the listed targets."
         in prompt
     )
+    assert "Do not write lines such as 'This scene...', 'The character...', 'The first sign...', or 'The goal of the scene...'." in prompt
     assert "Revision targets: style, reader_potential" in prompt
     assert "Scene goal:" not in prompt
     assert len(prompt.split("Previous draft: ", maxsplit=1)[1]) == 1200
@@ -649,6 +682,52 @@ def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
     )
 
     assert result["draft"]["draft_text"].startswith("[MOCK LLM RESPONSE] ")
+
+
+def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    captured = {"timeout": None}
+
+    def fake_init(self, use_llm=False, llm_mode="mock", llm_timeout=None):
+        captured["timeout"] = llm_timeout
+        self.use_llm = use_llm
+        self.llm_mode = llm_mode
+        self.llm_client = LLMClient(mode=llm_mode)
+
+    monkeypatch.setattr("src.agents.workflow.StylistAgent.__init__", fake_init)
+    monkeypatch.setattr(
+        "src.agents.workflow.StylistAgent.run",
+        lambda self, input_data: {
+            "agent": "StylistAgent",
+            "draft_text": "draft",
+            "style_notes": [],
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        llm_mode="mock",
+        llm_timeout=75.0,
+    )
+
+    assert captured["timeout"] == 75.0
+    assert result["draft"]["draft_text"] == "draft"
 
 
 def test_run_scene_workflow_can_use_original_story_mode(monkeypatch) -> None:

@@ -92,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_scene_parser.add_argument("--pov", help="Point of view for the scene.")
     run_scene_parser.add_argument("--language", help="Draft language for the scene.")
     run_scene_parser.add_argument(
+        "--llm-timeout",
+        type=float,
+        default=None,
+        help="Optional timeout in seconds for local LLM calls.",
+    )
+    run_scene_parser.add_argument(
         "--max-revision-rounds",
         type=int,
         default=1,
@@ -134,6 +140,12 @@ def build_parser() -> argparse.ArgumentParser:
     create_story_parser.add_argument("--tone", help="Narrative tone for the story.")
     create_story_parser.add_argument("--pov", help="Point of view for the story.")
     create_story_parser.add_argument("--language", help="Draft language for the story.")
+    create_story_parser.add_argument(
+        "--llm-timeout",
+        type=float,
+        default=None,
+        help="Optional timeout in seconds for local LLM calls.",
+    )
     create_story_parser.add_argument(
         "--max-revision-rounds",
         type=int,
@@ -418,6 +430,7 @@ def _run_scene_workflow(
     tone: str | None = None,
     pov: str | None = None,
     language: str | None = None,
+    llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     save_output: bool = False,
@@ -436,6 +449,7 @@ def _run_scene_workflow(
         tone=tone,
         pov=pov,
         language=language,
+        llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
     )
@@ -603,6 +617,7 @@ def _run_story_workflow(
     tone: str | None = None,
     pov: str | None = None,
     language: str | None = None,
+    llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     save_output: bool = False,
@@ -621,6 +636,7 @@ def _run_story_workflow(
         language=language,
         use_llm=use_llm,
         llm_mode=llm_mode,
+        llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
     )
@@ -700,6 +716,7 @@ def main(argv: list[str] | None = None) -> int:
             tone=args.tone,
             pov=args.pov,
             language=args.language,
+            llm_timeout=args.llm_timeout,
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
             save_output=args.save_output,
@@ -717,6 +734,7 @@ def main(argv: list[str] | None = None) -> int:
             tone=args.tone,
             pov=args.pov,
             language=args.language,
+            llm_timeout=args.llm_timeout,
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
             save_output=args.save_output,

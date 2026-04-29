@@ -26,6 +26,7 @@ def run_scene_workflow(
     tone: str | None = None,
     pov: str | None = None,
     language: str | None = None,
+    llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
 ) -> dict:
@@ -35,7 +36,7 @@ def run_scene_workflow(
     visionary = VisionaryAgent()
     emotion_guardian = EmotionGuardianAgent()
     continuity = ContinuityAgent()
-    stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
+    stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode, llm_timeout=llm_timeout)
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
     beta_reader = BetaReaderAgent()

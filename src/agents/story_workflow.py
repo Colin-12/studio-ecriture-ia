@@ -18,6 +18,7 @@ def run_story_workflow(
     language: str | None = None,
     use_llm: bool = False,
     llm_mode: str = "mock",
+    llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
 ) -> dict:
@@ -51,6 +52,7 @@ def run_story_workflow(
             tone=tone,
             pov=pov,
             language=language,
+            llm_timeout=llm_timeout,
             max_revision_rounds=max_revision_rounds,
             force_revision=force_revision,
         )

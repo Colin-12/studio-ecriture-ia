@@ -9,11 +9,19 @@ from src.llm.client import LLMClient
 class StylistAgent(BaseAgent):
     """Produce a minimal draft from a scene brief and continuity context."""
 
-    def __init__(self, use_llm: bool = False, llm_mode: str = "mock") -> None:
+    def __init__(
+        self,
+        use_llm: bool = False,
+        llm_mode: str = "mock",
+        llm_timeout: float | None = None,
+    ) -> None:
         super().__init__(name="StylistAgent", role="styling")
         self.use_llm = use_llm
         self.llm_mode = llm_mode
-        self.llm_client = LLMClient(mode=llm_mode)
+        if llm_timeout is None:
+            self.llm_client = LLMClient(mode=llm_mode)
+        else:
+            self.llm_client = LLMClient(mode=llm_mode, timeout=llm_timeout)
 
     def _build_prompt(
         self,
@@ -30,6 +38,20 @@ class StylistAgent(BaseAgent):
         revision_targets = revision_targets or []
         editor_notes = editor_notes or []
         quality_evaluation = quality_evaluation or {}
+        language = (scene_brief.get("language") or "").lower()
+        is_french = language == "fr"
+
+        instruction_lines = [
+            "Write the scene directly as fiction, not as commentary or explanation.",
+            "Write 180-300 words.",
+            "Show information through action, perception, dialogue, or inner thought.",
+            "Respect the requested genre, tone, point of view, and language.",
+            "Do not use meta phrases such as 'This scene...', 'The character...', 'The first sign...', or 'The goal of the scene...'.",
+            "Do not explain the plan of the scene. Write the scene itself.",
+        ]
+        if is_french:
+            instruction_lines.append("Use natural French prose.")
+
         revision_line = ""
         if revision_targets:
             revision_line = "Revise the draft focusing on: " + ", ".join(revision_targets) + "."
@@ -37,7 +59,7 @@ class StylistAgent(BaseAgent):
             [
                 line
                 for line in [
-                    "Write a short scene draft in 150-250 words.",
+                    *instruction_lines,
                     revision_line,
                     f"Scene goal: {scene_brief.get('scene_goal', '')}",
                     f"Genre: {scene_brief.get('genre', '')}",
@@ -67,7 +89,10 @@ class StylistAgent(BaseAgent):
         truncated_draft = previous_draft[:1200]
         return "\n".join(
             [
-                "Revise this scene in 120-180 words. Keep the same idea, improve only the listed targets.",
+                "Revise this scene in 250-450 words. Keep the same core idea and improve only the listed targets.",
+                "Remove meta phrasing and make the scene more embodied.",
+                "Show information through action, perception, dialogue, or inner thought.",
+                "Do not write lines such as 'This scene...', 'The character...', 'The first sign...', or 'The goal of the scene...'.",
                 f"Revision targets: {', '.join(revision_targets)}",
                 f"Previous draft: {truncated_draft}",
             ]

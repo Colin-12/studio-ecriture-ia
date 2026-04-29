@@ -52,6 +52,7 @@ def test_build_parser_parses_run_scene_command() -> None:
     assert args.scene_idea == "Marie decouvre une lettre cachee"
     assert args.use_llm is False
     assert args.story_mode == "existing_novel"
+    assert args.llm_timeout is None
     assert args.max_revision_rounds == 1
     assert args.force_revision is False
     assert args.save_output is False
@@ -122,6 +123,8 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
             "first_person",
             "--language",
             "fr",
+            "--llm-timeout",
+            "90",
             "--use-llm",
             "--llm-mode",
             "mock",
@@ -138,6 +141,7 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.tone == "sombre"
     assert args.pov == "first_person"
     assert args.language == "fr"
+    assert args.llm_timeout == 90.0
     assert args.use_llm is True
     assert args.llm_mode == "mock"
     assert args.max_revision_rounds == 2
@@ -162,6 +166,8 @@ def test_build_parser_parses_create_story_command() -> None:
             "first_person",
             "--language",
             "fr",
+            "--llm-timeout",
+            "75",
             "--use-llm",
             "--llm-mode",
             "mock",
@@ -179,6 +185,7 @@ def test_build_parser_parses_create_story_command() -> None:
     assert args.tone == "sombre"
     assert args.pov == "first_person"
     assert args.language == "fr"
+    assert args.llm_timeout == 75.0
     assert args.use_llm is True
     assert args.llm_mode == "mock"
     assert args.max_revision_rounds == 1

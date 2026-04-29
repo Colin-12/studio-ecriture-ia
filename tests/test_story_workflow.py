@@ -60,6 +60,40 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert result["global_summary"]
 
 
+def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) -> None:
+    captured = {"timeouts": []}
+
+    def fake_run_scene_workflow(**kwargs):
+        captured["timeouts"].append(kwargs["llm_timeout"])
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {"draft_text": "Draft"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        llm_timeout=80.0,
+    )
+
+    assert len(result["scenes"]) == 3
+    assert captured["timeouts"] == [80.0, 80.0, 80.0]
+
+
 def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
     result = {
         "story_plan": {
