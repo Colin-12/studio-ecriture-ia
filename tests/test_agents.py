@@ -101,6 +101,34 @@ def test_visionary_agent_returns_dict() -> None:
     assert "symbolic_layer" in result
 
 
+def test_devil_advocate_and_visionary_use_french_narrative_parameters() -> None:
+    devil_advocate = DevilAdvocateAgent()
+    visionary = VisionaryAgent()
+    scene_brief = {
+        "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        "conflict": "Il doit agir avant de perdre confiance en sa propre memoire.",
+        "genre": "thriller",
+        "tone": "sombre",
+        "pov": "first_person",
+        "language": "fr",
+    }
+
+    devil_result = devil_advocate.run({"scene_brief": scene_brief})
+    visionary_result = visionary.run(
+        {
+            "scene_brief": scene_brief,
+            "devil_advocate": devil_result,
+        }
+    )
+
+    assert any("menace" in risk.lower() or "suspense" in risk.lower() for risk in devil_result["risks"])
+    assert any("voix interieure" in objection.lower() or "perception subjective" in objection.lower() for objection in devil_result["objections"])
+    assert "Ancre la scene dans une menace immediate" in devil_result["revision_advice"]
+    assert any("menace" in alternative.lower() or "urgence" in alternative.lower() for alternative in visionary_result["alternatives"])
+    assert "Centre la scene" in visionary_result["strongest_angle"]
+    assert "perception intime" in visionary_result["symbolic_layer"]
+
+
 def test_quality_evaluator_agent_returns_dict() -> None:
     agent = QualityEvaluatorAgent()
 
@@ -543,6 +571,8 @@ def test_run_scene_workflow_can_propagate_narrative_parameters(monkeypatch) -> N
     assert result["scene_brief"]["pov"] == "first_person"
     assert result["scene_brief"]["language"] == "fr"
     assert "Genre: thriller" in result["draft"]["draft_text"]
+    assert result["devil_advocate"]["risks"]
+    assert result["visionary"]["alternatives"]
 
 
 def test_run_scene_workflow_can_produce_revision(monkeypatch) -> None:
