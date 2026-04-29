@@ -125,11 +125,20 @@ Ce workflow utilise la chaine suivante :
 - `SceneArchitect`
 - `DevilAdvocate`
 - `Visionary`
+- `EmotionGuardian`
 - `Continuity`
 - `Stylist`
 - `Editor`
 - `QualityEvaluator`
 - boucle de revision
+
+`EmotionGuardian` ajoute avant le draft :
+
+- `emotional_core`
+- `internal_conflict`
+- `fear_or_desire`
+- `emotional_risk`
+- `suggested_emotional_beat`
 
 Notes :
 

@@ -17,7 +17,10 @@ Le depot est deja pousse sur GitHub et a jour.
 - conclusion deterministe disponible dans le Continuiste enrichi, sans synthese `LLM`
 - filtrage et ranking des evenements structures ameliores pour reduire les resultats parasites
 - workflow `writer's room` disponible :
-  `SceneArchitect -> DevilAdvocate -> Visionary -> Continuity -> Stylist/Ollama -> Editor -> QualityEvaluator -> Revision loop`
+  `SceneArchitect -> DevilAdvocate -> Visionary -> EmotionGuardian -> Continuity -> Stylist/Ollama -> Editor -> QualityEvaluator -> Revision loop`
+- `EmotionGuardianAgent` integre au workflow, avec :
+  `emotional_core`, `internal_conflict`, `fear_or_desire`, `emotional_risk`, `suggested_emotional_beat`
+- `EmotionGuardianAgent` s'adapte a `genre`, `tone`, `pov` et `language`
 - `story_mode` disponible :
   `existing_novel` ou `original_story`
 - `StylistAgent` peut fonctionner en mode deterministe, en mode `mock`, ou via `Ollama` local
@@ -33,7 +36,7 @@ Le depot est deja pousse sur GitHub et a jour.
   `ingest`, `index`, `search`, `continuity`, `run-scene`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `47 passed`
+- tests locaux passes : `54 passed`
 
 ## Limites actuelles
 
