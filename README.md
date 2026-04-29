@@ -186,6 +186,7 @@ Cette commande :
 - genere chaque scene avec le workflow `run-scene`
 
 Si `--save-output` est utilise, la commande cree un dossier Markdown dans `outputs/stories/`.
+Ce dossier contient aussi un fichier `story_memory.json` avec une memoire simple du recit original.
 
 ## Etat actuel
 

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from src.agents.story_architect_agent import StoryArchitectAgent
@@ -141,6 +142,10 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
                     "required_context": "Context",
                     "conflict": "Conflict",
                     "expected_output": "Output",
+                    "genre": "thriller",
+                    "tone": "sombre",
+                    "pov": "first_person",
+                    "language": "fr",
                 },
                 "devil_advocate": {"risks": [], "objections": [], "revision_advice": ""},
                 "visionary": {"alternatives": [], "strongest_angle": "", "symbolic_layer": ""},
@@ -190,6 +195,13 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
     assert (story_dir / "scene_02.md").exists()
     assert (story_dir / "scene_03.md").exists()
     assert (story_dir / "summary.md").exists()
+    assert (story_dir / "story_memory.json").exists()
     plan_content = (story_dir / "story_plan.md").read_text(encoding="utf-8")
     assert "[trigger]" in plan_content
     assert "Turning point: Turning 1" in plan_content
+    story_memory = json.loads((story_dir / "story_memory.json").read_text(encoding="utf-8"))
+    assert story_memory["title"] == "Recit bref - Test"
+    assert story_memory["premise"] == "Premise"
+    assert len(story_memory["events"]) == 3
+    assert story_memory["events"][0]["scene_role"] == "trigger"
+    assert story_memory["decisions"][0]["story_mode"] == "original_story"
