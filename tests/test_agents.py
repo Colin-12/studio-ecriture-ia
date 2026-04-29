@@ -263,6 +263,8 @@ def test_stylist_agent_returns_dict() -> None:
     )
 
     assert isinstance(result, dict)
+    assert result["stylist_mode"] == "deterministic"
+    assert result["stylist_fallback_reason"] is None
     assert "draft_text" in result
     assert "style_notes" in result
     assert "Marie decouvre une lettre cachee" in result["draft_text"]
@@ -378,6 +380,8 @@ def test_stylist_agent_with_llm_returns_mock_response() -> None:
     )
 
     assert result["draft_text"].startswith("[MOCK LLM RESPONSE] ")
+    assert result["stylist_mode"] == "llm"
+    assert result["stylist_fallback_reason"] is None
     assert "Mock LLM mode was used for this draft." in result["style_notes"]
 
 
@@ -407,13 +411,136 @@ def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
     )
 
     assert result["draft_text"] == "Ollama generated draft"
+    assert result["stylist_mode"] == "llm"
+    assert result["stylist_fallback_reason"] is None
     assert "Ollama LLM mode was used for this draft." in result["style_notes"]
+
+
+def test_stylist_agent_with_french_refusal_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: "Je suis désolé, mais je ne peux pas écrire cette scène.",
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Invalid LLM draft: meta/refusal detected."
+    assert "Scene goal: Marie decouvre une lettre cachee" in result["draft_text"]
+
+
+def test_stylist_agent_with_english_refusal_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: "I am unable to generate the requested scene.",
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Invalid LLM draft: meta/refusal detected."
+    assert "Scene goal: Marie decouvre une lettre cachee" in result["draft_text"]
+
+
+def test_stylist_agent_accepts_simple_narrative_llm_output(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: (
+            "Marie glissa la lettre sous la lampe, lut le nom au bas de la page "
+            "et sentit son souffle se briser."
+        ),
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "llm"
+    assert result["stylist_fallback_reason"] is None
+    assert result["draft_text"].startswith("Marie glissa la lettre")
+
+
+def test_stylist_agent_with_llm_runtime_error_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="mock")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: (_ for _ in ()).throw(RuntimeError("Ollama request timed out.")),
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Ollama request timed out."
+    assert "Scene goal: Marie decouvre une lettre cachee" in result["draft_text"]
+    assert "LLM fallback: Ollama request timed out." in result["style_notes"]
 
 
 def test_stylist_agent_accepts_custom_llm_timeout() -> None:
     agent = StylistAgent(use_llm=True, llm_mode="ollama", llm_timeout=45.0)
 
     assert agent.llm_client.timeout == 45.0
+
+
+def test_stylist_agent_accepts_custom_llm_model() -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama", llm_model="qwen2.5:1.5b")
+
+    assert agent.llm_client.model == "qwen2.5:1.5b"
+
+
+def test_stylist_agent_accepts_custom_llm_num_predict() -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama", llm_num_predict=64)
+
+    assert agent.llm_client.num_predict == 64
 
 
 def test_stylist_agent_uses_short_revision_prompt_in_llm_mode(monkeypatch) -> None:
@@ -441,11 +568,9 @@ def test_stylist_agent_uses_short_revision_prompt_in_llm_mode(monkeypatch) -> No
     )
 
     assert result["draft_text"] == "Revised draft"
-    assert (
-        "Revise this scene in 250-450 words. Keep the same core idea and improve only the listed targets."
-        in captured["prompt"]
-    )
-    assert "Remove meta phrasing and make the scene more embodied." in captured["prompt"]
+    assert "Revise the scene now. Keep the same core idea." in captured["prompt"]
+    assert "Do not explain. Do not refuse. Do not analyze the task." in captured["prompt"]
+    assert "I am unable to generate" in captured["prompt"]
     assert "Revision targets: style, reader_potential" in captured["prompt"]
     assert "Scene goal:" not in captured["prompt"]
     assert "Editor notes:" not in captured["prompt"]
@@ -456,46 +581,39 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
 
     prompt = agent._build_prompt(
         {
-            "scene_goal": "Marie decouvre une lettre cachee",
+            "scene_goal": (
+                "Marie decouvre une lettre cachee "
+                "Goal: Marie ouvre la lettre. "
+                "Conflict: Elle craint ce qu'elle va lire. "
+                "Turning point: Un nom familier apparait."
+            ),
             "conflict": "The discovery should create tension around hidden information.",
             "expected_output": "This field should not be included in the prompt.",
         },
-        {
-            "conclusion": "Structured memory points to: The creature learns language in chapter 13."
-        },
-        {
-            "strongest_angle": "Center the scene on the consequence of the discovery.",
-            "symbolic_layer": "Use shadow and paper as motifs.",
-        },
+        {"conclusion": "Structured memory points to: The creature learns language in chapter 13."},
+        {},
         {
             "emotional_core": "The scene should expose the wound behind the discovery.",
             "suggested_emotional_beat": "Move from contained dread to direct exposure.",
         },
     )
 
-    assert "Write the scene directly as fiction, not as commentary or explanation." in prompt
-    assert "Write 180-300 words." in prompt
-    assert "Show information through action, perception, dialogue, or inner thought." in prompt
-    assert (
-        "Do not use meta phrases such as 'This scene...', 'The character...', "
-        "'The first sign...', or 'The goal of the scene...'."
-        in prompt
-    )
-    assert "Scene goal: Marie decouvre une lettre cachee" in prompt
+    assert "Write the scene now. Do not explain. Do not refuse. Do not analyze the task." in prompt
+    assert "Write 150 to 220 words." in prompt
+    assert "Never write phrases like: I am unable to generate" in prompt
+    assert "Goal: Marie decouvre une lettre cachee | Marie ouvre la lettre." in prompt
+    assert "Conflict: Elle craint ce qu'elle va lire." in prompt
+    assert "Turning point: Un nom familier apparait." in prompt
     assert "Genre: " in prompt
     assert "Tone: " in prompt
     assert "POV: " in prompt
     assert "Language: " in prompt
-    assert "Conflict: The discovery should create tension around hidden information." in prompt
-    assert (
-        "Continuity conclusion: Structured memory points to: "
-        "The creature learns language in chapter 13."
-    ) in prompt
-    assert "Strongest angle: Center the scene on the consequence of the discovery." in prompt
-    assert "Symbolic layer: Use shadow and paper as motifs." in prompt
     assert "Emotional core: The scene should expose the wound behind the discovery." in prompt
-    assert "Suggested emotional beat: Move from contained dread to direct exposure." in prompt
+    assert "Emotional beat: Move from contained dread to direct exposure." in prompt
     assert "Expected output:" not in prompt
+    assert "Continuity conclusion:" not in prompt
+    assert "Strongest angle:" not in prompt
+    assert "Symbolic layer:" not in prompt
 
 
 def test_stylist_agent_builds_french_llm_prompt_with_natural_prose_instruction() -> None:
@@ -513,7 +631,8 @@ def test_stylist_agent_builds_french_llm_prompt_with_natural_prose_instruction()
         {"conclusion": "Original story mode: no existing canon memory was used."},
     )
 
-    assert "Use natural French prose." in prompt
+    assert "Écris la scène en français naturel. Nexplique pas. Ne commente pas la consigne." in prompt
+    assert "Nutilise pas de phrases comme : Je ne peux pas générer" in prompt
 
 
 def test_stylist_agent_builds_shorter_revision_prompt() -> None:
@@ -525,11 +644,9 @@ def test_stylist_agent_builds_shorter_revision_prompt() -> None:
         ["style", "reader_potential"],
     )
 
-    assert (
-        "Revise this scene in 250-450 words. Keep the same core idea and improve only the listed targets."
-        in prompt
-    )
-    assert "Do not write lines such as 'This scene...', 'The character...', 'The first sign...', or 'The goal of the scene...'." in prompt
+    assert "Revise the scene now. Keep the same core idea." in prompt
+    assert "Do not explain. Do not refuse. Do not analyze the task." in prompt
+    assert "I am unable to generate" in prompt
     assert "Revision targets: style, reader_potential" in prompt
     assert "Scene goal:" not in prompt
     assert len(prompt.split("Previous draft: ", maxsplit=1)[1]) == 1200
@@ -555,6 +672,59 @@ def test_llm_client_ollama_mode_returns_response(monkeypatch) -> None:
         assert payload["model"] == "qwen2.5:3b"
         assert payload["prompt"] == "Prompt Ollama"
         assert payload["stream"] is False
+        return FakeResponse()
+
+    monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
+
+    result = client.generate("Prompt Ollama")
+
+    assert result == "Ollama reply"
+
+
+def test_llm_client_ollama_mode_uses_custom_model_in_payload(monkeypatch) -> None:
+    client = LLMClient(mode="ollama", model="qwen2.5:1.5b")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "Ollama reply"}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        payload = json.loads(http_request.data.decode("utf-8"))
+        assert payload["model"] == "qwen2.5:1.5b"
+        assert payload["prompt"] == "Prompt Ollama"
+        return FakeResponse()
+
+    monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
+
+    result = client.generate("Prompt Ollama")
+
+    assert result == "Ollama reply"
+
+
+def test_llm_client_ollama_mode_includes_num_predict_when_provided(monkeypatch) -> None:
+    client = LLMClient(mode="ollama", num_predict=64)
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "Ollama reply"}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        payload = json.loads(http_request.data.decode("utf-8"))
+        assert payload["model"] == "qwen2.5:3b"
+        assert payload["stream"] is False
+        assert payload["options"]["num_predict"] == 64
         return FakeResponse()
 
     monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
@@ -682,6 +852,7 @@ def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
     )
 
     assert result["draft"]["draft_text"].startswith("[MOCK LLM RESPONSE] ")
+    assert result["draft"]["stylist_mode"] == "llm"
 
 
 def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
@@ -698,9 +869,26 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         },
     )
 
-    captured = {"timeout": None}
+    captured = {
+        "use_llm": None,
+        "llm_mode": None,
+        "llm_model": None,
+        "llm_num_predict": None,
+        "timeout": None,
+    }
 
-    def fake_init(self, use_llm=False, llm_mode="mock", llm_timeout=None):
+    def fake_init(
+        self,
+        use_llm=False,
+        llm_mode="mock",
+        llm_timeout=None,
+        llm_model=None,
+        llm_num_predict=None,
+    ):
+        captured["use_llm"] = use_llm
+        captured["llm_mode"] = llm_mode
+        captured["llm_model"] = llm_model
+        captured["llm_num_predict"] = llm_num_predict
         captured["timeout"] = llm_timeout
         self.use_llm = use_llm
         self.llm_mode = llm_mode
@@ -711,6 +899,8 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         "src.agents.workflow.StylistAgent.run",
         lambda self, input_data: {
             "agent": "StylistAgent",
+            "stylist_mode": "llm",
+            "stylist_fallback_reason": None,
             "draft_text": "draft",
             "style_notes": [],
         },
@@ -723,11 +913,50 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         collection_name="novel_memory",
         use_llm=True,
         llm_mode="mock",
+        llm_model="qwen2.5:1.5b",
+        llm_num_predict=64,
         llm_timeout=75.0,
     )
 
+    assert captured["use_llm"] is True
+    assert captured["llm_mode"] == "mock"
+    assert captured["llm_model"] == "qwen2.5:1.5b"
+    assert captured["llm_num_predict"] == 64
     assert captured["timeout"] == 75.0
     assert result["draft"]["draft_text"] == "draft"
+
+
+def test_run_scene_workflow_does_not_crash_when_stylist_falls_back(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    monkeypatch.setattr(
+        "src.agents.stylist_agent.LLMClient.generate",
+        lambda self, prompt: (_ for _ in ()).throw(RuntimeError("Ollama request timed out.")),
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        llm_mode="mock",
+    )
+
+    assert result["draft"]["stylist_mode"] == "deterministic_fallback"
+    assert result["draft"]["stylist_fallback_reason"] == "Ollama request timed out."
+    assert "Scene goal: Marie decouvre une lettre cachee" in result["draft"]["draft_text"]
 
 
 def test_run_scene_workflow_can_use_original_story_mode(monkeypatch) -> None:
