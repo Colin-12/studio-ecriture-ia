@@ -24,6 +24,21 @@ class StylistAgent(BaseAgent):
         "l'objectif de la scene",
         "cette scène",
         "cette scene",
+        "scene 150",
+        "scène 150",
+        "150 à 220 mots",
+        "150-220 words",
+        "incident déclencheur",
+        "incident declencheur",
+        "objectif de scène",
+        "objectif de scene",
+        "scene goal",
+        "story goal",
+        "draft:",
+        "voici la scène",
+        "voici la scene",
+        "voici une scène",
+        "voici une scene",
     ]
 
     def __init__(
@@ -88,9 +103,20 @@ class StylistAgent(BaseAgent):
                 line
                 for line in [
                     *instruction_lines,
+                    "Do not contradict these story facts.",
+                    f"Protagonist: {scene_brief.get('protagonist', '')}",
+                    f"Core mystery: {scene_brief.get('core_mystery', '')}",
+                    f"Central evidence: {scene_brief.get('central_evidence', '')}",
+                    f"Main threat: {scene_brief.get('main_threat', '')}",
+                    "Forbidden inventions: "
+                    + " | ".join(scene_brief.get("forbidden_inventions", [])),
+                    f"Setting: {scene_brief.get('setting', '')}",
                     f"Goal: {scene_goal}",
+                    f"Concrete action: {scene_brief.get('concrete_action', '')}",
                     f"Conflict: {conflict}",
+                    f"Obstacle: {scene_brief.get('obstacle', '')}",
                     f"Turning point: {turning_point}",
+                    f"Immediate stakes: {scene_brief.get('immediate_stakes', '')}",
                     f"Emotional core: {emotion_guardian.get('emotional_core', '')}",
                     f"Emotional beat: {emotion_guardian.get('suggested_emotional_beat', '')}",
                     f"Genre: {scene_brief.get('genre', '')}",
@@ -122,6 +148,10 @@ class StylistAgent(BaseAgent):
     def _is_invalid_llm_draft(self, text: str) -> bool:
         normalized_text = (text or "").strip().lower()
         if not normalized_text:
+            return True
+        if normalized_text.startswith("**scene") or normalized_text.startswith("**scène"):
+            return True
+        if len(normalized_text.split()) < 60:
             return True
         return any(marker in normalized_text for marker in self._INVALID_LLM_MARKERS)
 
@@ -170,9 +200,17 @@ class StylistAgent(BaseAgent):
 
     def _build_deterministic_draft(
         self,
+        protagonist: str,
+        core_mystery: str,
+        central_evidence: str,
+        main_threat: str,
+        setting: str,
         scene_goal: str,
+        concrete_action: str,
         conflict: str,
+        obstacle: str,
         turning_point: str,
+        immediate_stakes: str,
         continuity_conclusion: str,
         strongest_angle: str,
         symbolic_layer: str,
@@ -189,13 +227,21 @@ class StylistAgent(BaseAgent):
     ) -> dict:
         revision_focus = ", ".join(revision_targets)
         draft_parts = [
+            f"Protagonist: {protagonist}",
+            f"Core mystery: {core_mystery}",
+            f"Central evidence: {central_evidence}",
+            f"Main threat: {main_threat}",
+            f"Setting: {setting}",
             f"Scene goal: {scene_goal}",
             f"Genre: {genre}",
             f"Tone: {tone}",
             f"POV: {pov}",
             f"Language: {language}",
+            f"Concrete action: {concrete_action}",
             f"Conflict: {conflict}",
+            f"Obstacle: {obstacle}",
             f"Turning point: {turning_point}",
+            f"Immediate stakes: {immediate_stakes}",
             f"Continuity note: {continuity_conclusion}",
             f"Strongest angle: {strongest_angle}",
             f"Symbolic layer: {symbolic_layer}",
@@ -245,6 +291,14 @@ class StylistAgent(BaseAgent):
         symbolic_layer = visionary.get("symbolic_layer", "")
         emotional_core = emotion_guardian.get("emotional_core", "")
         suggested_emotional_beat = emotion_guardian.get("suggested_emotional_beat", "")
+        protagonist = scene_brief.get("protagonist", "")
+        core_mystery = scene_brief.get("core_mystery", "")
+        central_evidence = scene_brief.get("central_evidence", "")
+        main_threat = scene_brief.get("main_threat", "")
+        setting = scene_brief.get("setting", "")
+        concrete_action = scene_brief.get("concrete_action", "")
+        obstacle = scene_brief.get("obstacle", "")
+        immediate_stakes = scene_brief.get("immediate_stakes", "")
         genre = scene_brief.get("genre", "")
         tone = scene_brief.get("tone", "")
         pov = scene_brief.get("pov", "")
@@ -266,9 +320,17 @@ class StylistAgent(BaseAgent):
                 draft_text = self.llm_client.generate(prompt)
             except Exception as exc:
                 return self._build_deterministic_draft(
+                    protagonist=protagonist,
+                    core_mystery=core_mystery,
+                    central_evidence=central_evidence,
+                    main_threat=main_threat,
+                    setting=setting,
                     scene_goal=scene_goal,
+                    concrete_action=concrete_action,
                     conflict=conflict,
+                    obstacle=obstacle,
                     turning_point=turning_point,
+                    immediate_stakes=immediate_stakes,
                     continuity_conclusion=continuity_conclusion,
                     strongest_angle=strongest_angle,
                     symbolic_layer=symbolic_layer,
@@ -285,9 +347,17 @@ class StylistAgent(BaseAgent):
                 )
             if self.llm_mode != "mock" and self._is_invalid_llm_draft(draft_text):
                 return self._build_deterministic_draft(
+                    protagonist=protagonist,
+                    core_mystery=core_mystery,
+                    central_evidence=central_evidence,
+                    main_threat=main_threat,
+                    setting=setting,
                     scene_goal=scene_goal,
+                    concrete_action=concrete_action,
                     conflict=conflict,
+                    obstacle=obstacle,
                     turning_point=turning_point,
+                    immediate_stakes=immediate_stakes,
                     continuity_conclusion=continuity_conclusion,
                     strongest_angle=strongest_angle,
                     symbolic_layer=symbolic_layer,
@@ -318,9 +388,17 @@ class StylistAgent(BaseAgent):
             }
 
         return self._build_deterministic_draft(
+            protagonist=protagonist,
+            core_mystery=core_mystery,
+            central_evidence=central_evidence,
+            main_threat=main_threat,
+            setting=setting,
             scene_goal=scene_goal,
+            concrete_action=concrete_action,
             conflict=conflict,
+            obstacle=obstacle,
             turning_point=turning_point,
+            immediate_stakes=immediate_stakes,
             continuity_conclusion=continuity_conclusion,
             strongest_angle=strongest_angle,
             symbolic_layer=symbolic_layer,

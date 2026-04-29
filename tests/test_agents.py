@@ -387,11 +387,17 @@ def test_stylist_agent_with_llm_returns_mock_response() -> None:
 
 def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
     agent = StylistAgent(use_llm=True, llm_mode="ollama")
+    narrative_draft = (
+        "Victor referma la porte du laboratoire avec des doigts si raides qu'il crut entendre ses os craquer. "
+        "Sur la table, les instruments luisaient encore, mais quelque chose avait changé dans l'air, comme si la pièce "
+        "retenait un souffle étranger. Il aperçut une trace humide près de la fenêtre, puis une autre, et son ventre se "
+        "serra lorsqu'il comprit qu'il n'était plus seul avec son triomphe."
+    )
 
     monkeypatch.setattr(
         agent.llm_client,
         "generate",
-        lambda prompt: "Ollama generated draft",
+        lambda prompt: narrative_draft,
     )
 
     result = agent.run(
@@ -410,7 +416,7 @@ def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
         }
     )
 
-    assert result["draft_text"] == "Ollama generated draft"
+    assert result["draft_text"] == narrative_draft
     assert result["stylist_mode"] == "llm"
     assert result["stylist_fallback_reason"] is None
     assert "Ollama LLM mode was used for this draft." in result["style_notes"]
@@ -468,6 +474,84 @@ def test_stylist_agent_with_english_refusal_uses_deterministic_fallback(monkeypa
     assert "Scene goal: Marie decouvre une lettre cachee" in result["draft_text"]
 
 
+def test_stylist_agent_with_instruction_like_title_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: (
+            "**Scene 150 à 220 mots**\n"
+            "Un homme nommé Paul avait découvert que quelque chose clochait."
+        ),
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+                "conflict": "The discovery should destabilize him.",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Invalid LLM draft: meta/refusal detected."
+
+
+def test_stylist_agent_with_instructional_phrase_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: (
+            "L'incident déclencheur arrive quand un homme comprend que sa mémoire a été manipulée "
+            "et que l'objectif de scène est de montrer sa peur."
+        ),
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+                "conflict": "The discovery should destabilize him.",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Invalid LLM draft: meta/refusal detected."
+
+
+def test_stylist_agent_with_too_short_output_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: "Marie trembla. La lettre tomba. Elle recula sans comprendre.",
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "language": "fr",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert result["stylist_mode"] == "deterministic_fallback"
+    assert result["stylist_fallback_reason"] == "Invalid LLM draft: meta/refusal detected."
+
+
 def test_stylist_agent_accepts_simple_narrative_llm_output(monkeypatch) -> None:
     agent = StylistAgent(use_llm=True, llm_mode="ollama")
 
@@ -475,8 +559,11 @@ def test_stylist_agent_accepts_simple_narrative_llm_output(monkeypatch) -> None:
         agent.llm_client,
         "generate",
         lambda prompt: (
-            "Marie glissa la lettre sous la lampe, lut le nom au bas de la page "
-            "et sentit son souffle se briser."
+            "Marie glissa la lettre sous la lampe, lut le nom au bas de la page et sentit son souffle se briser. "
+            "Le papier tremblait entre ses doigts tandis que la pluie cognait aux vitres. "
+            "Elle relut la signature, chercha un mensonge dans l'encre, puis recula quand un souvenir précis, "
+            "qu'elle croyait enterré, remonta d'un coup. Dans le couloir, le plancher craqua. "
+            "Marie replia la feuille contre sa poitrine, consciente que quelqu'un savait déjà qu'elle avait trouvé la lettre."
         ),
     )
 
@@ -588,6 +675,18 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
                 "Turning point: Un nom familier apparait."
             ),
             "conflict": "The discovery should create tension around hidden information.",
+            "protagonist": "Marie",
+            "core_mystery": "Les souvenirs de Marie ont ete modifies.",
+            "central_evidence": "Une lettre contredit un souvenir intime.",
+            "main_threat": "Elle risque de perdre sa seule preuve.",
+            "forbidden_inventions": [
+                "Ne pas changer le sujet principal.",
+                "Ne pas remplacer Marie.",
+            ],
+            "setting": "Appartement sombre",
+            "concrete_action": "Elle déplie la lettre sous une lampe.",
+            "obstacle": "Un bruit dans le couloir la coupe dans son geste.",
+            "immediate_stakes": "Perdre la seule preuve avant de comprendre.",
             "expected_output": "This field should not be included in the prompt.",
         },
         {"conclusion": "Structured memory points to: The creature learns language in chapter 13."},
@@ -599,11 +698,21 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     )
 
     assert "Write the scene now. Do not explain. Do not refuse. Do not analyze the task." in prompt
+    assert "Do not contradict these story facts." in prompt
     assert "Write 150 to 220 words." in prompt
     assert "Never write phrases like: I am unable to generate" in prompt
+    assert "Protagonist: Marie" in prompt
+    assert "Core mystery: Les souvenirs de Marie ont ete modifies." in prompt
+    assert "Central evidence: Une lettre contredit un souvenir intime." in prompt
+    assert "Main threat: Elle risque de perdre sa seule preuve." in prompt
+    assert "Forbidden inventions: Ne pas changer le sujet principal. | Ne pas remplacer Marie." in prompt
+    assert "Setting: Appartement sombre" in prompt
     assert "Goal: Marie decouvre une lettre cachee | Marie ouvre la lettre." in prompt
+    assert "Concrete action: Elle déplie la lettre sous une lampe." in prompt
     assert "Conflict: Elle craint ce qu'elle va lire." in prompt
+    assert "Obstacle: Un bruit dans le couloir la coupe dans son geste." in prompt
     assert "Turning point: Un nom familier apparait." in prompt
+    assert "Immediate stakes: Perdre la seule preuve avant de comprendre." in prompt
     assert "Genre: " in prompt
     assert "Tone: " in prompt
     assert "POV: " in prompt

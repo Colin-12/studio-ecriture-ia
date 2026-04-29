@@ -24,6 +24,7 @@ def run_scene_workflow(
     llm_model: str | None = None,
     llm_num_predict: int | None = None,
     story_mode: str = "existing_novel",
+    scene_context: dict | None = None,
     genre: str | None = None,
     tone: str | None = None,
     pov: str | None = None,
@@ -59,6 +60,8 @@ def run_scene_workflow(
             "language": language,
         }
     )
+    if scene_context:
+        scene_brief.update(scene_context)
     devil_advocate_result = devil_advocate.run({"scene_brief": scene_brief})
     visionary_result = visionary.run(
         {

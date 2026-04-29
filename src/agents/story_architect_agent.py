@@ -100,7 +100,11 @@ class StoryArchitectAgent(BaseAgent):
             "Create a short story plan with exactly these top-level fields:",
             "title, premise, main_character, central_conflict, target_reader_effect, scene_outline.",
             "scene_outline must be a list of exactly 3 scenes.",
-            "Each scene must contain: scene_number, scene_role, scene_idea, scene_goal, conflict, turning_point, emotional_shift.",
+            (
+                "Each scene must contain: scene_number, scene_role, scene_idea, scene_goal, "
+                "conflict, turning_point, emotional_shift, protagonist, setting, concrete_action, "
+                "obstacle, immediate_stakes."
+            ),
             "scene_role values must be: trigger, confrontation, decision.",
             f"Story idea: {story_idea}",
             f"Genre: {genre or ''}",
@@ -121,10 +125,16 @@ class StoryArchitectAgent(BaseAgent):
     ) -> dict:
         is_french = language == "fr"
         title = self._build_title(story_idea=story_idea, language=language)
+        normalized_idea = self._normalize_text(story_idea)
+        is_memory_ai_story = (
+            ("memoire" in normalized_idea or "souvenir" in normalized_idea or "memory" in normalized_idea)
+            and ("ia" in normalized_idea or "artificial intelligence" in normalized_idea or "ai" in normalized_idea)
+        )
 
         if is_french:
             premise = f"Un recit en trois scenes construit autour de : {story_idea}"
-            main_character = "Un protagoniste confronte a une rupture de repere"
+            protagonist = "Thomas" if is_memory_ai_story else "Le protagoniste"
+            main_character = f"{protagonist}, un homme confronte a une rupture de repere"
             central_conflict = "Le personnage doit agir avant que la situation ne devienne irreversible."
             target_reader_effect = "Susciter curiosite, tension et envie de poursuivre."
             scene_outline = [
@@ -136,6 +146,11 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "Le personnage hesite entre ignorer l'anomalie ou reconnaitre qu'un danger vient d'entrer dans sa vie.",
                     "turning_point": "Une preuve concrete oblige le personnage a prendre la menace au serieux.",
                     "emotional_shift": "Du doute ordinaire vers une inquietude personnelle.",
+                    "protagonist": protagonist,
+                    "setting": "Son appartement encore en desordre, a la tombée du jour.",
+                    "concrete_action": "Il remarque une preuve physique qui contredit un souvenir qu'il croyait certain.",
+                    "obstacle": "Tout semble presque normal autour de lui, ce qui le pousse à douter de lui-même.",
+                    "immediate_stakes": "S'il ignore cette contradiction, il risque de perdre sa seule prise sur ce qui est vrai.",
                 },
                 {
                     "scene_number": 2,
@@ -145,6 +160,11 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "Chaque tentative de verification rend la situation plus risquee ou plus instable.",
                     "turning_point": "La verification revele que le probleme est plus vaste ou plus intime que prevu.",
                     "emotional_shift": "De l'inquietude a une tension lucide.",
+                    "protagonist": protagonist,
+                    "setting": "Une rue froide puis un écran éclairant une archive ou un ancien message.",
+                    "concrete_action": "Il vérifie une photo, une vidéo, un message ou une archive pour comparer ses souvenirs à une trace extérieure.",
+                    "obstacle": "La preuve disparaît, change sous ses yeux ou contredit brutalement la version d'un proche.",
+                    "immediate_stakes": "Il peut perdre la seule preuve fiable de son identité avant de comprendre qui manipule sa mémoire.",
                 },
                 {
                     "scene_number": 3,
@@ -154,11 +174,17 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "Agir protege une part de verite mais coute une forme de securite ou d'illusion.",
                     "turning_point": "Le personnage choisit une ligne d'action qui change sa situation des maintenant.",
                     "emotional_shift": "De la tension a une resolution couteuse.",
+                    "protagonist": protagonist,
+                    "setting": "Seul devant la preuve, dans un lieu clos où personne ne peut décider à sa place.",
+                    "concrete_action": "Il choisit de conserver, copier ou détruire la preuve qui peut confirmer son identité.",
+                    "obstacle": "Garder la preuve l'expose immédiatement ; la détruire le laisse sans certitude.",
+                    "immediate_stakes": "Sa décision peut lui coûter la dernière version fiable de lui-même.",
                 },
             ]
         else:
             premise = f"A three-scene short narrative built around: {story_idea}"
-            main_character = "A protagonist forced to confront a destabilizing break in certainty"
+            protagonist = "Thomas" if is_memory_ai_story else "The protagonist"
+            main_character = f"{protagonist}, a protagonist forced to confront a destabilizing break in certainty"
             central_conflict = "The character must act before the situation becomes irreversible."
             target_reader_effect = "Create curiosity, tension, and momentum."
             scene_outline = [
@@ -170,6 +196,11 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "The protagonist hesitates between dismissing the anomaly and admitting that danger has entered their life.",
                     "turning_point": "A concrete proof forces the protagonist to take the threat seriously.",
                     "emotional_shift": "From ordinary doubt to personal unease.",
+                    "protagonist": protagonist,
+                    "setting": "His apartment at dusk, with familiar objects suddenly feeling unreliable.",
+                    "concrete_action": "He notices a physical piece of evidence that contradicts a memory he trusted.",
+                    "obstacle": "Everything else looks normal, which makes him doubt his own perception.",
+                    "immediate_stakes": "If he ignores the contradiction, he may lose his only grip on what is real.",
                 },
                 {
                     "scene_number": 2,
@@ -179,6 +210,11 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "Every attempt to verify the truth makes the situation riskier or more unstable.",
                     "turning_point": "The verification reveals that the problem is broader or more intimate than expected.",
                     "emotional_shift": "From unease to lucid tension.",
+                    "protagonist": protagonist,
+                    "setting": "A cold street and the glow of a photo, video, message, or archived file.",
+                    "concrete_action": "He checks a photo, a video, a message, or an archive against his memory.",
+                    "obstacle": "The evidence disappears, changes, or directly contradicts someone close to him.",
+                    "immediate_stakes": "He may lose the only reliable proof of his identity before he understands the manipulation.",
                 },
                 {
                     "scene_number": 3,
@@ -188,6 +224,11 @@ class StoryArchitectAgent(BaseAgent):
                     "conflict": "Acting may protect one truth but costs a form of safety or illusion.",
                     "turning_point": "The protagonist chooses a course of action that changes the situation immediately.",
                     "emotional_shift": "From tension to costly resolve.",
+                    "protagonist": protagonist,
+                    "setting": "Alone with the evidence in a closed space where no one else can decide for him.",
+                    "concrete_action": "He chooses whether to keep, copy, or destroy the proof that could confirm who he is.",
+                    "obstacle": "Keeping the proof exposes him at once; destroying it leaves him with no certainty.",
+                    "immediate_stakes": "His choice may cost him the last reliable version of himself.",
                 },
             ]
 
@@ -246,6 +287,11 @@ class StoryArchitectAgent(BaseAgent):
             "conflict",
             "turning_point",
             "emotional_shift",
+            "protagonist",
+            "setting",
+            "concrete_action",
+            "obstacle",
+            "immediate_stakes",
         }
 
         for index, scene in enumerate(scene_outline, start=1):

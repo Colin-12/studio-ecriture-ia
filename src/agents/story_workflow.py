@@ -17,6 +17,45 @@ def _build_global_summary(language: str | None) -> str:
     return "The story is organized in three scenes: trigger, confrontation, and final decision."
 
 
+def _build_story_context(
+    story_idea: str,
+    story_plan: dict,
+    language: str | None,
+) -> dict:
+    normalized_language = (language or "").lower()
+    normalized_idea = (story_idea or "").lower()
+    protagonist = story_plan.get("scene_outline", [{}])[0].get("protagonist") or story_plan.get(
+        "main_character",
+        "The protagonist",
+    )
+
+    if normalized_language == "fr" and "souvenir" in normalized_idea and "ia" in normalized_idea:
+        return {
+            "protagonist": "Thomas",
+            "core_mystery": "Les souvenirs de Thomas ont ete modifies par une IA.",
+            "central_evidence": "Une archive, une photo ou un message contredit un souvenir intime.",
+            "main_threat": "Thomas risque de perdre la seule preuve fiable de son identite.",
+            "forbidden_inventions": [
+                "Ne pas changer le sujet principal memoire/IA.",
+                "Ne pas introduire une nouvelle identite ou un nouveau traumatisme sans lien avec les souvenirs.",
+                "Ne pas remplacer Thomas par un autre protagoniste.",
+                "Ne pas inventer une preuve sans lien avec la memoire modifiee.",
+            ],
+        }
+
+    return {
+        "protagonist": protagonist,
+        "core_mystery": story_plan.get("central_conflict", ""),
+        "central_evidence": "A concrete trace must challenge what the protagonist believes is true.",
+        "main_threat": "The protagonist may lose the only reliable proof before understanding the truth.",
+        "forbidden_inventions": [
+            "Do not change the main story subject.",
+            "Do not replace the protagonist.",
+            "Do not invent evidence unrelated to the central mystery.",
+        ],
+    }
+
+
 def run_story_workflow(
     story_idea: str,
     db_path: str,
@@ -54,9 +93,26 @@ def run_story_workflow(
             "language": language,
         }
     )
+    story_context = _build_story_context(
+        story_idea=story_idea,
+        story_plan=story_plan,
+        language=language,
+    )
 
     scenes = []
     for scene in story_plan["scene_outline"]:
+        scene_context = {
+            key: scene[key]
+            for key in [
+                "protagonist",
+                "setting",
+                "concrete_action",
+                "obstacle",
+                "immediate_stakes",
+            ]
+            if key in scene
+        }
+        scene_context.update(story_context)
         scene_prompt = (
             f"{scene['scene_idea']} Goal: {scene['scene_goal']} "
             f"Conflict: {scene['conflict']} Turning point: {scene['turning_point']}"
@@ -71,6 +127,7 @@ def run_story_workflow(
             llm_model=llm_model,
             llm_num_predict=llm_num_predict,
             story_mode=story_mode,
+            scene_context=scene_context,
             genre=genre,
             tone=tone,
             pov=pov,

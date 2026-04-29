@@ -108,6 +108,11 @@ def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) ->
                         "conflict": "Conflict 1",
                         "turning_point": "Turning point 1",
                         "emotional_shift": "Emotional shift 1",
+                        "protagonist": "Thomas",
+                        "setting": "Appartement",
+                        "concrete_action": "Il compare une photo.",
+                        "obstacle": "La photo change.",
+                        "immediate_stakes": "Perdre sa seule preuve.",
                     },
                     {
                         "scene_number": 2,
@@ -117,6 +122,11 @@ def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) ->
                         "conflict": "Conflict 2",
                         "turning_point": "Turning point 2",
                         "emotional_shift": "Emotional shift 2",
+                        "protagonist": "Thomas",
+                        "setting": "Rue",
+                        "concrete_action": "Il vérifie une archive.",
+                        "obstacle": "Le fichier disparaît.",
+                        "immediate_stakes": "Perdre sa seule preuve.",
                     },
                     {
                         "scene_number": 3,
@@ -126,6 +136,11 @@ def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) ->
                         "conflict": "Conflict 3",
                         "turning_point": "Turning point 3",
                         "emotional_shift": "Emotional shift 3",
+                        "protagonist": "Thomas",
+                        "setting": "Pièce fermée",
+                        "concrete_action": "Il détruit ou garde la preuve.",
+                        "obstacle": "Le choix le condamne.",
+                        "immediate_stakes": "Perdre sa seule preuve.",
                     },
                 ],
             }
@@ -144,6 +159,7 @@ def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) ->
     assert result["architect_fallback_reason"] is None
     assert result["premise"] == "Premise LLM"
     assert result["scene_outline"][1]["scene_role"] == "confrontation"
+    assert result["scene_outline"][0]["concrete_action"] == "Il compare une photo."
 
 
 def test_story_architect_agent_builds_memory_title_with_french_phrase() -> None:
@@ -261,6 +277,11 @@ def test_story_architect_agent_returns_three_scenes() -> None:
     assert result["scene_outline"][2]["scene_role"] == "decision"
     assert result["scene_outline"][0]["turning_point"]
     assert result["scene_outline"][1]["emotional_shift"]
+    assert result["scene_outline"][0]["protagonist"] == "Thomas"
+    assert result["scene_outline"][0]["setting"]
+    assert result["scene_outline"][1]["concrete_action"]
+    assert result["scene_outline"][1]["obstacle"]
+    assert result["scene_outline"][2]["immediate_stakes"]
 
 
 def test_documentalist_agent_returns_expected_fields() -> None:
@@ -348,6 +369,8 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert len(result["scenes"]) == 3
     assert result["scenes"][0]["draft"]["draft_text"].startswith("Draft for ")
     assert result["scenes"][0]["story_scene"]["scene_role"] == "trigger"
+    assert result["scenes"][0]["story_scene"]["protagonist"] == "Thomas"
+    assert result["scenes"][0]["story_scene"]["concrete_action"]
     assert "story_memory" in result
     assert result["story_memory"]["events"]
     assert result["story_plan"]["title"] == "La mémoire réécrite"
@@ -360,10 +383,11 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
 
 
 def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) -> None:
-    captured = {"timeouts": []}
+    captured = {"timeouts": [], "scene_contexts": []}
 
     def fake_run_scene_workflow(**kwargs):
         captured["timeouts"].append(kwargs["llm_timeout"])
+        captured["scene_contexts"].append(kwargs["scene_context"])
         return {
             "scene_idea": kwargs["scene_idea"],
             "story_mode": kwargs["story_mode"],
@@ -386,11 +410,19 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
         db_path="db/novel_memory.sqlite",
         chroma_dir="data/chroma",
         collection_name="novel_memory",
+        language="fr",
         llm_timeout=80.0,
     )
 
     assert len(result["scenes"]) == 3
     assert captured["timeouts"] == [80.0, 80.0, 80.0]
+    assert captured["scene_contexts"][0]["protagonist"] == "Thomas"
+    assert captured["scene_contexts"][0]["core_mystery"] == "Les souvenirs de Thomas ont ete modifies par une IA."
+    assert "photo" in captured["scene_contexts"][0]["central_evidence"].lower()
+    assert "identite" in captured["scene_contexts"][0]["main_threat"].lower()
+    assert captured["scene_contexts"][0]["forbidden_inventions"]
+    assert captured["scene_contexts"][1]["concrete_action"]
+    assert captured["scene_contexts"][2]["immediate_stakes"]
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:
