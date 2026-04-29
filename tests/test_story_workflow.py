@@ -7,6 +7,110 @@ from src.agents.story_workflow import run_story_workflow
 from src.app.story_output_writer import save_story_output
 
 
+def test_story_architect_agent_builds_memory_title_in_french() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "La mémoire réécrite"
+
+
+def test_story_architect_agent_builds_memory_title_with_french_phrase() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Une femme apprend qu'une intelligence artificielle a efface sa memoire",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "La mémoire réécrite"
+
+
+def test_story_architect_agent_builds_dream_title_in_french() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Une femme comprend que chaque reve lui cache un piege",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "Le rêve qui ment"
+
+
+def test_story_architect_agent_builds_city_title_in_french() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Dans une ville cotiere, une disparition reveille des peurs anciennes",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "La ville silencieuse"
+
+
+def test_story_architect_agent_does_not_match_dream_inside_reveille() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Une disparition reveille des peurs dans une ville cotiere",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "La ville silencieuse"
+
+
+def test_story_architect_agent_uses_french_fallback_title() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Deux inconnus ratent le dernier train et doivent marcher jusqu'au matin",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "Récit court original"
+
+
+def test_story_architect_agent_uses_english_fallback_title() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Two strangers miss the last train and have to walk until dawn",
+            "language": "en",
+        }
+    )
+
+    assert result["title"] == "Original Short Story"
+
+
+def test_story_architect_agent_does_not_match_ai_inside_train() -> None:
+    agent = StoryArchitectAgent()
+
+    result = agent.run(
+        {
+            "story_idea": "Two strangers miss the last train and keep walking until dawn",
+            "language": "en",
+        }
+    )
+
+    assert result["title"] == "Original Short Story"
+
+
 def test_story_architect_agent_returns_three_scenes() -> None:
     agent = StoryArchitectAgent()
     story_idea = "Un homme decouvre que ses souvenirs ont ete modifies par une IA"
@@ -66,8 +170,8 @@ def test_documentalist_agent_returns_expected_fields() -> None:
             },
             "scenes": [
                 {"scene_idea": "Dans un appartement, tout vacille."},
-                {"scene_idea": "La rue devient menaçante."},
-                {"scene_idea": "Le bureau ferme sur une décision."},
+                {"scene_idea": "La rue devient menacante."},
+                {"scene_idea": "Le bureau ferme sur une decision."},
             ],
             "narrative_params": {
                 "genre": "thriller",

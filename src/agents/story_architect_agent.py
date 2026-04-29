@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from src.agents.base import BaseAgent
 
 
@@ -12,19 +15,53 @@ class StoryArchitectAgent(BaseAgent):
         super().__init__(name="StoryArchitectAgent", role="story_architect")
 
     @staticmethod
-    def _build_title(story_idea: str, language: str) -> str:
+    def _normalize_text(text: str) -> str:
+        lowered_text = (text or "").lower()
+        decomposed_text = unicodedata.normalize("NFKD", lowered_text)
+        return "".join(character for character in decomposed_text if not unicodedata.combining(character))
+
+    @classmethod
+    def _tokenize_text(cls, text: str) -> set[str]:
+        normalized_text = cls._normalize_text(text)
+        normalized_text = re.sub(r"[^a-z0-9]+", " ", normalized_text)
+        return {token for token in normalized_text.split() if token}
+
+    @classmethod
+    def _build_title(cls, story_idea: str, language: str) -> str:
         normalized_language = (language or "").lower()
-        normalized_idea = (story_idea or "").lower()
+        normalized_idea = cls._normalize_text(story_idea)
+        idea_tokens = cls._tokenize_text(story_idea)
 
         if normalized_language == "fr":
-            if any(
-                keyword in normalized_idea
-                for keyword in ("souvenir", "souvenirs", "memoire", "mémoire", "ia")
-            ):
-                return "La mémoire réécrite"
-            return "Récit court original"
+            token_rules = [
+                ({"souvenir", "souvenirs", "memoire", "ia"}, "La mémoire réécrite"),
+                ({"reve", "sommeil", "cauchemar"}, "Le rêve qui ment"),
+                ({"ville", "disparition", "disparu"}, "La ville silencieuse"),
+                ({"enfant", "famille", "maison"}, "La maison des absents"),
+                ({"enquete", "meurtre", "preuve"}, "La dernière preuve"),
+            ]
+            phrase_rules = [("intelligence artificielle", "La mémoire réécrite")]
+            fallback_title = "Récit court original"
+        else:
+            token_rules = [
+                ({"memory", "ai"}, "The Rewritten Memory"),
+                ({"dream", "sleep", "nightmare"}, "The Dream That Lies"),
+                ({"city", "disappearance", "missing"}, "The Silent City"),
+                ({"child", "family", "house"}, "The House of Absences"),
+                ({"investigation", "murder", "evidence"}, "The Last Proof"),
+            ]
+            phrase_rules = [("artificial intelligence", "The Rewritten Memory")]
+            fallback_title = "Original Short Story"
 
-        return "Original Short Story"
+        for phrase, title in phrase_rules:
+            if phrase in normalized_idea:
+                return title
+
+        for keywords, title in token_rules:
+            if any(keyword in idea_tokens for keyword in keywords):
+                return title
+
+        return fallback_title
 
     def run(self, input_data: dict) -> dict:
         story_idea = input_data.get("story_idea", "")
@@ -105,10 +142,7 @@ class StoryArchitectAgent(BaseAgent):
             ]
 
         if genre:
-            if is_french:
-                premise += f" Genre: {genre}."
-            else:
-                premise += f" Genre: {genre}."
+            premise += f" Genre: {genre}."
         if tone:
             if is_french:
                 target_reader_effect += f" Ton cherche: {tone}."
