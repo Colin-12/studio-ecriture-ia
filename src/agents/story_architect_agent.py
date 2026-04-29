@@ -2,17 +2,30 @@
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 
 from src.agents.base import BaseAgent
+from src.llm.client import LLMClient
 
 
 class StoryArchitectAgent(BaseAgent):
     """Turn a story idea into a compact three-scene plan."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        use_llm: bool = False,
+        llm_mode: str = "mock",
+        llm_timeout: float | None = None,
+    ) -> None:
         super().__init__(name="StoryArchitectAgent", role="story_architect")
+        self.use_llm = use_llm
+        self.llm_mode = llm_mode
+        if llm_timeout is None:
+            self.llm_client = LLMClient(mode=llm_mode)
+        else:
+            self.llm_client = LLMClient(mode=llm_mode, timeout=llm_timeout)
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -63,12 +76,37 @@ class StoryArchitectAgent(BaseAgent):
 
         return fallback_title
 
-    def run(self, input_data: dict) -> dict:
-        story_idea = input_data.get("story_idea", "")
-        genre = input_data.get("genre")
-        tone = input_data.get("tone")
-        pov = input_data.get("pov")
-        language = (input_data.get("language") or "").lower()
+    def _build_prompt(
+        self,
+        story_idea: str,
+        genre: str | None,
+        tone: str | None,
+        pov: str | None,
+        language: str | None,
+    ) -> str:
+        prompt_lines = [
+            "Return strict JSON only.",
+            "Create a short story plan with exactly these top-level fields:",
+            "title, premise, main_character, central_conflict, target_reader_effect, scene_outline.",
+            "scene_outline must be a list of exactly 3 scenes.",
+            "Each scene must contain: scene_number, scene_role, scene_idea, scene_goal, conflict, turning_point, emotional_shift.",
+            "scene_role values must be: trigger, confrontation, decision.",
+            f"Story idea: {story_idea}",
+            f"Genre: {genre or ''}",
+            f"Tone: {tone or ''}",
+            f"POV: {pov or ''}",
+            f"Language: {language or ''}",
+        ]
+        return "\n".join(prompt_lines)
+
+    def _build_deterministic_plan(
+        self,
+        story_idea: str,
+        genre: str | None,
+        tone: str | None,
+        pov: str | None,
+        language: str,
+    ) -> dict:
         is_french = language == "fr"
         title = self._build_title(story_idea=story_idea, language=language)
 
@@ -163,3 +201,77 @@ class StoryArchitectAgent(BaseAgent):
             "target_reader_effect": target_reader_effect,
             "scene_outline": scene_outline,
         }
+
+    def _parse_llm_plan(self, response_text: str) -> dict | None:
+        try:
+            parsed = json.loads(response_text)
+        except json.JSONDecodeError:
+            return None
+
+        required_fields = {
+            "title",
+            "premise",
+            "main_character",
+            "central_conflict",
+            "target_reader_effect",
+            "scene_outline",
+        }
+        if not isinstance(parsed, dict) or not required_fields.issubset(parsed):
+            return None
+
+        scene_outline = parsed.get("scene_outline")
+        if not isinstance(scene_outline, list) or len(scene_outline) != 3:
+            return None
+
+        expected_roles = ["trigger", "confrontation", "decision"]
+        scene_required_fields = {
+            "scene_number",
+            "scene_role",
+            "scene_idea",
+            "scene_goal",
+            "conflict",
+            "turning_point",
+            "emotional_shift",
+        }
+
+        for index, scene in enumerate(scene_outline, start=1):
+            if not isinstance(scene, dict) or not scene_required_fields.issubset(scene):
+                return None
+            if scene.get("scene_number") != index:
+                return None
+            if scene.get("scene_role") != expected_roles[index - 1]:
+                return None
+
+        parsed["agent"] = self.name
+        return parsed
+
+    def run(self, input_data: dict) -> dict:
+        story_idea = input_data.get("story_idea", "")
+        genre = input_data.get("genre")
+        tone = input_data.get("tone")
+        pov = input_data.get("pov")
+        language = (input_data.get("language") or "").lower()
+
+        deterministic_plan = self._build_deterministic_plan(
+            story_idea=story_idea,
+            genre=genre,
+            tone=tone,
+            pov=pov,
+            language=language,
+        )
+
+        if not self.use_llm:
+            return deterministic_plan
+
+        prompt = self._build_prompt(
+            story_idea=story_idea,
+            genre=genre,
+            tone=tone,
+            pov=pov,
+            language=language,
+        )
+        llm_response = self.llm_client.generate(prompt)
+        llm_plan = self._parse_llm_plan(llm_response)
+        if llm_plan is None:
+            return deterministic_plan
+        return llm_plan

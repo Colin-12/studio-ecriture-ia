@@ -34,7 +34,11 @@ def run_story_workflow(
     force_revision: bool = False,
 ) -> dict:
     """Build a simple three-scene story from an original idea."""
-    architect = StoryArchitectAgent()
+    architect = StoryArchitectAgent(
+        use_llm=use_llm,
+        llm_mode=llm_mode,
+        llm_timeout=llm_timeout,
+    )
     documentalist = DocumentalistAgent()
     story_plan = architect.run(
         {
