@@ -328,6 +328,31 @@ def test_stylist_agent_can_include_revision_focus() -> None:
     assert "Editor notes: Missing draft text." in result["draft_text"]
 
 
+def test_stylist_agent_avoids_repeating_embedded_goal_markers() -> None:
+    agent = StylistAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": (
+                    "Le personnage est confronte a un premier signe troublant. "
+                    "Goal: Installer l'incident declencheur. "
+                    "Conflict: Il hesite entre fuir et verifier. "
+                    "Turning point: Une preuve concrete apparait."
+                ),
+                "conflict": "",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert "Scene goal: Le personnage est confronte a un premier signe troublant. | Installer l'incident declencheur." in result["draft_text"]
+    assert "Scene goal: " in result["draft_text"]
+    assert "Goal:" not in result["draft_text"]
+    assert "Conflict: Il hesite entre fuir et verifier." in result["draft_text"]
+    assert "Turning point: Une preuve concrete apparait." in result["draft_text"]
+
+
 def test_llm_client_mock_mode_returns_predictable_text() -> None:
     client = LLMClient(mode="mock")
 

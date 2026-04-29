@@ -73,6 +73,49 @@ class StylistAgent(BaseAgent):
             ]
         )
 
+    def _extract_structured_scene_parts(
+        self,
+        scene_goal: str,
+        conflict: str,
+    ) -> tuple[str, str, str]:
+        """Split embedded Goal / Conflict / Turning point markers when present."""
+        if " Goal:" not in scene_goal and " Conflict:" not in scene_goal and " Turning point:" not in scene_goal:
+            return scene_goal, conflict, ""
+
+        turning_point = ""
+        scene_idea = scene_goal
+        extracted_conflict = conflict
+
+        if " Goal:" in scene_idea:
+            scene_idea, remainder = scene_idea.split(" Goal:", maxsplit=1)
+            scene_goal = remainder.strip()
+        else:
+            scene_goal = scene_idea
+            scene_idea = ""
+
+        if " Conflict:" in scene_goal:
+            scene_goal, remainder = scene_goal.split(" Conflict:", maxsplit=1)
+            extracted_conflict = remainder.strip()
+
+        if " Turning point:" in extracted_conflict:
+            extracted_conflict, turning_point = extracted_conflict.split(
+                " Turning point:",
+                maxsplit=1,
+            )
+            turning_point = turning_point.strip()
+        elif " Turning point:" in scene_goal:
+            scene_goal, turning_point = scene_goal.split(" Turning point:", maxsplit=1)
+            turning_point = turning_point.strip()
+
+        cleaned_scene_goal = scene_goal.strip()
+        cleaned_conflict = extracted_conflict.strip()
+        cleaned_scene_idea = scene_idea.strip()
+
+        if cleaned_scene_idea:
+            cleaned_scene_goal = f"{cleaned_scene_idea} | {cleaned_scene_goal}"
+
+        return cleaned_scene_goal, cleaned_conflict, turning_point
+
     def run(self, input_data: dict) -> dict:
         scene_brief = input_data.get("scene_brief") or {}
         continuity = input_data.get("continuity") or {}
@@ -85,6 +128,10 @@ class StylistAgent(BaseAgent):
 
         scene_goal = scene_brief.get("scene_goal", "")
         conflict = scene_brief.get("conflict", "")
+        scene_goal, conflict, turning_point = self._extract_structured_scene_parts(
+            scene_goal,
+            conflict,
+        )
         continuity_conclusion = continuity.get("conclusion", "No evidence found.")
         strongest_angle = visionary.get("strongest_angle", "")
         symbolic_layer = visionary.get("symbolic_layer", "")
@@ -103,6 +150,7 @@ class StylistAgent(BaseAgent):
             f"POV: {pov}",
             f"Language: {language}",
             f"Conflict: {conflict}",
+            f"Turning point: {turning_point}",
             f"Continuity note: {continuity_conclusion}",
             f"Strongest angle: {strongest_angle}",
             f"Symbolic layer: {symbolic_layer}",
