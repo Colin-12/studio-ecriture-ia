@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.app.cli import build_parser, load_settings
+from src.app.cli import _run_scene_workflow, build_parser, load_settings
 
 
 def test_load_settings_reads_yaml_file(tmp_path: Path) -> None:
@@ -143,6 +143,78 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.max_revision_rounds == 2
     assert args.force_revision is True
     assert args.save_output is True
+
+
+def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        "src.agents.workflow.run_scene_workflow",
+        lambda **kwargs: {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+            },
+            "devil_advocate": {
+                "risks": ["risk"],
+                "objections": ["objection"],
+                "revision_advice": "advice",
+            },
+            "visionary": {
+                "alternatives": ["alternative"],
+                "strongest_angle": "angle",
+                "symbolic_layer": "symbol",
+            },
+            "emotion_guardian": {
+                "emotional_core": "coeur",
+                "internal_conflict": "conflit",
+                "fear_or_desire": "peur",
+                "emotional_risk": "risque",
+                "suggested_emotional_beat": "battement",
+            },
+            "continuity": {"conclusion": "No evidence found."},
+            "draft": {"draft_text": "draft", "style_notes": ["note"]},
+            "editor_checklist": {
+                "has_goal": True,
+                "has_conflict": True,
+                "has_context": True,
+                "has_draft": True,
+                "notes": [],
+            },
+            "quality_evaluation": {
+                "originality": {"score": 3, "note": "ok"},
+                "narrative_tension": {"score": 3, "note": "ok"},
+                "emotion": {"score": 3, "note": "ok"},
+                "coherence": {"score": 3, "note": "ok"},
+                "style": {"score": 3, "note": "ok"},
+                "reader_potential": {"score": 3, "note": "ok"},
+                "needs_revision": False,
+                "revision_targets": [],
+            },
+            "revised_draft": None,
+            "revised_editor": None,
+            "revised_quality_evaluation": None,
+        },
+    )
+
+    exit_code = _run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        story_mode="original_story",
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Emotion Guardian:" in output
+    assert "Emotional core: coeur" in output
 
 
 def test_build_parser_parses_ingest_command() -> None:

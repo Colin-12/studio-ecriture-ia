@@ -4,6 +4,7 @@ import pytest
 
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
+from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
@@ -152,6 +153,37 @@ def test_quality_evaluator_agent_returns_dict() -> None:
     assert "revision_targets" in result
 
 
+def test_emotion_guardian_agent_returns_dict() -> None:
+    agent = EmotionGuardianAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+            },
+            "devil_advocate": {
+                "revision_advice": "Ancre la scene dans une menace immediate.",
+            },
+            "visionary": {
+                "strongest_angle": "Centre la scene sur une decision prise trop vite sous pression.",
+            },
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "emotional_core" in result
+    assert "internal_conflict" in result
+    assert "fear_or_desire" in result
+    assert "emotional_risk" in result
+    assert "suggested_emotional_beat" in result
+    assert "menace" in result["emotional_core"].lower() or "angle fort" in result["emotional_core"].lower()
+    assert "perception" in result["suggested_emotional_beat"].lower()
+
+
 def test_stylist_agent_returns_dict() -> None:
     agent = StylistAgent()
 
@@ -168,6 +200,10 @@ def test_stylist_agent_returns_dict() -> None:
                 "strongest_angle": "Center the scene on the consequence of the discovery.",
                 "symbolic_layer": "Use shadow and paper as motifs.",
             },
+            "emotion_guardian": {
+                "emotional_core": "The scene should expose the wound behind the discovery.",
+                "suggested_emotional_beat": "Move from contained dread to direct exposure.",
+            },
         }
     )
 
@@ -176,6 +212,7 @@ def test_stylist_agent_returns_dict() -> None:
     assert "style_notes" in result
     assert "Marie decouvre une lettre cachee" in result["draft_text"]
     assert "Strongest angle: Center the scene on the consequence of the discovery." in result["draft_text"]
+    assert "Emotional core: The scene should expose the wound behind the discovery." in result["draft_text"]
 
 
 def test_stylist_agent_integrates_narrative_parameters() -> None:
@@ -198,6 +235,10 @@ def test_stylist_agent_integrates_narrative_parameters() -> None:
                 "strongest_angle": "Center the scene on the first memory that stops feeling trustworthy.",
                 "symbolic_layer": "Use glitches and repeated details as motifs.",
             },
+            "emotion_guardian": {
+                "emotional_core": "Le coeur emotionnel repose sur une menace qui force une decision immediate.",
+                "suggested_emotional_beat": "Fais passer le personnage d'un doute contenu a une certitude inquietante.",
+            },
         }
     )
 
@@ -205,6 +246,7 @@ def test_stylist_agent_integrates_narrative_parameters() -> None:
     assert "Tone: sombre" in result["draft_text"]
     assert "POV: first_person" in result["draft_text"]
     assert "Language: fr" in result["draft_text"]
+    assert "Emotional core:" in result["draft_text"]
 
 
 def test_stylist_agent_can_include_revision_focus() -> None:
@@ -217,6 +259,10 @@ def test_stylist_agent_can_include_revision_focus() -> None:
                 "conflict": "The discovery should create tension around hidden information.",
             },
             "continuity": {"conclusion": "No evidence found."},
+            "emotion_guardian": {
+                "emotional_core": "The scene should expose the wound behind the discovery.",
+                "suggested_emotional_beat": "Move from contained dread to direct exposure.",
+            },
             "revision_targets": ["style", "reader_potential"],
             "editor_notes": ["Missing draft text."],
             "quality_evaluation": {"needs_revision": True},
@@ -272,6 +318,10 @@ def test_stylist_agent_with_ollama_mode_sets_correct_note(monkeypatch) -> None:
             },
             "continuity": {
                 "conclusion": "Structured memory points to: Victor creates the creature in chapter 5."
+            },
+            "emotion_guardian": {
+                "emotional_core": "The scene should expose Victor's panic.",
+                "suggested_emotional_beat": "Move from denial to dread.",
             },
         }
     )
@@ -329,7 +379,11 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
         {
             "strongest_angle": "Center the scene on the consequence of the discovery.",
             "symbolic_layer": "Use shadow and paper as motifs.",
-        }
+        },
+        {
+            "emotional_core": "The scene should expose the wound behind the discovery.",
+            "suggested_emotional_beat": "Move from contained dread to direct exposure.",
+        },
     )
 
     assert "Write a short scene draft in 150-250 words." in prompt
@@ -345,6 +399,8 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     ) in prompt
     assert "Strongest angle: Center the scene on the consequence of the discovery." in prompt
     assert "Symbolic layer: Use shadow and paper as motifs." in prompt
+    assert "Emotional core: The scene should expose the wound behind the discovery." in prompt
+    assert "Suggested emotional beat: Move from contained dread to direct exposure." in prompt
     assert "Expected output:" not in prompt
 
 
@@ -470,6 +526,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "scene_brief" in result
     assert "devil_advocate" in result
     assert "visionary" in result
+    assert "emotion_guardian" in result
     assert "continuity" in result
     assert "draft" in result
     assert "editor_checklist" in result
@@ -481,6 +538,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True
     assert "draft_text" in result["draft"]
+    assert "emotional_core" in result["emotion_guardian"]
 
 
 def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
@@ -573,6 +631,7 @@ def test_run_scene_workflow_can_propagate_narrative_parameters(monkeypatch) -> N
     assert "Genre: thriller" in result["draft"]["draft_text"]
     assert result["devil_advocate"]["risks"]
     assert result["visionary"]["alternatives"]
+    assert result["emotion_guardian"]["suggested_emotional_beat"]
 
 
 def test_run_scene_workflow_can_produce_revision(monkeypatch) -> None:

@@ -3,6 +3,7 @@
 from .base import BaseAgent
 from .continuity_agent import ContinuityAgent
 from .devil_advocate_agent import DevilAdvocateAgent
+from .emotion_guardian_agent import EmotionGuardianAgent
 from .editor_agent import EditorAgent
 from .quality_evaluator_agent import QualityEvaluatorAgent
 from .scene_architect_agent import SceneArchitectAgent
@@ -14,6 +15,7 @@ __all__ = [
     "BaseAgent",
     "ContinuityAgent",
     "DevilAdvocateAgent",
+    "EmotionGuardianAgent",
     "EditorAgent",
     "QualityEvaluatorAgent",
     "SceneArchitectAgent",

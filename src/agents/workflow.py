@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
+from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.editor_agent import EditorAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
@@ -30,6 +31,7 @@ def run_scene_workflow(
     architect = SceneArchitectAgent()
     devil_advocate = DevilAdvocateAgent()
     visionary = VisionaryAgent()
+    emotion_guardian = EmotionGuardianAgent()
     continuity = ContinuityAgent()
     stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
     editor = EditorAgent()
@@ -49,6 +51,13 @@ def run_scene_workflow(
         {
             "scene_brief": scene_brief,
             "devil_advocate": devil_advocate_result,
+        }
+    )
+    emotion_guardian_result = emotion_guardian.run(
+        {
+            "scene_brief": scene_brief,
+            "devil_advocate": devil_advocate_result,
+            "visionary": visionary_result,
         }
     )
     if story_mode == "existing_novel":
@@ -79,6 +88,7 @@ def run_scene_workflow(
             "scene_brief": scene_brief,
             "devil_advocate": devil_advocate_result,
             "visionary": visionary_result,
+            "emotion_guardian": emotion_guardian_result,
             "continuity": continuity_result,
         }
     )
@@ -110,6 +120,7 @@ def run_scene_workflow(
                 "scene_brief": scene_brief,
                 "devil_advocate": devil_advocate_result,
                 "visionary": visionary_result,
+                "emotion_guardian": emotion_guardian_result,
                 "continuity": continuity_result,
                 "previous_draft": stylist_result["draft_text"],
                 "revision_targets": revision_targets,
@@ -138,6 +149,7 @@ def run_scene_workflow(
         "scene_brief": scene_brief,
         "devil_advocate": devil_advocate_result,
         "visionary": visionary_result,
+        "emotion_guardian": emotion_guardian_result,
         "continuity": continuity_result,
         "draft": stylist_result,
         "editor_checklist": editor_result,

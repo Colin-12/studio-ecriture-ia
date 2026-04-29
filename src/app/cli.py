@@ -426,6 +426,16 @@ def _run_scene_workflow(
     print(f"   Strongest angle: {result['visionary']['strongest_angle']}")
     print(f"   Symbolic layer: {result['visionary']['symbolic_layer']}")
 
+    print("Emotion Guardian:")
+    print(f"   Emotional core: {result['emotion_guardian']['emotional_core']}")
+    print(f"   Internal conflict: {result['emotion_guardian']['internal_conflict']}")
+    print(f"   Fear or desire: {result['emotion_guardian']['fear_or_desire']}")
+    print(f"   Emotional risk: {result['emotion_guardian']['emotional_risk']}")
+    print(
+        f"   Suggested emotional beat: "
+        f"{result['emotion_guardian']['suggested_emotional_beat']}"
+    )
+
     print("Continuity:")
     print(f"   Conclusion: {result['continuity']['conclusion']}")
 

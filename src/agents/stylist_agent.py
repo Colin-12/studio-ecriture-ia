@@ -20,11 +20,13 @@ class StylistAgent(BaseAgent):
         scene_brief: dict,
         continuity: dict,
         visionary: dict | None = None,
+        emotion_guardian: dict | None = None,
         revision_targets: list[str] | None = None,
         editor_notes: list[str] | None = None,
         quality_evaluation: dict | None = None,
     ) -> str:
         visionary = visionary or {}
+        emotion_guardian = emotion_guardian or {}
         revision_targets = revision_targets or []
         editor_notes = editor_notes or []
         quality_evaluation = quality_evaluation or {}
@@ -46,6 +48,8 @@ class StylistAgent(BaseAgent):
                     f"Continuity conclusion: {continuity.get('conclusion', 'No evidence found.')}",
                     f"Strongest angle: {visionary.get('strongest_angle', '')}",
                     f"Symbolic layer: {visionary.get('symbolic_layer', '')}",
+                    f"Emotional core: {emotion_guardian.get('emotional_core', '')}",
+                    f"Suggested emotional beat: {emotion_guardian.get('suggested_emotional_beat', '')}",
                     f"Editor notes: {' | '.join(editor_notes)}",
                     f"Quality revision targets: {', '.join(revision_targets)}",
                     f"Needs revision: {quality_evaluation.get('needs_revision', False)}",
@@ -73,6 +77,7 @@ class StylistAgent(BaseAgent):
         scene_brief = input_data.get("scene_brief") or {}
         continuity = input_data.get("continuity") or {}
         visionary = input_data.get("visionary") or {}
+        emotion_guardian = input_data.get("emotion_guardian") or {}
         revision_targets = input_data.get("revision_targets") or []
         editor_notes = input_data.get("editor_notes") or []
         quality_evaluation = input_data.get("quality_evaluation") or {}
@@ -83,6 +88,8 @@ class StylistAgent(BaseAgent):
         continuity_conclusion = continuity.get("conclusion", "No evidence found.")
         strongest_angle = visionary.get("strongest_angle", "")
         symbolic_layer = visionary.get("symbolic_layer", "")
+        emotional_core = emotion_guardian.get("emotional_core", "")
+        suggested_emotional_beat = emotion_guardian.get("suggested_emotional_beat", "")
         genre = scene_brief.get("genre", "")
         tone = scene_brief.get("tone", "")
         pov = scene_brief.get("pov", "")
@@ -99,6 +106,8 @@ class StylistAgent(BaseAgent):
             f"Continuity note: {continuity_conclusion}",
             f"Strongest angle: {strongest_angle}",
             f"Symbolic layer: {symbolic_layer}",
+            f"Emotional core: {emotional_core}",
+            f"Suggested emotional beat: {suggested_emotional_beat}",
             "Expected movement: the scene should advance the immediate narrative situation.",
         ]
         if revision_targets:
@@ -111,6 +120,7 @@ class StylistAgent(BaseAgent):
                 scene_brief,
                 continuity,
                 visionary,
+                emotion_guardian,
                 revision_targets=revision_targets,
                 editor_notes=editor_notes,
                 quality_evaluation=quality_evaluation,
