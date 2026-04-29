@@ -9,10 +9,11 @@ from src.app.story_output_writer import save_story_output
 
 def test_story_architect_agent_returns_three_scenes() -> None:
     agent = StoryArchitectAgent()
+    story_idea = "Un homme decouvre que ses souvenirs ont ete modifies par une IA"
 
     result = agent.run(
         {
-            "story_idea": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "story_idea": story_idea,
             "genre": "thriller",
             "tone": "sombre",
             "pov": "first_person",
@@ -20,7 +21,8 @@ def test_story_architect_agent_returns_three_scenes() -> None:
         }
     )
 
-    assert result["title"]
+    assert result["title"] == "La mémoire réécrite"
+    assert result["title"] != f"Recit bref - {story_idea[:40].strip()}"
     assert len(result["scene_outline"]) == 3
     assert result["scene_outline"][0]["scene_number"] == 1
     assert result["scene_outline"][2]["scene_number"] == 3
@@ -118,7 +120,12 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert result["scenes"][0]["story_scene"]["scene_role"] == "trigger"
     assert "story_memory" in result
     assert result["story_memory"]["events"]
-    assert result["global_summary"]
+    assert result["story_plan"]["title"] == "La mémoire réécrite"
+    assert (
+        result["global_summary"]
+        == "Le récit est organisé en trois scènes : incident déclencheur, confrontation, puis décision finale avec conséquence immédiate."
+    )
+    assert "ses souvenirs ont organise" not in result["global_summary"]
 
 
 def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) -> None:

@@ -11,6 +11,21 @@ class StoryArchitectAgent(BaseAgent):
     def __init__(self) -> None:
         super().__init__(name="StoryArchitectAgent", role="story_architect")
 
+    @staticmethod
+    def _build_title(story_idea: str, language: str) -> str:
+        normalized_language = (language or "").lower()
+        normalized_idea = (story_idea or "").lower()
+
+        if normalized_language == "fr":
+            if any(
+                keyword in normalized_idea
+                for keyword in ("souvenir", "souvenirs", "memoire", "mémoire", "ia")
+            ):
+                return "La mémoire réécrite"
+            return "Récit court original"
+
+        return "Original Short Story"
+
     def run(self, input_data: dict) -> dict:
         story_idea = input_data.get("story_idea", "")
         genre = input_data.get("genre")
@@ -18,9 +33,9 @@ class StoryArchitectAgent(BaseAgent):
         pov = input_data.get("pov")
         language = (input_data.get("language") or "").lower()
         is_french = language == "fr"
+        title = self._build_title(story_idea=story_idea, language=language)
 
         if is_french:
-            title = "Recit bref - " + (story_idea[:40].strip() or "Sans titre")
             premise = f"Un recit en trois scenes construit autour de : {story_idea}"
             main_character = "Un protagoniste confronte a une rupture de repere"
             central_conflict = "Le personnage doit agir avant que la situation ne devienne irreversible."
@@ -55,7 +70,6 @@ class StoryArchitectAgent(BaseAgent):
                 },
             ]
         else:
-            title = "Short Story - " + (story_idea[:40].strip() or "Untitled")
             premise = f"A three-scene short narrative built around: {story_idea}"
             main_character = "A protagonist forced to confront a destabilizing break in certainty"
             central_conflict = "The character must act before the situation becomes irreversible."

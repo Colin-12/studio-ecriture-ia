@@ -7,6 +7,16 @@ from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.workflow import run_scene_workflow
 
 
+def _build_global_summary(language: str | None) -> str:
+    if (language or "").lower() == "fr":
+        return (
+            "Le récit est organisé en trois scènes : incident déclencheur, "
+            "confrontation, puis décision finale avec conséquence immédiate."
+        )
+
+    return "The story is organized in three scenes: trigger, confrontation, and final decision."
+
+
 def run_story_workflow(
     story_idea: str,
     db_path: str,
@@ -61,16 +71,7 @@ def run_story_workflow(
         scene_result["story_scene"] = scene
         scenes.append(scene_result)
 
-    if (language or "").lower() == "fr":
-        global_summary = (
-            f"{story_plan['title']} organise l'idee en {len(scenes)} scenes, "
-            f"avec une progression allant de l'alerte initiale a une consequence immediate."
-        )
-    else:
-        global_summary = (
-            f"{story_plan['title']} organizes the idea into {len(scenes)} scenes, "
-            "moving from first disturbance to immediate consequence."
-        )
+    global_summary = _build_global_summary(language)
 
     story_memory = documentalist.run(
         {
