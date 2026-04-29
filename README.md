@@ -171,6 +171,22 @@ Notes :
 python -m pytest -q
 ```
 
+### 9. Lancer create-story
+
+Exemple complet :
+
+```bash
+python -m src.app.cli create-story "Un homme decouvre que ses souvenirs ont ete modifies par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-timeout 240 --max-revision-rounds 0 --save-output
+```
+
+Cette commande :
+
+- construit un plan narratif court en `3` scenes
+- utilise un schema `trigger -> confrontation -> decision`
+- genere chaque scene avec le workflow `run-scene`
+
+Si `--save-output` est utilise, la commande cree un dossier Markdown dans `outputs/stories/`.
+
 ## Etat actuel
 
 Le depot contient maintenant le squelette propre de la Phase 1 du systeme de memoire. Les prochaines etapes pourront ajouter les modules d'ingestion, de stockage, d'indexation et de retrieval sans sur-ingenierie.

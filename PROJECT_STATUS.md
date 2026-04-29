@@ -25,23 +25,28 @@ Le depot est deja pousse sur GitHub et a jour.
   `confusion_points`, `engagement_points`, `boredom_risks`, `would_continue_reading`, `reader_notes`, `revision_targets`
 - `CommercialEditorAgent` integre au workflow, avec :
   `hook_score`, `market_angle`, `title_suggestions`, `format_suggestion`, `publication_risk`, `commercial_notes`
+- `create-story` operationnel pour generer un recit court en `3` scenes
+- `StoryArchitectAgent` structure le recit en `3` actes :
+  `trigger`, `confrontation`, `decision`
 - `story_mode` disponible :
   `existing_novel` ou `original_story`
 - `StylistAgent` peut fonctionner en mode deterministe, en mode `mock`, ou via `Ollama` local
 - `Ollama` local supporte `qwen2.5:3b`, sans API payante
 - parametres narratifs supportes dans `run-scene` :
   `--genre`, `--tone`, `--pov`, `--language`
+- timeout LLM configurable avec `--llm-timeout`
 - evaluation qualite disponible avec les criteres :
   `originality`, `narrative_tension`, `emotion`, `coherence`, `style`, `reader_potential`
 - revision supportee avec :
   `--max-revision-rounds` et `--force-revision`
 - la revision est bornee par `max_revision_rounds`, donc sans boucle infinie
 - `--save-output` sauvegarde les scenes en Markdown dans `outputs/`
+- `create-story --save-output` sauvegarde les recits dans `outputs/stories/`
 - interface `CLI` disponible pour :
-  `ingest`, `index`, `search`, `continuity`, `run-scene`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
+  `ingest`, `index`, `search`, `continuity`, `run-scene`, `create-story`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `57 passed`
+- tests locaux passes : `66 passed`
 
 ## Limites actuelles
 
