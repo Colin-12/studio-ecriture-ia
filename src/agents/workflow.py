@@ -21,6 +21,8 @@ def run_scene_workflow(
     collection_name: str,
     use_llm: bool = False,
     llm_mode: str = "mock",
+    llm_model: str | None = None,
+    llm_num_predict: int | None = None,
     story_mode: str = "existing_novel",
     genre: str | None = None,
     tone: str | None = None,
@@ -36,7 +38,13 @@ def run_scene_workflow(
     visionary = VisionaryAgent()
     emotion_guardian = EmotionGuardianAgent()
     continuity = ContinuityAgent()
-    stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode, llm_timeout=llm_timeout)
+    stylist = StylistAgent(
+        use_llm=use_llm,
+        llm_mode=llm_mode,
+        llm_timeout=llm_timeout,
+        llm_model=llm_model,
+        llm_num_predict=llm_num_predict,
+    )
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
     beta_reader = BetaReaderAgent()

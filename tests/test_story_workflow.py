@@ -18,6 +18,8 @@ def test_story_architect_agent_builds_memory_title_in_french() -> None:
     )
 
     assert result["title"] == "La mémoire réécrite"
+    assert result["architect_mode"] == "deterministic"
+    assert result["architect_fallback_reason"] is None
 
 
 def test_story_architect_agent_without_llm_uses_deterministic_fallback() -> None:
@@ -31,6 +33,8 @@ def test_story_architect_agent_without_llm_uses_deterministic_fallback() -> None
     )
 
     assert result["title"] == "La mémoire réécrite"
+    assert result["architect_mode"] == "deterministic"
+    assert result["architect_fallback_reason"] is None
 
 
 def test_story_architect_agent_with_mock_non_json_uses_fallback() -> None:
@@ -44,7 +48,42 @@ def test_story_architect_agent_with_mock_non_json_uses_fallback() -> None:
     )
 
     assert result["title"] == "La mémoire réécrite"
+    assert result["architect_mode"] == "deterministic"
+    assert result["architect_fallback_reason"] == "Invalid LLM plan response."
     assert len(result["scene_outline"]) == 3
+
+
+def test_story_architect_agent_with_llm_runtime_error_uses_fallback(monkeypatch) -> None:
+    agent = StoryArchitectAgent(use_llm=True, llm_mode="mock")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: (_ for _ in ()).throw(RuntimeError("Ollama request timed out.")),
+    )
+
+    result = agent.run(
+        {
+            "story_idea": "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "language": "fr",
+        }
+    )
+
+    assert result["title"] == "La mémoire réécrite"
+    assert result["architect_mode"] == "deterministic"
+    assert result["architect_fallback_reason"] == "Ollama request timed out."
+
+
+def test_story_architect_agent_accepts_custom_llm_model() -> None:
+    agent = StoryArchitectAgent(use_llm=True, llm_mode="ollama", llm_model="qwen2.5:1.5b")
+
+    assert agent.llm_client.model == "qwen2.5:1.5b"
+
+
+def test_story_architect_agent_accepts_custom_llm_num_predict() -> None:
+    agent = StoryArchitectAgent(use_llm=True, llm_mode="ollama", llm_num_predict=64)
+
+    assert agent.llm_client.num_predict == 64
 
 
 def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) -> None:
@@ -101,6 +140,8 @@ def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) ->
     )
 
     assert result["title"] == "Titre LLM"
+    assert result["architect_mode"] == "llm"
+    assert result["architect_fallback_reason"] is None
     assert result["premise"] == "Premise LLM"
     assert result["scene_outline"][1]["scene_role"] == "confrontation"
 
@@ -310,6 +351,7 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert "story_memory" in result
     assert result["story_memory"]["events"]
     assert result["story_plan"]["title"] == "La mémoire réécrite"
+    assert result["story_plan"]["architect_mode"] == "deterministic"
     assert (
         result["global_summary"]
         == "Le récit est organisé en trois scènes : incident déclencheur, confrontation, puis décision finale avec conséquence immédiate."
@@ -351,13 +393,101 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
     assert captured["timeouts"] == [80.0, 80.0, 80.0]
 
 
-def test_run_story_workflow_passes_llm_settings_to_story_architect(monkeypatch) -> None:
-    captured = {"use_llm": None, "llm_mode": None, "llm_timeout": None}
+def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:
+    captured = {"models": []}
 
-    def fake_architect_init(self, use_llm=False, llm_mode="mock", llm_timeout=None):
-        captured["use_llm"] = use_llm
-        captured["llm_mode"] = llm_mode
-        captured["llm_timeout"] = llm_timeout
+    def fake_run_scene_workflow(**kwargs):
+        captured["models"].append(kwargs["llm_model"])
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {"draft_text": "Draft"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        llm_model="qwen2.5:1.5b",
+    )
+
+    assert len(result["scenes"]) == 3
+    assert captured["models"] == ["qwen2.5:1.5b", "qwen2.5:1.5b", "qwen2.5:1.5b"]
+
+
+def test_run_story_workflow_passes_llm_num_predict_to_scene_workflow(monkeypatch) -> None:
+    captured = {"num_predicts": []}
+
+    def fake_run_scene_workflow(**kwargs):
+        captured["num_predicts"].append(kwargs["llm_num_predict"])
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {"draft_text": "Draft"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        llm_num_predict=64,
+    )
+
+    assert len(result["scenes"]) == 3
+    assert captured["num_predicts"] == [64, 64, 64]
+
+
+def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
+    captured = {
+        "architect_use_llm": None,
+        "architect_llm_mode": None,
+        "architect_llm_model": None,
+        "architect_llm_num_predict": None,
+        "architect_llm_timeout": None,
+        "scene_use_llm": [],
+        "scene_llm_mode": [],
+        "scene_llm_model": [],
+        "scene_llm_num_predict": [],
+        "scene_llm_timeout": [],
+    }
+
+    def fake_architect_init(
+        self,
+        use_llm=False,
+        llm_mode="mock",
+        llm_timeout=None,
+        llm_model=None,
+        llm_num_predict=None,
+    ):
+        captured["architect_use_llm"] = use_llm
+        captured["architect_llm_mode"] = llm_mode
+        captured["architect_llm_model"] = llm_model
+        captured["architect_llm_num_predict"] = llm_num_predict
+        captured["architect_llm_timeout"] = llm_timeout
         self.name = "StoryArchitectAgent"
         self.role = "story_architect"
 
@@ -369,7 +499,121 @@ def test_run_story_workflow_passes_llm_settings_to_story_architect(monkeypatch) 
         "src.agents.story_workflow.StoryArchitectAgent.run",
         lambda self, input_data: {
             "agent": self.name,
+            "architect_mode": "deterministic",
+            "architect_fallback_reason": None,
             "title": "La mémoire réécrite",
+            "premise": "Premise",
+            "main_character": "Character",
+            "central_conflict": "Conflict",
+            "target_reader_effect": "Effect",
+            "scene_outline": [
+                {
+                    "scene_number": 1,
+                    "scene_role": "trigger",
+                    "scene_idea": "Scene 1",
+                    "scene_goal": "Goal 1",
+                    "conflict": "Conflict 1",
+                    "turning_point": "Turning 1",
+                    "emotional_shift": "Shift 1",
+                },
+                {
+                    "scene_number": 2,
+                    "scene_role": "confrontation",
+                    "scene_idea": "Scene 2",
+                    "scene_goal": "Goal 2",
+                    "conflict": "Conflict 2",
+                    "turning_point": "Turning 2",
+                    "emotional_shift": "Shift 2",
+                },
+                {
+                    "scene_number": 3,
+                    "scene_role": "decision",
+                    "scene_idea": "Scene 3",
+                    "scene_goal": "Goal 3",
+                    "conflict": "Conflict 3",
+                    "turning_point": "Turning 3",
+                    "emotional_shift": "Shift 3",
+                },
+            ],
+        },
+    )
+
+    def fake_run_scene_workflow(**kwargs):
+        captured["scene_use_llm"].append(kwargs["use_llm"])
+        captured["scene_llm_mode"].append(kwargs["llm_mode"])
+        captured["scene_llm_model"].append(kwargs["llm_model"])
+        captured["scene_llm_num_predict"].append(kwargs["llm_num_predict"])
+        captured["scene_llm_timeout"].append(kwargs["llm_timeout"])
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {"draft_text": "Draft"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        use_architect_llm=False,
+        llm_mode="mock",
+        llm_model="qwen2.5:1.5b",
+        llm_num_predict=64,
+        llm_timeout=42.0,
+        language="fr",
+    )
+
+    assert captured["architect_use_llm"] is False
+    assert captured["architect_llm_mode"] == "mock"
+    assert captured["architect_llm_model"] == "qwen2.5:1.5b"
+    assert captured["architect_llm_num_predict"] == 64
+    assert captured["architect_llm_timeout"] == 42.0
+    assert captured["scene_use_llm"] == [True, True, True]
+    assert captured["scene_llm_mode"] == ["mock", "mock", "mock"]
+    assert captured["scene_llm_model"] == ["qwen2.5:1.5b", "qwen2.5:1.5b", "qwen2.5:1.5b"]
+    assert captured["scene_llm_num_predict"] == [64, 64, 64]
+    assert captured["scene_llm_timeout"] == [42.0, 42.0, 42.0]
+    assert result["story_plan"]["title"] == "La mémoire réécrite"
+
+
+def test_run_story_workflow_can_enable_architect_llm_separately(monkeypatch) -> None:
+    captured = {"architect_use_llm": None}
+
+    def fake_architect_init(
+        self,
+        use_llm=False,
+        llm_mode="mock",
+        llm_timeout=None,
+        llm_model=None,
+        llm_num_predict=None,
+    ):
+        captured["architect_use_llm"] = use_llm
+        self.name = "StoryArchitectAgent"
+        self.role = "story_architect"
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.StoryArchitectAgent.__init__",
+        fake_architect_init,
+    )
+    monkeypatch.setattr(
+        "src.agents.story_workflow.StoryArchitectAgent.run",
+        lambda self, input_data: {
+            "agent": self.name,
+            "architect_mode": "llm",
+            "architect_fallback_reason": None,
+            "title": "Titre LLM",
             "premise": "Premise",
             "main_character": "Character",
             "central_conflict": "Conflict",
@@ -425,16 +669,13 @@ def test_run_story_workflow_passes_llm_settings_to_story_architect(monkeypatch) 
         db_path="db/novel_memory.sqlite",
         chroma_dir="data/chroma",
         collection_name="novel_memory",
-        use_llm=True,
-        llm_mode="mock",
-        llm_timeout=42.0,
+        use_llm=False,
+        use_architect_llm=True,
         language="fr",
     )
 
-    assert captured["use_llm"] is True
-    assert captured["llm_mode"] == "mock"
-    assert captured["llm_timeout"] == 42.0
-    assert result["story_plan"]["title"] == "La mémoire réécrite"
+    assert captured["architect_use_llm"] is True
+    assert result["story_plan"]["architect_mode"] == "llm"
 
 
 def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:

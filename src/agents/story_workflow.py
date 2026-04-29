@@ -28,15 +28,20 @@ def run_story_workflow(
     pov: str | None = None,
     language: str | None = None,
     use_llm: bool = False,
+    use_architect_llm: bool = False,
     llm_mode: str = "mock",
+    llm_model: str | None = None,
+    llm_num_predict: int | None = None,
     llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
 ) -> dict:
     """Build a simple three-scene story from an original idea."""
     architect = StoryArchitectAgent(
-        use_llm=use_llm,
+        use_llm=use_architect_llm,
         llm_mode=llm_mode,
+        llm_model=llm_model,
+        llm_num_predict=llm_num_predict,
         llm_timeout=llm_timeout,
     )
     documentalist = DocumentalistAgent()
@@ -63,6 +68,8 @@ def run_story_workflow(
             collection_name=collection_name,
             use_llm=use_llm,
             llm_mode=llm_mode,
+            llm_model=llm_model,
+            llm_num_predict=llm_num_predict,
             story_mode=story_mode,
             genre=genre,
             tone=tone,

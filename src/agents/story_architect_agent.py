@@ -18,14 +18,25 @@ class StoryArchitectAgent(BaseAgent):
         use_llm: bool = False,
         llm_mode: str = "mock",
         llm_timeout: float | None = None,
+        llm_model: str | None = None,
+        llm_num_predict: int | None = None,
     ) -> None:
         super().__init__(name="StoryArchitectAgent", role="story_architect")
         self.use_llm = use_llm
         self.llm_mode = llm_mode
         if llm_timeout is None:
-            self.llm_client = LLMClient(mode=llm_mode)
+            self.llm_client = LLMClient(
+                mode=llm_mode,
+                model=llm_model,
+                num_predict=llm_num_predict,
+            )
         else:
-            self.llm_client = LLMClient(mode=llm_mode, timeout=llm_timeout)
+            self.llm_client = LLMClient(
+                mode=llm_mode,
+                model=llm_model,
+                num_predict=llm_num_predict,
+                timeout=llm_timeout,
+            )
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -106,6 +117,7 @@ class StoryArchitectAgent(BaseAgent):
         tone: str | None,
         pov: str | None,
         language: str,
+        fallback_reason: str | None = None,
     ) -> dict:
         is_french = language == "fr"
         title = self._build_title(story_idea=story_idea, language=language)
@@ -194,6 +206,8 @@ class StoryArchitectAgent(BaseAgent):
 
         return {
             "agent": self.name,
+            "architect_mode": "deterministic",
+            "architect_fallback_reason": fallback_reason,
             "title": title,
             "premise": premise,
             "main_character": main_character,
@@ -243,6 +257,8 @@ class StoryArchitectAgent(BaseAgent):
                 return None
 
         parsed["agent"] = self.name
+        parsed["architect_mode"] = "llm"
+        parsed["architect_fallback_reason"] = None
         return parsed
 
     def run(self, input_data: dict) -> dict:
@@ -270,8 +286,26 @@ class StoryArchitectAgent(BaseAgent):
             pov=pov,
             language=language,
         )
-        llm_response = self.llm_client.generate(prompt)
-        llm_plan = self._parse_llm_plan(llm_response)
+        try:
+            llm_response = self.llm_client.generate(prompt)
+            llm_plan = self._parse_llm_plan(llm_response)
+        except (RuntimeError, TimeoutError, ValueError) as exc:
+            return self._build_deterministic_plan(
+                story_idea=story_idea,
+                genre=genre,
+                tone=tone,
+                pov=pov,
+                language=language,
+                fallback_reason=str(exc),
+            )
+
         if llm_plan is None:
-            return deterministic_plan
+            return self._build_deterministic_plan(
+                story_idea=story_idea,
+                genre=genre,
+                tone=tone,
+                pov=pov,
+                language=language,
+                fallback_reason="Invalid LLM plan response.",
+            )
         return llm_plan

@@ -90,6 +90,46 @@ def test_build_parser_parses_run_scene_with_ollama_mode() -> None:
     assert args.llm_mode == "ollama"
 
 
+def test_build_parser_parses_run_scene_with_llm_model() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Victor comprend que sa creation lui echappe",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-model",
+            "qwen2.5:1.5b",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.llm_mode == "ollama"
+    assert args.llm_model == "qwen2.5:1.5b"
+
+
+def test_build_parser_parses_run_scene_with_llm_num_predict() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Victor comprend que sa creation lui echappe",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-num-predict",
+            "64",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.llm_mode == "ollama"
+    assert args.llm_num_predict == 64
+
+
 def test_build_parser_parses_run_scene_with_original_story_mode() -> None:
     parser = build_parser()
 
@@ -187,10 +227,69 @@ def test_build_parser_parses_create_story_command() -> None:
     assert args.language == "fr"
     assert args.llm_timeout == 75.0
     assert args.use_llm is True
+    assert args.use_architect_llm is False
     assert args.llm_mode == "mock"
     assert args.max_revision_rounds == 1
     assert args.force_revision is True
     assert args.save_output is True
+
+
+def test_build_parser_parses_create_story_with_architect_llm() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "create-story",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--use-architect-llm",
+        ]
+    )
+
+    assert args.command == "create-story"
+    assert args.use_architect_llm is True
+    assert args.use_llm is False
+
+
+def test_build_parser_parses_create_story_with_llm_model() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "create-story",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-model",
+            "qwen2.5:1.5b",
+        ]
+    )
+
+    assert args.command == "create-story"
+    assert args.use_llm is True
+    assert args.llm_mode == "ollama"
+    assert args.llm_model == "qwen2.5:1.5b"
+
+
+def test_build_parser_parses_create_story_with_llm_num_predict() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "create-story",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-num-predict",
+            "64",
+        ]
+    )
+
+    assert args.command == "create-story"
+    assert args.use_llm is True
+    assert args.llm_mode == "ollama"
+    assert args.llm_num_predict == 64
 
 
 def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys) -> None:
@@ -227,7 +326,12 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
                 "suggested_emotional_beat": "battement",
             },
             "continuity": {"conclusion": "No evidence found."},
-            "draft": {"draft_text": "draft", "style_notes": ["note"]},
+            "draft": {
+                "stylist_mode": "deterministic_fallback",
+                "stylist_fallback_reason": "Ollama request timed out.",
+                "draft_text": "draft",
+                "style_notes": ["note"],
+            },
             "editor_checklist": {
                 "has_goal": True,
                 "has_conflict": True,
@@ -277,6 +381,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
 
     output = capsys.readouterr().out
     assert exit_code == 0
+    assert "Stylist mode: deterministic_fallback" in output
+    assert "Stylist fallback: Ollama request timed out." in output
     assert "Emotion Guardian:" in output
     assert "Emotional core: coeur" in output
     assert "Beta Reader:" in output
@@ -290,6 +396,8 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
         "src.agents.story_workflow.run_story_workflow",
         lambda **kwargs: {
             "story_plan": {
+                "architect_mode": "deterministic",
+                "architect_fallback_reason": "Ollama request timed out.",
                 "title": "Recit bref - Test",
                 "premise": "Premise",
                 "central_conflict": "Conflict",
@@ -298,7 +406,11 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
                 {
                     "scene_idea": "Scene 1",
                     "scene_brief": {"scene_goal": "Goal 1"},
-                    "draft": {"draft_text": "Draft 1"},
+                    "draft": {
+                        "stylist_mode": "deterministic_fallback",
+                        "stylist_fallback_reason": "Ollama request timed out.",
+                        "draft_text": "Draft 1",
+                    },
                     "story_scene": {
                         "scene_number": 1,
                         "scene_role": "trigger",
@@ -326,9 +438,127 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
 
     output = capsys.readouterr().out
     assert exit_code == 0
+    assert "Architect mode: deterministic" in output
+    assert "Architect fallback: Ollama request timed out." in output
+    assert "Stylist mode: deterministic_fallback" in output
+    assert "Stylist fallback: Ollama request timed out." in output
     assert "Story memory:" in output
     assert "Canon summary: Canon summary" in output
     assert "Events: 3" in output
+
+
+def test_run_story_workflow_passes_architect_llm_flag(monkeypatch) -> None:
+    captured = {}
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_story_workflow",
+        lambda **kwargs: captured.update(kwargs) or {
+            "story_plan": {
+                "architect_mode": "deterministic",
+                "architect_fallback_reason": None,
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "central_conflict": "Conflict",
+            },
+            "scenes": [],
+            "global_summary": "Summary",
+            "story_memory": {
+                "canon_summary": "Canon summary",
+                "characters": [],
+                "events": [],
+                "decisions": [],
+            },
+        },
+    )
+
+    exit_code = _run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        use_architect_llm=True,
+    )
+
+    assert exit_code == 0
+    assert captured["use_llm"] is True
+    assert captured["use_architect_llm"] is True
+
+
+def test_run_story_workflow_passes_llm_model(monkeypatch) -> None:
+    captured = {}
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_story_workflow",
+        lambda **kwargs: captured.update(kwargs) or {
+            "story_plan": {
+                "architect_mode": "deterministic",
+                "architect_fallback_reason": None,
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "central_conflict": "Conflict",
+            },
+            "scenes": [],
+            "global_summary": "Summary",
+            "story_memory": {
+                "canon_summary": "Canon summary",
+                "characters": [],
+                "events": [],
+                "decisions": [],
+            },
+        },
+    )
+
+    exit_code = _run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        llm_mode="ollama",
+        llm_model="qwen2.5:1.5b",
+    )
+
+    assert exit_code == 0
+    assert captured["llm_model"] == "qwen2.5:1.5b"
+
+
+def test_run_story_workflow_passes_llm_num_predict(monkeypatch) -> None:
+    captured = {}
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_story_workflow",
+        lambda **kwargs: captured.update(kwargs) or {
+            "story_plan": {
+                "architect_mode": "deterministic",
+                "architect_fallback_reason": None,
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "central_conflict": "Conflict",
+            },
+            "scenes": [],
+            "global_summary": "Summary",
+            "story_memory": {
+                "canon_summary": "Canon summary",
+                "characters": [],
+                "events": [],
+                "decisions": [],
+            },
+        },
+    )
+
+    exit_code = _run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        llm_mode="ollama",
+        llm_num_predict=64,
+    )
+
+    assert exit_code == 0
+    assert captured["llm_num_predict"] == 64
 
 
 def test_build_parser_parses_ingest_command() -> None:

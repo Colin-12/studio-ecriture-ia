@@ -82,6 +82,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="LLM backend to use when --use-llm is enabled.",
     )
     run_scene_parser.add_argument(
+        "--llm-model",
+        help="Optional Ollama model name to use when --llm-mode ollama is enabled.",
+    )
+    run_scene_parser.add_argument(
+        "--llm-num-predict",
+        type=int,
+        default=None,
+        help="Optional Ollama num_predict limit to reduce generation length.",
+    )
+    run_scene_parser.add_argument(
         "--story-mode",
         choices=["existing_novel", "original_story"],
         default="existing_novel",
@@ -125,10 +135,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use the configured LLM path in scene drafting.",
     )
     create_story_parser.add_argument(
+        "--use-architect-llm",
+        action="store_true",
+        help="Use the configured LLM path in StoryArchitectAgent.",
+    )
+    create_story_parser.add_argument(
         "--llm-mode",
         choices=["mock", "ollama"],
         default="mock",
         help="LLM backend to use when --use-llm is enabled.",
+    )
+    create_story_parser.add_argument(
+        "--llm-model",
+        help="Optional Ollama model name to use when --llm-mode ollama is enabled.",
+    )
+    create_story_parser.add_argument(
+        "--llm-num-predict",
+        type=int,
+        default=None,
+        help="Optional Ollama num_predict limit to reduce generation length.",
     )
     create_story_parser.add_argument(
         "--story-mode",
@@ -425,6 +450,8 @@ def _run_scene_workflow(
     collection_name: str,
     use_llm: bool = False,
     llm_mode: str = "mock",
+    llm_model: str | None = None,
+    llm_num_predict: int | None = None,
     story_mode: str = "existing_novel",
     genre: str | None = None,
     tone: str | None = None,
@@ -444,6 +471,8 @@ def _run_scene_workflow(
         collection_name=collection_name,
         use_llm=use_llm,
         llm_mode=llm_mode,
+        llm_model=llm_model,
+        llm_num_predict=llm_num_predict,
         story_mode=story_mode,
         genre=genre,
         tone=tone,
@@ -497,6 +526,10 @@ def _run_scene_workflow(
     print(f"   Conclusion: {result['continuity']['conclusion']}")
 
     print("Draft:")
+    if result["draft"].get("stylist_mode"):
+        print(f"   Stylist mode: {result['draft']['stylist_mode']}")
+    if result["draft"].get("stylist_fallback_reason"):
+        print(f"   Stylist fallback: {result['draft']['stylist_fallback_reason']}")
     print(f"   {result['draft']['draft_text']}")
     print("Style notes:")
     for note in result["draft"]["style_notes"]:
@@ -611,7 +644,10 @@ def _run_story_workflow(
     chroma_dir: str | Path,
     collection_name: str,
     use_llm: bool = False,
+    use_architect_llm: bool = False,
     llm_mode: str = "mock",
+    llm_model: str | None = None,
+    llm_num_predict: int | None = None,
     story_mode: str = "original_story",
     genre: str | None = None,
     tone: str | None = None,
@@ -635,7 +671,10 @@ def _run_story_workflow(
         pov=pov,
         language=language,
         use_llm=use_llm,
+        use_architect_llm=use_architect_llm,
         llm_mode=llm_mode,
+        llm_model=llm_model,
+        llm_num_predict=llm_num_predict,
         llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
@@ -643,6 +682,10 @@ def _run_story_workflow(
 
     plan = result["story_plan"]
     print(f"Title: {plan['title']}")
+    if plan.get("architect_mode"):
+        print(f"Architect mode: {plan['architect_mode']}")
+    if plan.get("architect_fallback_reason"):
+        print(f"Architect fallback: {plan['architect_fallback_reason']}")
     print(f"Premise: {plan['premise']}")
     print(f"Central conflict: {plan['central_conflict']}")
 
@@ -655,6 +698,10 @@ def _run_story_workflow(
         )
         print(f"   Idea: {story_scene.get('scene_idea', scene['scene_idea'])}")
         print(f"   Goal: {chapter_goal}")
+        if scene["draft"].get("stylist_mode"):
+            print(f"   Stylist mode: {scene['draft']['stylist_mode']}")
+        if scene["draft"].get("stylist_fallback_reason"):
+            print(f"   Stylist fallback: {scene['draft']['stylist_fallback_reason']}")
         print(f"   Draft: {scene['draft']['draft_text']}")
 
     print("Global summary:")
@@ -719,6 +766,8 @@ def main(argv: list[str] | None = None) -> int:
             collection_name,
             use_llm=args.use_llm,
             llm_mode=args.llm_mode,
+            llm_model=args.llm_model,
+            llm_num_predict=args.llm_num_predict,
             story_mode=args.story_mode,
             genre=args.genre,
             tone=args.tone,
@@ -736,7 +785,10 @@ def main(argv: list[str] | None = None) -> int:
             chroma_dir,
             collection_name,
             use_llm=args.use_llm,
+            use_architect_llm=args.use_architect_llm,
             llm_mode=args.llm_mode,
+            llm_model=args.llm_model,
+            llm_num_predict=args.llm_num_predict,
             story_mode=args.story_mode,
             genre=args.genre,
             tone=args.tone,

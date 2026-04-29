@@ -12,23 +12,26 @@ class LLMClient:
     def __init__(
         self,
         mode: str = "mock",
-        model: str = "qwen2.5:3b",
+        model: str | None = None,
+        num_predict: int | None = None,
         timeout: float = 120.0,
         base_url: str = "http://localhost:11434",
     ) -> None:
         self.mode = mode
-        self.model = model
+        self.model = model or "qwen2.5:3b"
+        self.num_predict = num_predict
         self.timeout = timeout
         self.base_url = base_url.rstrip("/")
 
     def _generate_with_ollama(self, prompt: str) -> str:
-        payload = json.dumps(
-            {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-            }
-        ).encode("utf-8")
+        payload_data = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+        }
+        if self.num_predict is not None:
+            payload_data["options"] = {"num_predict": self.num_predict}
+        payload = json.dumps(payload_data).encode("utf-8")
         http_request = request.Request(
             url=f"{self.base_url}/api/generate",
             data=payload,
