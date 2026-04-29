@@ -36,8 +36,11 @@ def save_story_output(result: dict, output_dir: str | Path = "outputs/stories") 
     for scene in story_plan.get("scene_outline") or []:
         plan_lines.extend(
             [
-                f"- Scene {scene.get('scene_number', '?')}: {scene.get('scene_idea', '')}",
+                f"- Scene {scene.get('scene_number', '?')} [{scene.get('scene_role', '')}]: {scene.get('scene_idea', '')}",
                 f"  Goal: {scene.get('scene_goal', '')}",
+                f"  Conflict: {scene.get('conflict', '')}",
+                f"  Turning point: {scene.get('turning_point', '')}",
+                f"  Emotional shift: {scene.get('emotional_shift', '')}",
             ]
         )
     story_plan_path.write_text("\n".join(plan_lines).strip() + "\n", encoding="utf-8")

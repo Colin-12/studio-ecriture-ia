@@ -631,8 +631,14 @@ def _run_story_workflow(
     print(f"Central conflict: {plan['central_conflict']}")
 
     for scene in result["scenes"]:
-        chapter_goal = scene["scene_brief"]["scene_goal"]
-        print(f"Scene: {chapter_goal}")
+        story_scene = scene.get("story_scene", {})
+        chapter_goal = story_scene.get("scene_goal", scene["scene_brief"]["scene_goal"])
+        print(
+            f"Scene {story_scene.get('scene_number', '?')} "
+            f"[{story_scene.get('scene_role', 'scene')}]"
+        )
+        print(f"   Idea: {story_scene.get('scene_idea', scene['scene_idea'])}")
+        print(f"   Goal: {chapter_goal}")
         print(f"   Draft: {scene['draft']['draft_text']}")
 
     print("Global summary:")

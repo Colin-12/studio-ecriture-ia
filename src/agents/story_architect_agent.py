@@ -28,18 +28,30 @@ class StoryArchitectAgent(BaseAgent):
             scene_outline = [
                 {
                     "scene_number": 1,
+                    "scene_role": "trigger",
                     "scene_idea": f"Le personnage est confronte a un premier signe troublant: {story_idea}",
-                    "scene_goal": "Installer la situation et l'inquietude initiale.",
+                    "scene_goal": "Installer l'incident declencheur et l'inquietude initiale.",
+                    "conflict": "Le personnage hesite entre ignorer l'anomalie ou reconnaitre qu'un danger vient d'entrer dans sa vie.",
+                    "turning_point": "Une preuve concrete oblige le personnage a prendre la menace au serieux.",
+                    "emotional_shift": "Du doute ordinaire vers une inquietude personnelle.",
                 },
                 {
                     "scene_number": 2,
+                    "scene_role": "confrontation",
                     "scene_idea": "Le personnage cherche a verifier ce qu'il a compris et rencontre une resistance.",
-                    "scene_goal": "Faire monter le conflit et reduire les options.",
+                    "scene_goal": "Transformer le soupcon initial en confrontation active.",
+                    "conflict": "Chaque tentative de verification rend la situation plus risquee ou plus instable.",
+                    "turning_point": "La verification revele que le probleme est plus vaste ou plus intime que prevu.",
+                    "emotional_shift": "De l'inquietude a une tension lucide.",
                 },
                 {
                     "scene_number": 3,
+                    "scene_role": "decision",
                     "scene_idea": "Le personnage prend une decision sous pression et accepte une consequence immediate.",
-                    "scene_goal": "Clore le mini-recit sur une bascule nette.",
+                    "scene_goal": "Clore le recit court sur une decision irreversible.",
+                    "conflict": "Agir protege une part de verite mais coute une forme de securite ou d'illusion.",
+                    "turning_point": "Le personnage choisit une ligne d'action qui change sa situation des maintenant.",
+                    "emotional_shift": "De la tension a une resolution couteuse.",
                 },
             ]
         else:
@@ -51,18 +63,30 @@ class StoryArchitectAgent(BaseAgent):
             scene_outline = [
                 {
                     "scene_number": 1,
+                    "scene_role": "trigger",
                     "scene_idea": f"The protagonist faces a first disturbing sign: {story_idea}",
-                    "scene_goal": "Establish the situation and first unease.",
+                    "scene_goal": "Establish the triggering incident and first unease.",
+                    "conflict": "The protagonist hesitates between dismissing the anomaly and admitting that danger has entered their life.",
+                    "turning_point": "A concrete proof forces the protagonist to take the threat seriously.",
+                    "emotional_shift": "From ordinary doubt to personal unease.",
                 },
                 {
                     "scene_number": 2,
+                    "scene_role": "confrontation",
                     "scene_idea": "The protagonist tries to verify what is happening and meets resistance.",
-                    "scene_goal": "Escalate the conflict and narrow the options.",
+                    "scene_goal": "Turn the first suspicion into active confrontation.",
+                    "conflict": "Every attempt to verify the truth makes the situation riskier or more unstable.",
+                    "turning_point": "The verification reveals that the problem is broader or more intimate than expected.",
+                    "emotional_shift": "From unease to lucid tension.",
                 },
                 {
                     "scene_number": 3,
+                    "scene_role": "decision",
                     "scene_idea": "The protagonist makes a pressured decision and accepts an immediate consequence.",
-                    "scene_goal": "Close the mini-story on a clear turn.",
+                    "scene_goal": "Close the short narrative on an irreversible decision.",
+                    "conflict": "Acting may protect one truth but costs a form of safety or illusion.",
+                    "turning_point": "The protagonist chooses a course of action that changes the situation immediately.",
+                    "emotional_shift": "From tension to costly resolve.",
                 },
             ]
 

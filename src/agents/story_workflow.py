@@ -35,8 +35,12 @@ def run_story_workflow(
 
     scenes = []
     for scene in story_plan["scene_outline"]:
+        scene_prompt = (
+            f"{scene['scene_idea']} Goal: {scene['scene_goal']} "
+            f"Conflict: {scene['conflict']} Turning point: {scene['turning_point']}"
+        )
         scene_result = run_scene_workflow(
-            scene_idea=scene["scene_idea"],
+            scene_idea=scene_prompt,
             db_path=db_path,
             chroma_dir=chroma_dir,
             collection_name=collection_name,
@@ -50,6 +54,7 @@ def run_story_workflow(
             max_revision_rounds=max_revision_rounds,
             force_revision=force_revision,
         )
+        scene_result["story_scene"] = scene
         scenes.append(scene_result)
 
     if (language or "").lower() == "fr":

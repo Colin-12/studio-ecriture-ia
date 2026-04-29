@@ -22,6 +22,11 @@ def test_story_architect_agent_returns_three_scenes() -> None:
     assert len(result["scene_outline"]) == 3
     assert result["scene_outline"][0]["scene_number"] == 1
     assert result["scene_outline"][2]["scene_number"] == 3
+    assert result["scene_outline"][0]["scene_role"] == "trigger"
+    assert result["scene_outline"][1]["scene_role"] == "confrontation"
+    assert result["scene_outline"][2]["scene_role"] == "decision"
+    assert result["scene_outline"][0]["turning_point"]
+    assert result["scene_outline"][1]["emotional_shift"]
 
 
 def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> None:
@@ -51,6 +56,7 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
     assert "story_plan" in result
     assert len(result["scenes"]) == 3
     assert result["scenes"][0]["draft"]["draft_text"].startswith("Draft for ")
+    assert result["scenes"][0]["story_scene"]["scene_role"] == "trigger"
     assert result["global_summary"]
 
 
@@ -63,9 +69,33 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
             "central_conflict": "Conflict",
             "target_reader_effect": "Effect",
             "scene_outline": [
-                {"scene_number": 1, "scene_idea": "Scene 1", "scene_goal": "Goal 1"},
-                {"scene_number": 2, "scene_idea": "Scene 2", "scene_goal": "Goal 2"},
-                {"scene_number": 3, "scene_idea": "Scene 3", "scene_goal": "Goal 3"},
+                {
+                    "scene_number": 1,
+                    "scene_role": "trigger",
+                    "scene_idea": "Scene 1",
+                    "scene_goal": "Goal 1",
+                    "conflict": "Conflict 1",
+                    "turning_point": "Turning 1",
+                    "emotional_shift": "Shift 1",
+                },
+                {
+                    "scene_number": 2,
+                    "scene_role": "confrontation",
+                    "scene_idea": "Scene 2",
+                    "scene_goal": "Goal 2",
+                    "conflict": "Conflict 2",
+                    "turning_point": "Turning 2",
+                    "emotional_shift": "Shift 2",
+                },
+                {
+                    "scene_number": 3,
+                    "scene_role": "decision",
+                    "scene_idea": "Scene 3",
+                    "scene_goal": "Goal 3",
+                    "conflict": "Conflict 3",
+                    "turning_point": "Turning 3",
+                    "emotional_shift": "Shift 3",
+                },
             ],
         },
         "scenes": [
@@ -126,3 +156,6 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
     assert (story_dir / "scene_02.md").exists()
     assert (story_dir / "scene_03.md").exists()
     assert (story_dir / "summary.md").exists()
+    plan_content = (story_dir / "story_plan.md").read_text(encoding="utf-8")
+    assert "[trigger]" in plan_content
+    assert "Turning point: Turning 1" in plan_content
