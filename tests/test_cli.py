@@ -197,6 +197,14 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
                 "needs_revision": False,
                 "revision_targets": [],
             },
+            "beta_reader": {
+                "confusion_points": ["confusion"],
+                "engagement_points": ["engagement"],
+                "boredom_risks": ["scene_too_short"],
+                "would_continue_reading": False,
+                "reader_notes": "reader note",
+                "revision_targets": ["expand_scene"],
+            },
             "revised_draft": None,
             "revised_editor": None,
             "revised_quality_evaluation": None,
@@ -215,6 +223,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
     assert exit_code == 0
     assert "Emotion Guardian:" in output
     assert "Emotional core: coeur" in output
+    assert "Beta Reader:" in output
+    assert "Reader notes: reader note" in output
 
 
 def test_build_parser_parses_ingest_command() -> None:

@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from src.agents.beta_reader_agent import BetaReaderAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.emotion_guardian_agent import EmotionGuardianAgent
@@ -182,6 +183,28 @@ def test_emotion_guardian_agent_returns_dict() -> None:
     assert "suggested_emotional_beat" in result
     assert "menace" in result["emotional_core"].lower() or "angle fort" in result["emotional_core"].lower()
     assert "perception" in result["suggested_emotional_beat"].lower()
+
+
+def test_beta_reader_agent_returns_dict() -> None:
+    agent = BetaReaderAgent()
+
+    result = agent.run(
+        {
+            "draft_text": "Scene goal: Marie decouvre une lettre cachee. Because the narrator explains every step, the tension stays distant.",
+            "scene_brief": {"language": "en"},
+            "quality_evaluation": {"needs_revision": True, "revision_targets": ["style"]},
+        }
+    )
+
+    assert isinstance(result, dict)
+    assert "confusion_points" in result
+    assert "engagement_points" in result
+    assert "boredom_risks" in result
+    assert "would_continue_reading" in result
+    assert "reader_notes" in result
+    assert "revision_targets" in result
+    assert "reduce_exposition" in result["revision_targets"]
+    assert "style" in result["revision_targets"]
 
 
 def test_stylist_agent_returns_dict() -> None:
@@ -531,6 +554,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "draft" in result
     assert "editor_checklist" in result
     assert "quality_evaluation" in result
+    assert "beta_reader" in result
     assert "revised_draft" in result
     assert "revised_editor" in result
     assert "revised_quality_evaluation" in result
@@ -539,6 +563,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert result["editor_checklist"]["has_draft"] is True
     assert "draft_text" in result["draft"]
     assert "emotional_core" in result["emotion_guardian"]
+    assert "would_continue_reading" in result["beta_reader"]
 
 
 def test_run_scene_workflow_can_use_mock_llm(monkeypatch) -> None:
@@ -807,6 +832,62 @@ def test_run_scene_workflow_can_force_revision_when_quality_passes(monkeypatch) 
     assert result["quality_evaluation"]["needs_revision"] is False
     assert result["revised_draft"] is not None
     assert "Revision focus: general_quality" in result["revised_draft"]["draft_text"]
+
+
+def test_run_scene_workflow_can_revise_from_beta_reader_feedback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    monkeypatch.setattr(
+        "src.agents.quality_evaluator_agent.QualityEvaluatorAgent.run",
+        lambda self, input_data: {
+            "agent": self.name,
+            "originality": {"score": 3, "note": "Acceptable."},
+            "narrative_tension": {"score": 3, "note": "Acceptable."},
+            "emotion": {"score": 3, "note": "Acceptable."},
+            "coherence": {"score": 3, "note": "Acceptable."},
+            "style": {"score": 3, "note": "Acceptable."},
+            "reader_potential": {"score": 3, "note": "Acceptable."},
+            "needs_revision": False,
+            "revision_targets": [],
+        },
+    )
+
+    monkeypatch.setattr(
+        "src.agents.beta_reader_agent.BetaReaderAgent.run",
+        lambda self, input_data: {
+            "agent": self.name,
+            "confusion_points": [],
+            "engagement_points": ["The hook is visible."],
+            "boredom_risks": ["scene_too_short"],
+            "would_continue_reading": False,
+            "reader_notes": "The reader needs a fuller scene.",
+            "revision_targets": ["expand_scene"],
+        },
+    )
+
+    result = run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        max_revision_rounds=1,
+    )
+
+    assert result["quality_evaluation"]["needs_revision"] is False
+    assert result["beta_reader"]["would_continue_reading"] is False
+    assert result["revised_draft"] is not None
+    assert "Revision focus: expand_scene" in result["revised_draft"]["draft_text"]
 
 
 def test_run_scene_workflow_respects_zero_revision_rounds(monkeypatch) -> None:

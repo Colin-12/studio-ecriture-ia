@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.agents.beta_reader_agent import BetaReaderAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.emotion_guardian_agent import EmotionGuardianAgent
@@ -36,6 +37,7 @@ def run_scene_workflow(
     stylist = StylistAgent(use_llm=use_llm, llm_mode=llm_mode)
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
+    beta_reader = BetaReaderAgent()
 
     scene_brief = architect.run(
         {
@@ -106,13 +108,29 @@ def run_scene_workflow(
             "editor_result": editor_result,
         }
     )
+    beta_reader_result = beta_reader.run(
+        {
+            "draft_text": stylist_result["draft_text"],
+            "scene_brief": scene_brief,
+            "quality_evaluation": quality_result,
+        }
+    )
 
     revised_draft = None
     revised_editor = None
     revised_quality_evaluation = None
-    should_revise = quality_result["needs_revision"] or force_revision
+    revision_targets = list(
+        dict.fromkeys(
+            (quality_result.get("revision_targets") or [])
+            + (beta_reader_result.get("revision_targets") or [])
+        )
+    )
+    should_revise = (
+        quality_result["needs_revision"]
+        or force_revision
+        or not beta_reader_result["would_continue_reading"]
+    )
     if should_revise and max_revision_rounds > 0:
-        revision_targets = quality_result["revision_targets"] or []
         if force_revision and not revision_targets:
             revision_targets = ["general_quality"]
         revised_draft = stylist.run(
@@ -154,6 +172,7 @@ def run_scene_workflow(
         "draft": stylist_result,
         "editor_checklist": editor_result,
         "quality_evaluation": quality_result,
+        "beta_reader": beta_reader_result,
         "revised_draft": revised_draft,
         "revised_editor": revised_editor,
         "revised_quality_evaluation": revised_quality_evaluation,

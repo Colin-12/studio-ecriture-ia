@@ -473,6 +473,35 @@ def _run_scene_workflow(
     else:
         print("   revision_targets=none")
 
+    print("Beta Reader:")
+    if result["beta_reader"]["confusion_points"]:
+        for point in result["beta_reader"]["confusion_points"]:
+            print(f"   Confusion: {point}")
+    else:
+        print("   Confusion: none")
+    if result["beta_reader"]["engagement_points"]:
+        for point in result["beta_reader"]["engagement_points"]:
+            print(f"   Engagement: {point}")
+    else:
+        print("   Engagement: none")
+    if result["beta_reader"]["boredom_risks"]:
+        for risk in result["beta_reader"]["boredom_risks"]:
+            print(f"   Boredom risk: {risk}")
+    else:
+        print("   Boredom risk: none")
+    print(
+        f"   would_continue_reading="
+        f"{result['beta_reader']['would_continue_reading']}"
+    )
+    print(f"   Reader notes: {result['beta_reader']['reader_notes']}")
+    if result["beta_reader"]["revision_targets"]:
+        print(
+            "   revision_targets="
+            + ", ".join(result["beta_reader"]["revision_targets"])
+        )
+    else:
+        print("   revision_targets=none")
+
     if result["revised_draft"] is not None:
         print("Revised draft:")
         print(f"   {result['revised_draft']['draft_text']}")
