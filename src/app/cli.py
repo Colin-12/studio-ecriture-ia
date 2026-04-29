@@ -108,6 +108,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Save the scene workflow result as a Markdown file in outputs/.",
     )
 
+    create_story_parser = subparsers.add_parser(
+        "create-story",
+        help="Run a minimal three-scene story workflow.",
+    )
+    create_story_parser.add_argument("story_idea", help="Story idea to expand.")
+    create_story_parser.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Use the configured LLM path in scene drafting.",
+    )
+    create_story_parser.add_argument(
+        "--llm-mode",
+        choices=["mock", "ollama"],
+        default="mock",
+        help="LLM backend to use when --use-llm is enabled.",
+    )
+    create_story_parser.add_argument(
+        "--story-mode",
+        choices=["existing_novel", "original_story"],
+        default="original_story",
+        help="Use existing canon memory or build an original story.",
+    )
+    create_story_parser.add_argument("--genre", help="Narrative genre for the story.")
+    create_story_parser.add_argument("--tone", help="Narrative tone for the story.")
+    create_story_parser.add_argument("--pov", help="Point of view for the story.")
+    create_story_parser.add_argument("--language", help="Draft language for the story.")
+    create_story_parser.add_argument(
+        "--max-revision-rounds",
+        type=int,
+        default=1,
+        help="Maximum number of simple revision rounds per scene.",
+    )
+    create_story_parser.add_argument(
+        "--force-revision",
+        action="store_true",
+        help="Force one bounded revision cycle per scene even if quality passes.",
+    )
+    create_story_parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save the generated story as Markdown files in outputs/stories/.",
+    )
+
     return parser
 
 
@@ -548,6 +591,62 @@ def _run_scene_workflow(
     return 0
 
 
+def _run_story_workflow(
+    story_idea: str,
+    db_path: str | Path,
+    chroma_dir: str | Path,
+    collection_name: str,
+    use_llm: bool = False,
+    llm_mode: str = "mock",
+    story_mode: str = "original_story",
+    genre: str | None = None,
+    tone: str | None = None,
+    pov: str | None = None,
+    language: str | None = None,
+    max_revision_rounds: int = 1,
+    force_revision: bool = False,
+    save_output: bool = False,
+) -> int:
+    from src.agents.story_workflow import run_story_workflow
+
+    result = run_story_workflow(
+        story_idea=story_idea,
+        db_path=str(db_path),
+        chroma_dir=str(chroma_dir),
+        collection_name=collection_name,
+        story_mode=story_mode,
+        genre=genre,
+        tone=tone,
+        pov=pov,
+        language=language,
+        use_llm=use_llm,
+        llm_mode=llm_mode,
+        max_revision_rounds=max_revision_rounds,
+        force_revision=force_revision,
+    )
+
+    plan = result["story_plan"]
+    print(f"Title: {plan['title']}")
+    print(f"Premise: {plan['premise']}")
+    print(f"Central conflict: {plan['central_conflict']}")
+
+    for scene in result["scenes"]:
+        chapter_goal = scene["scene_brief"]["scene_goal"]
+        print(f"Scene: {chapter_goal}")
+        print(f"   Draft: {scene['draft']['draft_text']}")
+
+    print("Global summary:")
+    print(f"   {result['global_summary']}")
+
+    if save_output:
+        from src.app.story_output_writer import save_story_output
+
+        output_path = save_story_output(result)
+        print(f"Saved story output: {output_path}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -585,6 +684,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run-scene":
         return _run_scene_workflow(
             args.scene_idea,
+            db_path,
+            chroma_dir,
+            collection_name,
+            use_llm=args.use_llm,
+            llm_mode=args.llm_mode,
+            story_mode=args.story_mode,
+            genre=args.genre,
+            tone=args.tone,
+            pov=args.pov,
+            language=args.language,
+            max_revision_rounds=args.max_revision_rounds,
+            force_revision=args.force_revision,
+            save_output=args.save_output,
+        )
+    if args.command == "create-story":
+        return _run_story_workflow(
+            args.story_idea,
             db_path,
             chroma_dir,
             collection_name,

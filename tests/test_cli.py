@@ -145,6 +145,47 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.save_output is True
 
 
+def test_build_parser_parses_create_story_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "create-story",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--story-mode",
+            "original_story",
+            "--genre",
+            "thriller",
+            "--tone",
+            "sombre",
+            "--pov",
+            "first_person",
+            "--language",
+            "fr",
+            "--use-llm",
+            "--llm-mode",
+            "mock",
+            "--max-revision-rounds",
+            "1",
+            "--force-revision",
+            "--save-output",
+        ]
+    )
+
+    assert args.command == "create-story"
+    assert args.story_idea == "Un homme decouvre que ses souvenirs ont ete modifies par une IA"
+    assert args.story_mode == "original_story"
+    assert args.genre == "thriller"
+    assert args.tone == "sombre"
+    assert args.pov == "first_person"
+    assert args.language == "fr"
+    assert args.use_llm is True
+    assert args.llm_mode == "mock"
+    assert args.max_revision_rounds == 1
+    assert args.force_revision is True
+    assert args.save_output is True
+
+
 def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "src.agents.workflow.run_scene_workflow",
