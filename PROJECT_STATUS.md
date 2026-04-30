@@ -32,9 +32,12 @@ Le depot est deja pousse sur GitHub et a jour.
   `existing_novel` ou `original_story`
 - `StylistAgent` peut fonctionner en mode deterministe, en mode `mock`, ou via `Ollama` local
 - `Ollama` local supporte `qwen2.5:3b`, sans API payante
+- workflow `create-story` avec `Ollama` local valide avec `qwen2.5:3b`
 - parametres narratifs supportes dans `run-scene` :
   `--genre`, `--tone`, `--pov`, `--language`
 - timeout LLM configurable avec `--llm-timeout`
+- configuration Ollama de reference actuelle :
+  `--llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0`
 - evaluation qualite disponible avec les criteres :
   `originality`, `narrative_tension`, `emotion`, `coherence`, `style`, `reader_potential`
 - revision supportee avec :
@@ -46,7 +49,7 @@ Le depot est deja pousse sur GitHub et a jour.
   `ingest`, `index`, `search`, `continuity`, `run-scene`, `create-story`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `66 passed`
+- tests locaux passes : `106 passed`
 
 ## Limites actuelles
 

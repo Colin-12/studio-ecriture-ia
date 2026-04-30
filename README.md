@@ -188,6 +188,19 @@ Cette commande :
 Si `--save-output` est utilise, la commande cree un dossier Markdown dans `outputs/stories/`.
 Ce dossier contient aussi un fichier `story_memory.json` avec une memoire simple du recit original.
 
+## Configuration Ollama recommandee
+
+Configuration de reference validee pour `create-story` en francais :
+
+```bash
+python -m src.app.cli create-story "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0 --save-output
+```
+
+Notes :
+
+- `qwen2.5:3b` est recommande pour la generation de scenes avec le `StylistAgent`
+- `qwen2.5:1.5b` est plus leger, mais moins fiable pour la prose narrative francaise et plus sensible aux sorties meta
+
 ## Etat actuel
 
 Le depot contient maintenant le squelette propre de la Phase 1 du systeme de memoire. Les prochaines etapes pourront ajouter les modules d'ingestion, de stockage, d'indexation et de retrieval sans sur-ingenierie.
