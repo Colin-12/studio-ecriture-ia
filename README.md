@@ -4,24 +4,28 @@
 
 Studio d'ecriture IA local base sur une `writers room` multi-agents.
 
-Le projet genere soit une scene, soit un recit court en `3` scenes a partir d'une idee, avec un workflow narratif structure, `Ollama` en local, une memoire inter-scenes simple et un export Markdown exploitable.
+Le projet supporte maintenant deux modes principaux :
 
-Le depot contient aussi `examples/trisha_revenge_story/`, un exemple narratif canonise qui servira plus tard a tester la continuation de recit, sans imposer la suite.
+- `create-story` : creer un recit court en `3` scenes a partir d'une impulsion humaine
+- `continue-story` : continuer un recit existant a partir d'un canon + une direction humaine
+
+Le depot contient aussi `examples/trisha_revenge_story/`, un exemple canonise pour tester la continuation de recit sans imposer la suite.
 
 ## Fonctionnalites principales
 
 - generation de scene avec `run-scene`
 - generation de recit court en `3` scenes avec `create-story`
-- continuation d'un recit existant avec `continue-story`
+- continuation de recit avec `continue-story`
 - workflow narratif multi-agents
-- utilisation locale de `Ollama`
-- decisions narratives avec `NarrativeDecisionAgent`
+- `NarrativeDecisionAgent` pour arbitrer les ajouts et preparer le canon
+- `UserIntentAgent` pour interpreter la direction utilisateur dans `continue-story` sans modifier le canon
 - memoire inter-scenes avec `canon_so_far`
 - export Markdown + `story_memory.json`
+- support local de `Ollama`
+- `--agent-depth {fast, balanced, deep}`
+- `--llm-keep-alive` pour garder le modele Ollama charge
 
 ## Architecture actuelle
-
-Le workflow `create-story` suit actuellement cette structure :
 
 ```text
 StoryArchitect
@@ -40,40 +44,42 @@ StoryArchitect
   -> story_memory.json
 ```
 
-`StoryArchitectAgent` construit un plan en `3` scenes : `trigger`, `confrontation`, `decision`.
+En mode `continue-story`, la direction humaine est d'abord interpretee par `UserIntentAgent`, puis injectee comme intention creative non canonique dans le contexte de scene.
 
-Chaque scene peut recevoir :
+## Profondeur agentique
 
-- le plan de scene
-- le `story_context`
-- le `canon_so_far`, c'est-a-dire un resume simple des scenes deja generees
+- `fast` : agents mostly deterministic, LLM mainly for stylist
+- `balanced` : default writer room with deterministic analysis agents and LLM stylist
+- `deep` : reserved for deeper LLM-based agent deliberation
 
-`NarrativeDecisionAgent` intervient apres chaque scene pour :
+## Commande recommandee
 
-- accepter ou rejeter des ajouts narratifs simples
-- produire des `canon_updates`
-- ajouter des contraintes utiles pour la suite si necessaire
-
-## Commande de demo recommandee
+Configuration de reference pour `create-story` en francais :
 
 ```bash
 python -m src.app.cli create-story "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0 --save-output
 ```
 
-Configuration recommandee :
+Notes :
 
-- `qwen2.5:3b` pour la generation de scenes en francais
-- `--max-revision-rounds 0` pour une execution plus directe du MVP
+- `qwen2.5:3b` est la configuration recommandee pour le `StylistAgent`
+- `--llm-keep-alive` peut etre utilise pour garder le modele charge entre plusieurs appels
 
-Exemple MVP de continuation :
+## Exemple continue-story
 
 ```bash
-python -m src.app.cli continue-story examples/trisha_revenge_story --direction "Anaïs veut comprendre si Trisha la volontairement attirée sur le parking." --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --save-output
+python -m src.app.cli continue-story examples/trisha_revenge_story --direction "Anaïs veut comprendre si Trisha la volontairement attirée sur le parking." --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --llm-keep-alive 10m --agent-depth fast --save-output
 ```
 
 ## Sorties generees
 
-Avec `--save-output`, le projet cree un dossier de sortie de ce type :
+Avec `--save-output`, le projet genere des sorties Markdown exploitables :
+
+- `outputs/` pour `run-scene`
+- `outputs/stories/` pour `create-story`
+- `continuations/` dans le dossier canon source pour `continue-story`
+
+`create-story` exporte notamment :
 
 ```text
 outputs/stories/YYYYMMDD_HHMMSS_story/
@@ -84,23 +90,6 @@ outputs/stories/YYYYMMDD_HHMMSS_story/
   summary.md
   story_memory.json
 ```
-
-Ces fichiers permettent de relire :
-
-- le plan narratif
-- les scenes generees
-- les decisions narratives par scene
-- un resume global
-- une memoire narrative simple reutilisable
-
-## Exemple de resultat attendu
-
-Exemple court de structure :
-
-- `Title: La memoire reecrite`
-- `Stylist mode: llm`
-- `Narrative decision: accepted additions / canon updates`
-- `Saved story output: outputs/stories/...`
 
 ## Installation rapide
 
@@ -113,25 +102,23 @@ ollama pull qwen2.5:3b
 ollama serve
 ```
 
-Ensuite, lancer la commande de demo `create-story`.
-
 ## Tests
 
-- etat actuel : `109 passed`
-- un warning `ChromaDB` peut apparaitre selon l'environnement, mais il est non bloquant pour le MVP actuel
+- etat actuel : `122 passed`
+- un warning `ChromaDB` peut apparaitre selon l'environnement, mais il est non bloquant
 
 ## Limites actuelles
 
-- la qualite litteraire reste variable selon le prompt et le modele local
-- `qwen2.5:1.5b` est plus leger et souvent plus rapide, mais moins fiable pour la prose narrative francaise
-- plusieurs agents restent deterministes par conception
-- l'interface graphique n'est pas encore implementee
-- la memoire narrative reste simple, mais elle est deja fonctionnelle pour un recit court
+- la qualite litteraire reste variable selon le modele local
+- `qwen2.5:1.5b` est plus leger mais moins fiable pour la prose narrative francaise
+- plusieurs agents restent deterministes
+- l'interface graphique n'est pas encore faite
+- la memoire narrative reste simple, mais elle est deja fonctionnelle
 
 ## Prochaines etapes
 
-- activer plus de `LLM` par agent quand c'est utile
-- mieux extraire personnages, lieux, objets et elements de canon
-- ajouter un workflow `continue-story`
-- proposer une interface `Streamlit` ou web
-- ameliorer la qualite stylistique et la stabilite narrative
+- activer plus de `LLM` par agent selon `agent_depth`
+- mieux extraire personnages, lieux, objets et canon
+- enrichir `continue-story`
+- ajouter une interface `Streamlit` ou web
+- ameliorer la qualite stylistique
