@@ -2,8 +2,10 @@ import json
 from pathlib import Path
 
 from src.agents.documentalist_agent import DocumentalistAgent
+from src.agents.continue_story_workflow import run_continue_story_workflow
 from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.story_workflow import run_story_workflow
+from src.app.continue_output_writer import save_continue_output
 from src.app.story_output_writer import save_story_output
 
 
@@ -475,6 +477,119 @@ def test_run_story_workflow_adds_narrative_decision_to_each_scene(monkeypatch) -
     assert result["scenes"][0]["narrative_decision"]["accepted_additions"]
     assert "canon_updates" in result["scenes"][1]["narrative_decision"]
     assert result["scenes"][2]["narrative_decision"]["decision_notes"]
+
+
+def test_run_continue_story_workflow_reads_story_memory_and_passes_scene_context(
+    monkeypatch, tmp_path: Path
+) -> None:
+    story_dir = tmp_path / "trisha_story"
+    story_dir.mkdir()
+    (story_dir / "story_memory.json").write_text(
+        json.dumps(
+            {
+                "title": "Le retour de Trisha",
+                "premise": "Trisha revient apres sa chute.",
+                "central_conflict": "La vengeance la maintient captive.",
+                "theme": "Le prix affectif de la vengeance.",
+                "characters": [{"name": "Trisha"}, {"name": "Anais"}],
+                "locations": [{"name": "parking"}],
+                "events": [{"order": 1, "summary": "La nuit du parking."}],
+                "continuity_notes": ["Le recit s'arrete apres la nuit du parking."],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (story_dir / "source_text.md").write_text("# Source\nTexte", encoding="utf-8")
+    (story_dir / "story_brief.md").write_text("# Brief\nContenu", encoding="utf-8")
+    (story_dir / "characters.md").write_text("# Characters\nTrisha", encoding="utf-8")
+
+    captured = {}
+
+    def fake_run_scene_workflow(**kwargs):
+        captured.update(kwargs)
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": kwargs["scene_context"],
+            "draft": {"draft_text": "Anais revient seule sur le parking.", "stylist_mode": "llm"},
+            "editor_checklist": {"has_goal": True, "has_conflict": True, "has_context": True, "has_draft": True},
+            "quality_evaluation": {"needs_revision": False, "revision_targets": []},
+            "beta_reader": {"would_continue_reading": True, "reader_notes": ""},
+            "commercial_editor": {"hook_score": 4, "market_angle": "tension"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.continue_story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_continue_story_workflow(
+        story_dir=story_dir,
+        direction="Anais veut comprendre si Trisha l'a volontairement attiree sur le parking.",
+        use_llm=True,
+        llm_mode="mock",
+        llm_model="qwen2.5:3b",
+        llm_timeout=180.0,
+        llm_num_predict=420,
+    )
+
+    assert captured["story_mode"] == "original_story"
+    assert captured["use_llm"] is True
+    assert captured["llm_mode"] == "mock"
+    assert captured["llm_model"] == "qwen2.5:3b"
+    assert captured["llm_timeout"] == 180.0
+    assert captured["llm_num_predict"] == 420
+    assert captured["scene_context"]["title"] == "Le retour de Trisha"
+    assert captured["scene_context"]["characters"][0]["name"] == "Trisha"
+    assert "parking" in json.dumps(captured["scene_context"]["locations"])
+    assert result["story_memory"]["title"] == "Le retour de Trisha"
+    assert "continuation_scene" in result
+    assert "narrative_decision" in result
+
+
+def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
+    story_dir = tmp_path / "story"
+    story_dir.mkdir()
+    result = {
+        "source_story_dir": str(story_dir),
+        "scene_idea": "Continuer le recit depuis Anais.",
+        "direction": "Anais veut comprendre.",
+        "continuation_scene": {
+            "draft": {"draft_text": "Anais revient sur le parking."},
+            "editor_checklist": {
+                "has_goal": True,
+                "has_conflict": True,
+                "has_context": True,
+                "has_draft": True,
+            },
+            "quality_evaluation": {
+                "needs_revision": False,
+                "revision_targets": [],
+            },
+            "beta_reader": {
+                "would_continue_reading": True,
+                "reader_notes": "La tension tient.",
+            },
+            "commercial_editor": {
+                "hook_score": 4,
+                "market_angle": "thriller emotionnel",
+            },
+        },
+        "narrative_decision": {
+            "accepted_additions": [{}],
+            "rejected_additions": [],
+            "canon_updates": ["Anais garde le secret."],
+            "decision_notes": "No major contradiction detected.",
+        },
+    }
+
+    output_path = save_continue_output(result)
+
+    assert output_path.exists()
+    content = output_path.read_text(encoding="utf-8")
+    assert "Continuation Output" in content
+    assert "Anais veut comprendre." in content
+    assert "Narrative decision" in content
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:

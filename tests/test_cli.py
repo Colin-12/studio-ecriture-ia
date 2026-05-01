@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.app.cli import _run_scene_workflow, _run_story_workflow, build_parser, load_settings
+from src.app.cli import _run_continue_story_workflow, _run_scene_workflow, _run_story_workflow, build_parser, load_settings
 
 
 def test_load_settings_reads_yaml_file(tmp_path: Path) -> None:
@@ -292,6 +292,40 @@ def test_build_parser_parses_create_story_with_llm_num_predict() -> None:
     assert args.llm_num_predict == 64
 
 
+def test_build_parser_parses_continue_story_command() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "continue-story",
+            "examples/trisha_revenge_story",
+            "--direction",
+            "Anais veut comprendre si Trisha l'a volontairement attiree sur le parking.",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-model",
+            "qwen2.5:3b",
+            "--llm-timeout",
+            "180",
+            "--llm-num-predict",
+            "420",
+            "--save-output",
+        ]
+    )
+
+    assert args.command == "continue-story"
+    assert args.story_dir == "examples/trisha_revenge_story"
+    assert args.direction.startswith("Anais veut comprendre")
+    assert args.use_llm is True
+    assert args.llm_mode == "ollama"
+    assert args.llm_model == "qwen2.5:3b"
+    assert args.llm_timeout == 180.0
+    assert args.llm_num_predict == 420
+    assert args.max_revision_rounds == 0
+    assert args.save_output is True
+
+
 def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "src.agents.workflow.run_scene_workflow",
@@ -570,6 +604,42 @@ def test_run_story_workflow_passes_llm_num_predict(monkeypatch) -> None:
 
     assert exit_code == 0
     assert captured["llm_num_predict"] == 64
+
+
+def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        "src.agents.continue_story_workflow.run_continue_story_workflow",
+        lambda **kwargs: {
+            "source_story_dir": kwargs["story_dir"],
+            "story_memory": {"title": "Le retour de Trisha"},
+            "scene_idea": "Continuer le recit depuis Anais.",
+            "direction": kwargs["direction"],
+            "continuation_scene": {
+                "draft": {
+                    "stylist_mode": "llm",
+                    "draft_text": "Anais reprend souffle et revoit la scene."
+                }
+            },
+            "narrative_decision": {
+                "accepted_additions": [{}],
+                "rejected_additions": [],
+                "canon_updates": ["Anais garde le secret pour l'instant."],
+            },
+        },
+    )
+
+    exit_code = _run_continue_story_workflow(
+        story_dir="examples/trisha_revenge_story",
+        direction="Anais veut comprendre si Trisha l'a volontairement attiree sur le parking.",
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Source story: examples/trisha_revenge_story" in output
+    assert "Title: Le retour de Trisha" in output
+    assert "Stylist mode: llm" in output
+    assert "Narrative decision:" in output
+    assert "accepted additions count: 1" in output
 
 
 def test_build_parser_parses_ingest_command() -> None:

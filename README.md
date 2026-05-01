@@ -12,6 +12,7 @@ Le depot contient aussi `examples/trisha_revenge_story/`, un exemple narratif ca
 
 - generation de scene avec `run-scene`
 - generation de recit court en `3` scenes avec `create-story`
+- continuation d'un recit existant avec `continue-story`
 - workflow narratif multi-agents
 - utilisation locale de `Ollama`
 - decisions narratives avec `NarrativeDecisionAgent`
@@ -63,6 +64,12 @@ Configuration recommandee :
 
 - `qwen2.5:3b` pour la generation de scenes en francais
 - `--max-revision-rounds 0` pour une execution plus directe du MVP
+
+Exemple MVP de continuation :
+
+```bash
+python -m src.app.cli continue-story examples/trisha_revenge_story --direction "Anaïs veut comprendre si Trisha la volontairement attirée sur le parking." --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --save-output
+```
 
 ## Sorties generees
 

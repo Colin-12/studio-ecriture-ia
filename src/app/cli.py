@@ -188,6 +188,56 @@ def build_parser() -> argparse.ArgumentParser:
         help="Save the generated story as Markdown files in outputs/stories/.",
     )
 
+    continue_story_parser = subparsers.add_parser(
+        "continue-story",
+        help="Continue an existing canonized story from a folder.",
+    )
+    continue_story_parser.add_argument("story_dir", help="Canonized story folder to continue.")
+    continue_story_parser.add_argument("--scene-idea", help="Explicit next scene idea.")
+    continue_story_parser.add_argument("--direction", help="Human direction for the continuation.")
+    continue_story_parser.add_argument("--genre", help="Narrative genre for the continuation.")
+    continue_story_parser.add_argument("--tone", help="Narrative tone for the continuation.")
+    continue_story_parser.add_argument("--pov", help="Point of view for the continuation.")
+    continue_story_parser.add_argument("--language", help="Draft language for the continuation.")
+    continue_story_parser.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Use the configured LLM path in continuation drafting.",
+    )
+    continue_story_parser.add_argument(
+        "--llm-mode",
+        choices=["mock", "ollama"],
+        default="mock",
+        help="LLM backend to use when --use-llm is enabled.",
+    )
+    continue_story_parser.add_argument(
+        "--llm-model",
+        help="Optional Ollama model name to use when --llm-mode ollama is enabled.",
+    )
+    continue_story_parser.add_argument(
+        "--llm-timeout",
+        type=float,
+        default=None,
+        help="Optional timeout in seconds for local LLM calls.",
+    )
+    continue_story_parser.add_argument(
+        "--llm-num-predict",
+        type=int,
+        default=None,
+        help="Optional Ollama num_predict limit to reduce generation length.",
+    )
+    continue_story_parser.add_argument(
+        "--max-revision-rounds",
+        type=int,
+        default=0,
+        help="Maximum number of simple revision rounds to run.",
+    )
+    continue_story_parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save the continuation as a Markdown file next to the source story.",
+    )
+
     return parser
 
 
@@ -739,6 +789,63 @@ def _run_story_workflow(
     return 0
 
 
+def _run_continue_story_workflow(
+    story_dir: str | Path,
+    scene_idea: str | None = None,
+    direction: str | None = None,
+    genre: str | None = None,
+    tone: str | None = None,
+    pov: str | None = None,
+    language: str | None = None,
+    use_llm: bool = False,
+    llm_mode: str = "mock",
+    llm_model: str | None = None,
+    llm_timeout: float | None = None,
+    llm_num_predict: int | None = None,
+    max_revision_rounds: int = 0,
+    save_output: bool = False,
+) -> int:
+    from src.agents.continue_story_workflow import run_continue_story_workflow
+
+    result = run_continue_story_workflow(
+        story_dir=story_dir,
+        scene_idea=scene_idea,
+        direction=direction,
+        genre=genre,
+        tone=tone,
+        pov=pov,
+        language=language,
+        use_llm=use_llm,
+        llm_mode=llm_mode,
+        llm_model=llm_model,
+        llm_timeout=llm_timeout,
+        llm_num_predict=llm_num_predict,
+        max_revision_rounds=max_revision_rounds,
+    )
+
+    scene = result["continuation_scene"]
+    draft = scene["draft"]
+    decision = result["narrative_decision"]
+    print(f"Source story: {result['source_story_dir']}")
+    print(f"Title: {result['story_memory'].get('title', '')}")
+    print(f"Scene idea: {result['scene_idea']}")
+    if draft.get("stylist_mode"):
+        print(f"Stylist mode: {draft['stylist_mode']}")
+    print(f"Draft: {draft.get('draft_text', '')}")
+    print("Narrative decision:")
+    print(f"   accepted additions count: {len(decision.get('accepted_additions') or [])}")
+    print(f"   rejected additions count: {len(decision.get('rejected_additions') or [])}")
+    print(f"   canon updates count: {len(decision.get('canon_updates') or [])}")
+
+    if save_output:
+        from src.app.continue_output_writer import save_continue_output
+
+        output_path = save_continue_output(result)
+        print(f"Saved continuation output: {output_path}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -812,6 +919,23 @@ def main(argv: list[str] | None = None) -> int:
             llm_timeout=args.llm_timeout,
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
+            save_output=args.save_output,
+        )
+    if args.command == "continue-story":
+        return _run_continue_story_workflow(
+            story_dir=args.story_dir,
+            scene_idea=args.scene_idea,
+            direction=args.direction,
+            genre=args.genre,
+            tone=args.tone,
+            pov=args.pov,
+            language=args.language,
+            use_llm=args.use_llm,
+            llm_mode=args.llm_mode,
+            llm_model=args.llm_model,
+            llm_timeout=args.llm_timeout,
+            llm_num_predict=args.llm_num_predict,
+            max_revision_rounds=args.max_revision_rounds,
             save_output=args.save_output,
         )
 
