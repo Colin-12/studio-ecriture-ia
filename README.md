@@ -6,6 +6,8 @@ Studio d'ecriture IA local base sur une `writers room` multi-agents.
 
 Le projet genere soit une scene, soit un recit court en `3` scenes a partir d'une idee, avec un workflow narratif structure, `Ollama` en local, une memoire inter-scenes simple et un export Markdown exploitable.
 
+Le depot contient aussi `examples/trisha_revenge_story/`, un exemple narratif canonise qui servira plus tard a tester la continuation de recit, sans imposer la suite.
+
 ## Fonctionnalites principales
 
 - generation de scene avec `run-scene`

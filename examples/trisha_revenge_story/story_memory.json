@@ -1,0 +1,61 @@
+{
+  "title": "Le retour de Trisha",
+  "premise": "Trisha revient dans sa ville cotiere apres sa chute, reprend methodiquement ce qu'on lui a vole, puis reserve sa vengeance la plus intime a Matt et Anais.",
+  "central_conflict": "Trisha veut reprendre le controle total de sa vie, mais sa vengeance revele qu'elle reste prisonniere de la seule blessure capable de la faire sentir vivante.",
+  "theme": "La vengeance comme illusion de maitrise, et le prix affectif de la destruction de soi et des autres.",
+  "characters": [
+    {
+      "name": "Trisha",
+      "role": "protagoniste",
+      "status": "Victorieuse en apparence, mais vide."
+    },
+    {
+      "name": "Matt",
+      "role": "ancienne blessure intime",
+      "status": "Detruit dans une histoire qu'il ne comprend pas."
+    },
+    {
+      "name": "Anais",
+      "role": "amie d'enfance et fiancee de Matt",
+      "status": "A decouvert la mise en scene de Trisha avec Matt."
+    }
+  ],
+  "locations": [
+    {
+      "name": "ville cotiere"
+    },
+    {
+      "name": "port"
+    },
+    {
+      "name": "parking"
+    }
+  ],
+  "events": [
+    {
+      "order": 1,
+      "summary": "Trisha revient dans sa ville cotiere apres sa chute et commence sa reconquete."
+    },
+    {
+      "order": 2,
+      "summary": "Elle recupere les entreprises qu'on lui a volees en exposant les mensonges et les fraudes."
+    },
+    {
+      "order": 3,
+      "summary": "Elle reserve sa vengeance la plus intime a Matt et Anais."
+    },
+    {
+      "order": 4,
+      "summary": "La nuit du parking, Anais surprend la mise en scene de Trisha avec Matt."
+    }
+  ],
+  "decisions": [
+    "Traiter ce texte comme canon initial sans imposer la suite."
+  ],
+  "continuity_notes": [
+    "Le recit s'arrete apres la nuit du parking.",
+    "Conserver la relation triangulaire entre Trisha, Matt et Anais.",
+    "Preserver le ton sombre, froid, intime et tragique.",
+    "Ne pas contredire la destruction psychologique deja installee."
+  ]
+}
