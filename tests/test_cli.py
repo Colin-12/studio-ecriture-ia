@@ -416,6 +416,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
             },
             "visionary": {
                 "alternatives": ["alternative"],
+                "visionary_mode": "deterministic_fallback",
+                "visionary_fallback_reason": "Invalid LLM visionary response.",
                 "strongest_angle": "angle",
                 "symbolic_layer": "symbol",
             },
@@ -482,6 +484,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
 
     output = capsys.readouterr().out
     assert exit_code == 0
+    assert "Visionary mode: deterministic_fallback" in output
+    assert "Visionary fallback: Invalid LLM visionary response." in output
     assert "Stylist mode: deterministic_fallback" in output
     assert "Stylist fallback: Ollama request timed out." in output
     assert "Agent depth: balanced" in output
@@ -508,6 +512,10 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
                 {
                     "scene_idea": "Scene 1",
                     "scene_brief": {"scene_goal": "Goal 1"},
+                    "visionary": {
+                        "visionary_mode": "deterministic",
+                        "visionary_fallback_reason": None,
+                    },
                     "draft": {
                         "stylist_mode": "deterministic_fallback",
                         "stylist_fallback_reason": "Ollama request timed out.",
@@ -552,6 +560,7 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
     assert "Architect mode: deterministic" in output
     assert "Agent depth: balanced" in output
     assert "Architect fallback: Ollama request timed out." in output
+    assert "Visionary mode: deterministic" in output
     assert "Stylist mode: deterministic_fallback" in output
     assert "Stylist fallback: Ollama request timed out." in output
     assert "Narrative decision:" in output
@@ -742,6 +751,10 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
                 "intent_strength": "medium",
             },
             "continuation_scene": {
+                "visionary": {
+                    "visionary_mode": "deterministic_fallback",
+                    "visionary_fallback_reason": "Invalid LLM visionary response.",
+                },
                 "draft": {
                     "stylist_mode": "llm",
                     "draft_text": "Anais reprend souffle et revoit la scene."
@@ -771,6 +784,7 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
     assert "desired_action: comprendre ou vérifier une vérité cachée" in output
     assert "narrative_focus: Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking." in output
     assert "Stylist mode: llm" in output
+    assert "Visionary mode: deterministic_fallback" in output
     assert "Narrative decision:" in output
     assert "accepted additions count: 1" in output
 

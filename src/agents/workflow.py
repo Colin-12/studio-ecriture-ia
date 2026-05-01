@@ -39,7 +39,14 @@ def run_scene_workflow(
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
     devil_advocate = DevilAdvocateAgent()
-    visionary = VisionaryAgent()
+    visionary = VisionaryAgent(
+        use_llm=agent_depth == "deep" and use_llm,
+        llm_mode=llm_mode,
+        llm_model=llm_model,
+        llm_timeout=llm_timeout,
+        llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
+    )
     emotion_guardian = EmotionGuardianAgent()
     continuity = ContinuityAgent()
     stylist = StylistAgent(

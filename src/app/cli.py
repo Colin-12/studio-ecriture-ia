@@ -594,6 +594,10 @@ def _run_scene_workflow(
     print("Visionary:")
     for alternative in result["visionary"]["alternatives"]:
         print(f"   Alternative: {alternative}")
+    if result["visionary"].get("visionary_mode"):
+        print(f"   Visionary mode: {result['visionary']['visionary_mode']}")
+    if result["visionary"].get("visionary_fallback_reason"):
+        print(f"   Visionary fallback: {result['visionary']['visionary_fallback_reason']}")
     print(f"   Strongest angle: {result['visionary']['strongest_angle']}")
     print(f"   Symbolic layer: {result['visionary']['symbolic_layer']}")
 
@@ -788,6 +792,10 @@ def _run_story_workflow(
         )
         print(f"   Idea: {story_scene.get('scene_idea', scene['scene_idea'])}")
         print(f"   Goal: {chapter_goal}")
+        if scene["visionary"].get("visionary_mode"):
+            print(f"   Visionary mode: {scene['visionary']['visionary_mode']}")
+        if scene["visionary"].get("visionary_fallback_reason"):
+            print(f"   Visionary fallback: {scene['visionary']['visionary_fallback_reason']}")
         if scene["draft"].get("stylist_mode"):
             print(f"   Stylist mode: {scene['draft']['stylist_mode']}")
         if scene["draft"].get("stylist_fallback_reason"):
@@ -886,6 +894,10 @@ def _run_continue_story_workflow(
         print(f"   intent_strength: {user_intent.get('intent_strength', '')}")
     if draft.get("stylist_mode"):
         print(f"Stylist mode: {draft['stylist_mode']}")
+    if scene.get("visionary", {}).get("visionary_mode"):
+        print(f"Visionary mode: {scene['visionary']['visionary_mode']}")
+    if scene.get("visionary", {}).get("visionary_fallback_reason"):
+        print(f"Visionary fallback: {scene['visionary']['visionary_fallback_reason']}")
     print(f"Draft: {draft.get('draft_text', '')}")
     print("Narrative decision:")
     print(f"   accepted additions count: {len(decision.get('accepted_additions') or [])}")

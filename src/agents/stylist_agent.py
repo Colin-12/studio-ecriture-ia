@@ -126,6 +126,12 @@ class StylistAgent(BaseAgent):
                     f"Immediate stakes: {scene_brief.get('immediate_stakes', '')}",
                     f"Emotional core: {emotion_guardian.get('emotional_core', '')}",
                     f"Emotional beat: {emotion_guardian.get('suggested_emotional_beat', '')}",
+                    f"Sensory strategy: {(visionary or {}).get('sensory_strategy', '')}",
+                    f"Visual motif: {(visionary or {}).get('visual_motif', '')}",
+                    "Concrete details: "
+                    + " | ".join((visionary or {}).get("concrete_details", [])),
+                    f"Subtext to preserve: {(visionary or {}).get('subtext_to_preserve', '')}",
+                    "Avoid: " + " | ".join((visionary or {}).get("avoid", [])),
                     f"Genre: {scene_brief.get('genre', '')}",
                     f"Tone: {scene_brief.get('tone', '')}",
                     f"POV: {scene_brief.get('pov', '')}",
@@ -253,7 +259,12 @@ class StylistAgent(BaseAgent):
         immediate_stakes: str,
         continuity_conclusion: str,
         strongest_angle: str,
+        sensory_strategy: str,
+        visual_motif: str,
         symbolic_layer: str,
+        concrete_details: list[str],
+        subtext_to_preserve: str,
+        avoid: list[str],
         emotional_core: str,
         suggested_emotional_beat: str,
         genre: str,
@@ -286,7 +297,12 @@ class StylistAgent(BaseAgent):
             f"Immediate stakes: {immediate_stakes}",
             f"Continuity note: {continuity_conclusion}",
             f"Strongest angle: {strongest_angle}",
+            f"Sensory strategy: {sensory_strategy}",
+            f"Visual motif: {visual_motif}",
             f"Symbolic layer: {symbolic_layer}",
+            "Concrete details: " + " | ".join(concrete_details),
+            f"Subtext to preserve: {subtext_to_preserve}",
+            "Avoid: " + " | ".join(avoid),
             f"Emotional core: {emotional_core}",
             f"Suggested emotional beat: {suggested_emotional_beat}",
             "Expected movement: the scene should advance the immediate narrative situation.",
@@ -334,7 +350,12 @@ class StylistAgent(BaseAgent):
         )
         continuity_conclusion = continuity.get("conclusion", "No evidence found.")
         strongest_angle = visionary.get("strongest_angle", "")
+        sensory_strategy = visionary.get("sensory_strategy", "")
+        visual_motif = visionary.get("visual_motif", "")
         symbolic_layer = visionary.get("symbolic_layer", "")
+        concrete_details = visionary.get("concrete_details") or []
+        subtext_to_preserve = visionary.get("subtext_to_preserve", "")
+        avoid = visionary.get("avoid") or []
         emotional_core = emotion_guardian.get("emotional_core", "")
         suggested_emotional_beat = emotion_guardian.get("suggested_emotional_beat", "")
         protagonist = scene_brief.get("protagonist", "")
@@ -381,7 +402,12 @@ class StylistAgent(BaseAgent):
                     immediate_stakes=immediate_stakes,
                     continuity_conclusion=continuity_conclusion,
                     strongest_angle=strongest_angle,
+                    sensory_strategy=sensory_strategy,
+                    visual_motif=visual_motif,
                     symbolic_layer=symbolic_layer,
+                    concrete_details=concrete_details,
+                    subtext_to_preserve=subtext_to_preserve,
+                    avoid=avoid,
                     emotional_core=emotional_core,
                     suggested_emotional_beat=suggested_emotional_beat,
                     genre=genre,
@@ -410,7 +436,12 @@ class StylistAgent(BaseAgent):
                     immediate_stakes=immediate_stakes,
                     continuity_conclusion=continuity_conclusion,
                     strongest_angle=strongest_angle,
+                    sensory_strategy=sensory_strategy,
+                    visual_motif=visual_motif,
                     symbolic_layer=symbolic_layer,
+                    concrete_details=concrete_details,
+                    subtext_to_preserve=subtext_to_preserve,
+                    avoid=avoid,
                     emotional_core=emotional_core,
                     suggested_emotional_beat=suggested_emotional_beat,
                     genre=genre,
@@ -453,7 +484,12 @@ class StylistAgent(BaseAgent):
             immediate_stakes=immediate_stakes,
             continuity_conclusion=continuity_conclusion,
             strongest_angle=strongest_angle,
+            sensory_strategy=sensory_strategy,
+            visual_motif=visual_motif,
             symbolic_layer=symbolic_layer,
+            concrete_details=concrete_details,
+            subtext_to_preserve=subtext_to_preserve,
+            avoid=avoid,
             emotional_core=emotional_core,
             suggested_emotional_beat=suggested_emotional_beat,
             genre=genre,

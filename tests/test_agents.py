@@ -102,8 +102,85 @@ def test_visionary_agent_returns_dict() -> None:
 
     assert isinstance(result, dict)
     assert len(result["alternatives"]) >= 2
+    assert result["visionary_mode"] == "deterministic"
+    assert result["visionary_fallback_reason"] is None
     assert "strongest_angle" in result
+    assert "sensory_strategy" in result
+    assert len(result["concrete_details"]) == 3
     assert "symbolic_layer" in result
+
+
+def test_visionary_agent_with_llm_valid_json_returns_llm_mode(monkeypatch) -> None:
+    agent = VisionaryAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(
+        agent.llm_client,
+        "generate",
+        lambda prompt: json.dumps(
+            {
+                "strongest_angle": "Center the scene on the instant the clue becomes undeniable.",
+                "sensory_strategy": "Keep the perception tactile and compressed.",
+                "visual_motif": "A fractured reflection over the evidence.",
+                "symbolic_layer": "The room should feel like a memory under revision.",
+                "concrete_details": [
+                    "a flickering bathroom bulb",
+                    "dust on a framed photo",
+                    "a cold phone screen",
+                ],
+                "subtext_to_preserve": "The protagonist already fears the answer.",
+                "avoid": [
+                    "turning the scene into exposition",
+                    "adding a new subplot",
+                ],
+            }
+        ),
+    )
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Thomas compare une photo a son souvenir",
+                "conflict": "He must decide whether the archive can still be trusted.",
+                "genre": "thriller",
+                "tone": "sombre",
+                "pov": "first_person",
+                "language": "fr",
+            },
+            "devil_advocate": {
+                "revision_advice": "Anchor the scene in an immediate threat.",
+            },
+        }
+    )
+
+    assert result["visionary_mode"] == "llm"
+    assert result["visionary_fallback_reason"] is None
+    assert result["sensory_strategy"] == "Keep the perception tactile and compressed."
+    assert result["visual_motif"] == "A fractured reflection over the evidence."
+    assert len(result["concrete_details"]) == 3
+    assert len(result["avoid"]) == 2
+
+
+def test_visionary_agent_with_invalid_json_uses_deterministic_fallback(monkeypatch) -> None:
+    agent = VisionaryAgent(use_llm=True, llm_mode="ollama")
+
+    monkeypatch.setattr(agent.llm_client, "generate", lambda prompt: "{not-json")
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "language": "fr",
+            },
+            "devil_advocate": {
+                "revision_advice": "Strengthen the turning point.",
+            },
+        }
+    )
+
+    assert result["visionary_mode"] == "deterministic_fallback"
+    assert result["visionary_fallback_reason"] == "Invalid LLM visionary response."
+    assert result["alternatives"]
 
 
 def test_devil_advocate_and_visionary_use_french_narrative_parameters() -> None:
@@ -364,6 +441,8 @@ def test_stylist_agent_integrates_narrative_parameters() -> None:
     assert "POV: first_person" in result["draft_text"]
     assert "Language: fr" in result["draft_text"]
     assert "Emotional core:" in result["draft_text"]
+    assert "Sensory strategy:" in result["draft_text"]
+    assert "Concrete details:" in result["draft_text"]
 
 
 def test_stylist_agent_can_include_revision_focus() -> None:
@@ -778,7 +857,17 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
             "expected_output": "This field should not be included in the prompt.",
         },
         {"conclusion": "Structured memory points to: The creature learns language in chapter 13."},
-        {},
+        {
+            "sensory_strategy": "Keep the perception tactile and compressed.",
+            "visual_motif": "A fractured reflection over the evidence.",
+            "concrete_details": [
+                "une lampe qui gresille",
+                "une photo poussiereuse",
+                "un ecran froid",
+            ],
+            "subtext_to_preserve": "Marie sait deja qu'elle va perdre quelque chose.",
+            "avoid": ["l'explication abstraite", "le melodrame vague"],
+        },
         {
             "emotional_core": "The scene should expose the wound behind the discovery.",
             "suggested_emotional_beat": "Move from contained dread to direct exposure.",
@@ -810,6 +899,11 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     assert "Obstacle: Un bruit dans le couloir la coupe dans son geste." in prompt
     assert "Turning point: Un nom familier apparait." in prompt
     assert "Immediate stakes: Perdre la seule preuve avant de comprendre." in prompt
+    assert "Sensory strategy: Keep the perception tactile and compressed." in prompt
+    assert "Visual motif: A fractured reflection over the evidence." in prompt
+    assert "Concrete details: une lampe qui gresille | une photo poussiereuse | un ecran froid" in prompt
+    assert "Subtext to preserve: Marie sait deja qu'elle va perdre quelque chose." in prompt
+    assert "Avoid: l'explication abstraite | le melodrame vague" in prompt
     assert "Genre: " in prompt
     assert "Tone: " in prompt
     assert "POV: " in prompt
@@ -1187,6 +1281,74 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
     assert captured["llm_keep_alive"] == "30m"
     assert captured["timeout"] == 75.0
     assert result["draft"]["draft_text"] == "draft"
+
+
+def test_run_scene_workflow_only_activates_visionary_llm_in_deep(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.continuity_agent.answer_with_evidence",
+        lambda **kwargs: {
+            "question": kwargs["query"],
+            "passages": [],
+            "chapters": [],
+            "scores": [],
+            "sources": [],
+            "structured_events": [],
+            "conclusion": "No evidence found.",
+        },
+    )
+
+    captured = {"use_llm_values": []}
+
+    def fake_visionary_init(
+        self,
+        use_llm=False,
+        llm_mode="mock",
+        llm_model=None,
+        llm_timeout=None,
+        llm_num_predict=None,
+        llm_keep_alive=None,
+    ):
+        captured["use_llm_values"].append(use_llm)
+        self.name = "VisionaryAgent"
+        self.role = "visionary"
+        self.use_llm = use_llm
+
+    monkeypatch.setattr("src.agents.workflow.VisionaryAgent.__init__", fake_visionary_init)
+    monkeypatch.setattr(
+        "src.agents.workflow.VisionaryAgent.run",
+        lambda self, input_data: {
+            "agent": "VisionaryAgent",
+            "visionary_mode": "llm" if self.use_llm else "deterministic",
+            "visionary_fallback_reason": None,
+            "alternatives": [],
+            "strongest_angle": "angle",
+            "sensory_strategy": "strategy",
+            "visual_motif": "motif",
+            "symbolic_layer": "symbol",
+            "concrete_details": ["a", "b", "c"],
+            "subtext_to_preserve": "subtext",
+            "avoid": ["x", "y"],
+        },
+    )
+
+    run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        agent_depth="balanced",
+    )
+    run_scene_workflow(
+        scene_idea="Marie decouvre une lettre cachee",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        agent_depth="deep",
+    )
+
+    assert captured["use_llm_values"] == [False, True]
 
 
 def test_run_scene_workflow_does_not_crash_when_stylist_falls_back(monkeypatch) -> None:
