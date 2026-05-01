@@ -20,6 +20,7 @@ class StoryArchitectAgent(BaseAgent):
         llm_timeout: float | None = None,
         llm_model: str | None = None,
         llm_num_predict: int | None = None,
+        llm_keep_alive: str | None = None,
     ) -> None:
         super().__init__(name="StoryArchitectAgent", role="story_architect")
         self.use_llm = use_llm
@@ -29,12 +30,14 @@ class StoryArchitectAgent(BaseAgent):
                 mode=llm_mode,
                 model=llm_model,
                 num_predict=llm_num_predict,
+                keep_alive=llm_keep_alive,
             )
         else:
             self.llm_client = LLMClient(
                 mode=llm_mode,
                 model=llm_model,
                 num_predict=llm_num_predict,
+                keep_alive=llm_keep_alive,
                 timeout=llm_timeout,
             )
 

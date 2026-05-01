@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.agents.agent_depth import get_agent_strategy_summary
 from src.agents.documentalist_agent import DocumentalistAgent
 from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.story_architect_agent import StoryArchitectAgent
@@ -92,9 +93,11 @@ def run_story_workflow(
     llm_mode: str = "mock",
     llm_model: str | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
+    agent_depth: str = "balanced",
 ) -> dict:
     """Build a simple three-scene story from an original idea."""
     architect = StoryArchitectAgent(
@@ -102,6 +105,7 @@ def run_story_workflow(
         llm_mode=llm_mode,
         llm_model=llm_model,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
         llm_timeout=llm_timeout,
     )
     documentalist = DocumentalistAgent()
@@ -150,6 +154,7 @@ def run_story_workflow(
             llm_mode=llm_mode,
             llm_model=llm_model,
             llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
             story_mode=story_mode,
             scene_context=scene_context,
             genre=genre,
@@ -159,6 +164,7 @@ def run_story_workflow(
             llm_timeout=llm_timeout,
             max_revision_rounds=max_revision_rounds,
             force_revision=force_revision,
+            agent_depth=agent_depth,
         )
         scene_result["story_scene"] = scene
         narrative_decision = narrative_decision_agent.run(
@@ -197,6 +203,8 @@ def run_story_workflow(
 
     return {
         "story_idea": story_idea,
+        "agent_depth": agent_depth,
+        "agent_strategy_summary": get_agent_strategy_summary(agent_depth),
         "story_plan": story_plan,
         "scenes": scenes,
         "global_summary": global_summary,

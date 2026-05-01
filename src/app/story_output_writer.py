@@ -105,6 +105,9 @@ def save_story_output(result: dict, output_dir: str | Path = "outputs/stories") 
     summary_lines = [
         "# Summary",
         "",
+        f"Agent depth: {result.get('agent_depth', 'balanced')}",
+        result.get("agent_strategy_summary", ""),
+        "",
         result.get("global_summary", ""),
         "",
     ]

@@ -88,6 +88,12 @@ def test_story_architect_agent_accepts_custom_llm_num_predict() -> None:
     assert agent.llm_client.num_predict == 64
 
 
+def test_story_architect_agent_accepts_custom_llm_keep_alive() -> None:
+    agent = StoryArchitectAgent(use_llm=True, llm_mode="ollama", llm_keep_alive="30m")
+
+    assert agent.llm_client.keep_alive == "30m"
+
+
 def test_story_architect_agent_with_valid_llm_json_uses_llm_plan(monkeypatch) -> None:
     agent = StoryArchitectAgent(use_llm=True, llm_mode="mock")
 
@@ -369,6 +375,7 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
 
     assert "story_plan" in result
     assert len(result["scenes"]) == 3
+    assert result["agent_depth"] == "balanced"
     assert result["scenes"][0]["draft"]["draft_text"].startswith("Draft for ")
     assert result["scenes"][0]["story_scene"]["scene_role"] == "trigger"
     assert result["scenes"][0]["story_scene"]["protagonist"] == "Thomas"
@@ -424,6 +431,7 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
     )
 
     assert len(result["scenes"]) == 3
+    assert result["agent_depth"] == "balanced"
     assert captured["timeouts"] == [80.0, 80.0, 80.0]
     assert captured["scene_contexts"][0]["protagonist"] == "Thomas"
     assert captured["scene_contexts"][0]["core_mystery"] == "Les souvenirs de Thomas ont ete modifies par une IA."
@@ -531,20 +539,24 @@ def test_run_continue_story_workflow_reads_story_memory_and_passes_scene_context
         llm_model="qwen2.5:3b",
         llm_timeout=180.0,
         llm_num_predict=420,
+        llm_keep_alive="30m",
     )
 
     assert captured["story_mode"] == "original_story"
+    assert captured["agent_depth"] == "balanced"
     assert captured["use_llm"] is True
     assert captured["llm_mode"] == "mock"
     assert captured["llm_model"] == "qwen2.5:3b"
     assert captured["llm_timeout"] == 180.0
     assert captured["llm_num_predict"] == 420
+    assert captured["llm_keep_alive"] == "30m"
     assert captured["scene_context"]["title"] == "Le retour de Trisha"
     assert captured["scene_context"]["characters"][0]["name"] == "Trisha"
     assert "parking" in json.dumps(captured["scene_context"]["locations"])
     assert captured["scene_context"]["user_intent"]["focus_candidate"] == "Anaïs"
     assert "Ne pas faire dAnaïs" in captured["scene_context"]["user_intent"]["do_not_invert"]
     assert result["story_memory"]["title"] == "Le retour de Trisha"
+    assert result["agent_depth"] == "balanced"
     assert "continuation_scene" in result
     assert "narrative_decision" in result
     assert result["user_intent"]["focus_candidate"] == "Anaïs"
@@ -555,6 +567,8 @@ def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
     story_dir.mkdir()
     result = {
         "source_story_dir": str(story_dir),
+        "agent_depth": "deep",
+        "agent_strategy_summary": "reserved for deeper LLM-based agent deliberation",
         "scene_idea": "Continuer le recit depuis Anais.",
         "direction": "Anais veut comprendre.",
         "continuation_scene": {
@@ -603,6 +617,7 @@ def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
     assert output_path.exists()
     content = output_path.read_text(encoding="utf-8")
     assert "Continuation Output" in content
+    assert "Agent depth: deep" in content
     assert "Anais veut comprendre." in content
     assert "Narrative decision" in content
     assert "User intent" in content
@@ -677,17 +692,53 @@ def test_run_story_workflow_passes_llm_num_predict_to_scene_workflow(monkeypatch
     assert captured["num_predicts"] == [64, 64, 64]
 
 
+def test_run_story_workflow_passes_llm_keep_alive_to_scene_workflow(monkeypatch) -> None:
+    captured = {"keep_alives": []}
+
+    def fake_run_scene_workflow(**kwargs):
+        captured["keep_alives"].append(kwargs["llm_keep_alive"])
+        return {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {"draft_text": "Draft"},
+        }
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        fake_run_scene_workflow,
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        llm_keep_alive="30m",
+    )
+
+    assert len(result["scenes"]) == 3
+    assert captured["keep_alives"] == ["30m", "30m", "30m"]
+
+
 def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
     captured = {
         "architect_use_llm": None,
         "architect_llm_mode": None,
         "architect_llm_model": None,
         "architect_llm_num_predict": None,
+        "architect_llm_keep_alive": None,
         "architect_llm_timeout": None,
         "scene_use_llm": [],
         "scene_llm_mode": [],
         "scene_llm_model": [],
         "scene_llm_num_predict": [],
+        "scene_llm_keep_alive": [],
         "scene_llm_timeout": [],
     }
 
@@ -698,11 +749,13 @@ def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
         llm_timeout=None,
         llm_model=None,
         llm_num_predict=None,
+        llm_keep_alive=None,
     ):
         captured["architect_use_llm"] = use_llm
         captured["architect_llm_mode"] = llm_mode
         captured["architect_llm_model"] = llm_model
         captured["architect_llm_num_predict"] = llm_num_predict
+        captured["architect_llm_keep_alive"] = llm_keep_alive
         captured["architect_llm_timeout"] = llm_timeout
         self.name = "StoryArchitectAgent"
         self.role = "story_architect"
@@ -759,6 +812,7 @@ def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
         captured["scene_llm_mode"].append(kwargs["llm_mode"])
         captured["scene_llm_model"].append(kwargs["llm_model"])
         captured["scene_llm_num_predict"].append(kwargs["llm_num_predict"])
+        captured["scene_llm_keep_alive"].append(kwargs["llm_keep_alive"])
         captured["scene_llm_timeout"].append(kwargs["llm_timeout"])
         return {
             "scene_idea": kwargs["scene_idea"],
@@ -787,6 +841,7 @@ def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
         llm_mode="mock",
         llm_model="qwen2.5:1.5b",
         llm_num_predict=64,
+        llm_keep_alive="30m",
         llm_timeout=42.0,
         language="fr",
     )
@@ -795,11 +850,13 @@ def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
     assert captured["architect_llm_mode"] == "mock"
     assert captured["architect_llm_model"] == "qwen2.5:1.5b"
     assert captured["architect_llm_num_predict"] == 64
+    assert captured["architect_llm_keep_alive"] == "30m"
     assert captured["architect_llm_timeout"] == 42.0
     assert captured["scene_use_llm"] == [True, True, True]
     assert captured["scene_llm_mode"] == ["mock", "mock", "mock"]
     assert captured["scene_llm_model"] == ["qwen2.5:1.5b", "qwen2.5:1.5b", "qwen2.5:1.5b"]
     assert captured["scene_llm_num_predict"] == [64, 64, 64]
+    assert captured["scene_llm_keep_alive"] == ["30m", "30m", "30m"]
     assert captured["scene_llm_timeout"] == [42.0, 42.0, 42.0]
     assert result["story_plan"]["title"] == "La mémoire réécrite"
 
@@ -814,6 +871,7 @@ def test_run_story_workflow_can_enable_architect_llm_separately(monkeypatch) -> 
         llm_timeout=None,
         llm_model=None,
         llm_num_predict=None,
+        llm_keep_alive=None,
     ):
         captured["architect_use_llm"] = use_llm
         self.name = "StoryArchitectAgent"

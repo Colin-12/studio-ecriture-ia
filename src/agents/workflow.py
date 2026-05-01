@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.agents.agent_depth import get_agent_strategy_summary
 from src.agents.beta_reader_agent import BetaReaderAgent
 from src.agents.commercial_editor_agent import CommercialEditorAgent
 from src.agents.continuity_agent import ContinuityAgent
@@ -23,6 +24,7 @@ def run_scene_workflow(
     llm_mode: str = "mock",
     llm_model: str | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     story_mode: str = "existing_novel",
     scene_context: dict | None = None,
     genre: str | None = None,
@@ -32,6 +34,7 @@ def run_scene_workflow(
     llm_timeout: float | None = None,
     max_revision_rounds: int = 1,
     force_revision: bool = False,
+    agent_depth: str = "balanced",
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
@@ -45,6 +48,7 @@ def run_scene_workflow(
         llm_timeout=llm_timeout,
         llm_model=llm_model,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
     )
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
@@ -187,6 +191,8 @@ def run_scene_workflow(
     return {
         "scene_idea": scene_idea,
         "story_mode": story_mode,
+        "agent_depth": agent_depth,
+        "agent_strategy_summary": get_agent_strategy_summary(agent_depth),
         "scene_brief": scene_brief,
         "devil_advocate": devil_advocate_result,
         "visionary": visionary_result,

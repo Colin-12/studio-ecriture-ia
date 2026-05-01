@@ -14,12 +14,14 @@ class LLMClient:
         mode: str = "mock",
         model: str | None = None,
         num_predict: int | None = None,
+        keep_alive: str | None = None,
         timeout: float = 120.0,
         base_url: str = "http://localhost:11434",
     ) -> None:
         self.mode = mode
         self.model = model or "qwen2.5:3b"
         self.num_predict = num_predict
+        self.keep_alive = keep_alive
         self.timeout = timeout
         self.base_url = base_url.rstrip("/")
 
@@ -31,6 +33,8 @@ class LLMClient:
         }
         if self.num_predict is not None:
             payload_data["options"] = {"num_predict": self.num_predict}
+        if self.keep_alive is not None:
+            payload_data["keep_alive"] = self.keep_alive
         payload = json.dumps(payload_data).encode("utf-8")
         http_request = request.Request(
             url=f"{self.base_url}/api/generate",

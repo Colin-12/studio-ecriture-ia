@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from src.agents.agent_depth import get_agent_strategy_summary
 from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.user_intent_agent import UserIntentAgent
 from src.agents.workflow import run_scene_workflow
@@ -60,7 +61,9 @@ def run_continue_story_workflow(
     llm_model: str | None = None,
     llm_timeout: float | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     max_revision_rounds: int = 0,
+    agent_depth: str = "balanced",
 ) -> dict:
     story_path = Path(story_dir)
     story_memory_path = story_path / "story_memory.json"
@@ -89,6 +92,7 @@ def run_continue_story_workflow(
         llm_mode=llm_mode,
         llm_model=llm_model,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
         story_mode="original_story",
         scene_context=scene_context,
         genre=genre,
@@ -98,6 +102,7 @@ def run_continue_story_workflow(
         llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=False,
+        agent_depth=agent_depth,
     )
 
     narrative_decision = NarrativeDecisionAgent().run(
@@ -116,6 +121,8 @@ def run_continue_story_workflow(
 
     return {
         "source_story_dir": str(story_path),
+        "agent_depth": agent_depth,
+        "agent_strategy_summary": get_agent_strategy_summary(agent_depth),
         "story_memory": story_memory,
         "scene_idea": final_scene_idea,
         "direction": direction,

@@ -67,6 +67,10 @@ def save_scene_output(result: dict, output_dir: str | Path = "outputs") -> Path:
         "## Story mode",
         result.get("story_mode", ""),
         "",
+        "## Agent strategy",
+        f"- `agent_depth`: {result.get('agent_depth', 'balanced')}",
+        f"- `agent_strategy_summary`: {result.get('agent_strategy_summary', '')}",
+        "",
     ]
 
     narrative_fields = [

@@ -690,6 +690,12 @@ def test_stylist_agent_accepts_custom_llm_num_predict() -> None:
     assert agent.llm_client.num_predict == 64
 
 
+def test_stylist_agent_accepts_custom_llm_keep_alive() -> None:
+    agent = StylistAgent(use_llm=True, llm_mode="ollama", llm_keep_alive="30m")
+
+    assert agent.llm_client.keep_alive == "30m"
+
+
 def test_stylist_agent_uses_short_revision_prompt_in_llm_mode(monkeypatch) -> None:
     agent = StylistAgent(use_llm=True, llm_mode="mock")
     captured = {}
@@ -959,6 +965,32 @@ def test_llm_client_ollama_mode_includes_num_predict_when_provided(monkeypatch) 
     assert result == "Ollama reply"
 
 
+def test_llm_client_ollama_mode_includes_keep_alive_when_provided(monkeypatch) -> None:
+    client = LLMClient(mode="ollama", keep_alive="30m")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "Ollama reply"}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        payload = json.loads(http_request.data.decode("utf-8"))
+        assert payload["model"] == "qwen2.5:3b"
+        assert payload["keep_alive"] == "30m"
+        return FakeResponse()
+
+    monkeypatch.setattr("src.llm.client.request.urlopen", fake_urlopen)
+
+    result = client.generate("Prompt Ollama")
+
+    assert result == "Ollama reply"
+
+
 def test_llm_client_ollama_mode_raises_clear_error_when_unavailable(monkeypatch) -> None:
     client = LLMClient(mode="ollama")
 
@@ -1045,6 +1077,7 @@ def test_run_scene_workflow_returns_complete_dict(monkeypatch) -> None:
     assert "revised_editor" in result
     assert "revised_quality_evaluation" in result
     assert result["story_mode"] == "existing_novel"
+    assert result["agent_depth"] == "balanced"
     assert result["editor_checklist"]["has_goal"] is True
     assert result["editor_checklist"]["has_draft"] is True
     assert "draft_text" in result["draft"]
@@ -1099,6 +1132,7 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         "llm_mode": None,
         "llm_model": None,
         "llm_num_predict": None,
+        "llm_keep_alive": None,
         "timeout": None,
     }
 
@@ -1109,11 +1143,13 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         llm_timeout=None,
         llm_model=None,
         llm_num_predict=None,
+        llm_keep_alive=None,
     ):
         captured["use_llm"] = use_llm
         captured["llm_mode"] = llm_mode
         captured["llm_model"] = llm_model
         captured["llm_num_predict"] = llm_num_predict
+        captured["llm_keep_alive"] = llm_keep_alive
         captured["timeout"] = llm_timeout
         self.use_llm = use_llm
         self.llm_mode = llm_mode
@@ -1140,6 +1176,7 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
         llm_mode="mock",
         llm_model="qwen2.5:1.5b",
         llm_num_predict=64,
+        llm_keep_alive="30m",
         llm_timeout=75.0,
     )
 
@@ -1147,6 +1184,7 @@ def test_run_scene_workflow_passes_llm_timeout_to_stylist(monkeypatch) -> None:
     assert captured["llm_mode"] == "mock"
     assert captured["llm_model"] == "qwen2.5:1.5b"
     assert captured["llm_num_predict"] == 64
+    assert captured["llm_keep_alive"] == "30m"
     assert captured["timeout"] == 75.0
     assert result["draft"]["draft_text"] == "draft"
 

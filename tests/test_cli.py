@@ -56,6 +56,7 @@ def test_build_parser_parses_run_scene_command() -> None:
     assert args.max_revision_rounds == 1
     assert args.force_revision is False
     assert args.save_output is False
+    assert args.agent_depth == "balanced"
 
 
 def test_build_parser_parses_run_scene_with_use_llm() -> None:
@@ -130,6 +131,26 @@ def test_build_parser_parses_run_scene_with_llm_num_predict() -> None:
     assert args.llm_num_predict == 64
 
 
+def test_build_parser_parses_run_scene_with_llm_keep_alive() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "run-scene",
+            "Victor comprend que sa creation lui echappe",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-keep-alive",
+            "30m",
+        ]
+    )
+
+    assert args.command == "run-scene"
+    assert args.llm_mode == "ollama"
+    assert args.llm_keep_alive == "30m"
+
+
 def test_build_parser_parses_run_scene_with_original_story_mode() -> None:
     parser = build_parser()
 
@@ -187,6 +208,7 @@ def test_build_parser_parses_run_scene_with_narrative_parameters() -> None:
     assert args.max_revision_rounds == 2
     assert args.force_revision is True
     assert args.save_output is True
+    assert args.agent_depth == "balanced"
 
 
 def test_build_parser_parses_create_story_command() -> None:
@@ -215,6 +237,8 @@ def test_build_parser_parses_create_story_command() -> None:
             "1",
             "--force-revision",
             "--save-output",
+            "--agent-depth",
+            "deep",
         ]
     )
 
@@ -232,6 +256,7 @@ def test_build_parser_parses_create_story_command() -> None:
     assert args.max_revision_rounds == 1
     assert args.force_revision is True
     assert args.save_output is True
+    assert args.agent_depth == "deep"
 
 
 def test_build_parser_parses_create_story_with_architect_llm() -> None:
@@ -292,6 +317,25 @@ def test_build_parser_parses_create_story_with_llm_num_predict() -> None:
     assert args.llm_num_predict == 64
 
 
+def test_build_parser_parses_create_story_with_llm_keep_alive() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "create-story",
+            "Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-keep-alive",
+            "30m",
+        ]
+    )
+
+    assert args.command == "create-story"
+    assert args.llm_keep_alive == "30m"
+
+
 def test_build_parser_parses_continue_story_command() -> None:
     parser = build_parser()
 
@@ -324,6 +368,27 @@ def test_build_parser_parses_continue_story_command() -> None:
     assert args.llm_num_predict == 420
     assert args.max_revision_rounds == 0
     assert args.save_output is True
+    assert args.agent_depth == "balanced"
+    assert args.llm_keep_alive is None
+
+
+def test_build_parser_parses_continue_story_with_llm_keep_alive() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "continue-story",
+            "examples/trisha_revenge_story",
+            "--use-llm",
+            "--llm-mode",
+            "ollama",
+            "--llm-keep-alive",
+            "30m",
+        ]
+    )
+
+    assert args.command == "continue-story"
+    assert args.llm_keep_alive == "30m"
 
 
 def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys) -> None:
@@ -332,6 +397,8 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
         lambda **kwargs: {
             "scene_idea": kwargs["scene_idea"],
             "story_mode": kwargs["story_mode"],
+            "agent_depth": kwargs["agent_depth"],
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
             "scene_brief": {
                 "scene_goal": kwargs["scene_idea"],
                 "required_context": "Context",
@@ -417,6 +484,7 @@ def test_run_scene_workflow_prints_emotion_guardian_section(monkeypatch, capsys)
     assert exit_code == 0
     assert "Stylist mode: deterministic_fallback" in output
     assert "Stylist fallback: Ollama request timed out." in output
+    assert "Agent depth: balanced" in output
     assert "Emotion Guardian:" in output
     assert "Emotional core: coeur" in output
     assert "Beta Reader:" in output
@@ -461,6 +529,8 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
                 }
             ],
             "global_summary": "Summary",
+            "agent_depth": "balanced",
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
             "story_memory": {
                 "canon_summary": "Canon summary",
                 "characters": [{"name": "Character"}],
@@ -480,6 +550,7 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
     output = capsys.readouterr().out
     assert exit_code == 0
     assert "Architect mode: deterministic" in output
+    assert "Agent depth: balanced" in output
     assert "Architect fallback: Ollama request timed out." in output
     assert "Stylist mode: deterministic_fallback" in output
     assert "Stylist fallback: Ollama request timed out." in output
@@ -507,6 +578,8 @@ def test_run_story_workflow_passes_architect_llm_flag(monkeypatch) -> None:
             },
             "scenes": [],
             "global_summary": "Summary",
+            "agent_depth": "balanced",
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
             "story_memory": {
                 "canon_summary": "Canon summary",
                 "characters": [],
@@ -545,6 +618,8 @@ def test_run_story_workflow_passes_llm_model(monkeypatch) -> None:
             },
             "scenes": [],
             "global_summary": "Summary",
+            "agent_depth": "balanced",
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
             "story_memory": {
                 "canon_summary": "Canon summary",
                 "characters": [],
@@ -583,6 +658,8 @@ def test_run_story_workflow_passes_llm_num_predict(monkeypatch) -> None:
             },
             "scenes": [],
             "global_summary": "Summary",
+            "agent_depth": "balanced",
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
             "story_memory": {
                 "canon_summary": "Canon summary",
                 "characters": [],
@@ -606,11 +683,53 @@ def test_run_story_workflow_passes_llm_num_predict(monkeypatch) -> None:
     assert captured["llm_num_predict"] == 64
 
 
+def test_run_story_workflow_passes_llm_keep_alive(monkeypatch) -> None:
+    captured = {}
+
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_story_workflow",
+        lambda **kwargs: captured.update(kwargs) or {
+            "story_plan": {
+                "architect_mode": "deterministic",
+                "architect_fallback_reason": None,
+                "title": "Recit bref - Test",
+                "premise": "Premise",
+                "central_conflict": "Conflict",
+            },
+            "scenes": [],
+            "global_summary": "Summary",
+            "agent_depth": "balanced",
+            "agent_strategy_summary": "default writer room with deterministic analysis agents and LLM stylist",
+            "story_memory": {
+                "canon_summary": "Canon summary",
+                "characters": [],
+                "events": [],
+                "decisions": [],
+            },
+        },
+    )
+
+    exit_code = _run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        use_llm=True,
+        llm_mode="ollama",
+        llm_keep_alive="30m",
+    )
+
+    assert exit_code == 0
+    assert captured["llm_keep_alive"] == "30m"
+
+
 def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "src.agents.continue_story_workflow.run_continue_story_workflow",
         lambda **kwargs: {
             "source_story_dir": kwargs["story_dir"],
+            "agent_depth": kwargs["agent_depth"],
+            "agent_strategy_summary": "reserved for deeper LLM-based agent deliberation",
             "story_memory": {"title": "Le retour de Trisha"},
             "scene_idea": "Continuer le recit depuis Anais.",
             "direction": kwargs["direction"],
@@ -639,11 +758,13 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
     exit_code = _run_continue_story_workflow(
         story_dir="examples/trisha_revenge_story",
         direction="Anais veut comprendre si Trisha l'a volontairement attiree sur le parking.",
+        agent_depth="deep",
     )
 
     output = capsys.readouterr().out
     assert exit_code == 0
     assert "Source story: examples/trisha_revenge_story" in output
+    assert "Agent depth: deep" in output
     assert "Title: Le retour de Trisha" in output
     assert "User intent:" in output
     assert "focus_candidate: Anaïs" in output

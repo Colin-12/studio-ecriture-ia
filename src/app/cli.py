@@ -92,6 +92,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama num_predict limit to reduce generation length.",
     )
     run_scene_parser.add_argument(
+        "--llm-keep-alive",
+        help="Optional Ollama keep_alive value to keep the model loaded between calls.",
+    )
+    run_scene_parser.add_argument(
         "--story-mode",
         choices=["existing_novel", "original_story"],
         default="existing_novel",
@@ -122,6 +126,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-output",
         action="store_true",
         help="Save the scene workflow result as a Markdown file in outputs/.",
+    )
+    run_scene_parser.add_argument(
+        "--agent-depth",
+        choices=["fast", "balanced", "deep"],
+        default="balanced",
+        help="Agent deliberation depth profile.",
     )
 
     create_story_parser = subparsers.add_parser(
@@ -156,6 +166,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama num_predict limit to reduce generation length.",
     )
     create_story_parser.add_argument(
+        "--llm-keep-alive",
+        help="Optional Ollama keep_alive value to keep the model loaded between calls.",
+    )
+    create_story_parser.add_argument(
         "--story-mode",
         choices=["existing_novel", "original_story"],
         default="original_story",
@@ -186,6 +200,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-output",
         action="store_true",
         help="Save the generated story as Markdown files in outputs/stories/.",
+    )
+    create_story_parser.add_argument(
+        "--agent-depth",
+        choices=["fast", "balanced", "deep"],
+        default="balanced",
+        help="Agent deliberation depth profile.",
     )
 
     continue_story_parser = subparsers.add_parser(
@@ -227,6 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama num_predict limit to reduce generation length.",
     )
     continue_story_parser.add_argument(
+        "--llm-keep-alive",
+        help="Optional Ollama keep_alive value to keep the model loaded between calls.",
+    )
+    continue_story_parser.add_argument(
         "--max-revision-rounds",
         type=int,
         default=0,
@@ -236,6 +260,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-output",
         action="store_true",
         help="Save the continuation as a Markdown file next to the source story.",
+    )
+    continue_story_parser.add_argument(
+        "--agent-depth",
+        choices=["fast", "balanced", "deep"],
+        default="balanced",
+        help="Agent deliberation depth profile.",
     )
 
     return parser
@@ -502,6 +532,7 @@ def _run_scene_workflow(
     llm_mode: str = "mock",
     llm_model: str | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     story_mode: str = "existing_novel",
     genre: str | None = None,
     tone: str | None = None,
@@ -511,6 +542,7 @@ def _run_scene_workflow(
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     save_output: bool = False,
+    agent_depth: str = "balanced",
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -523,6 +555,7 @@ def _run_scene_workflow(
         llm_mode=llm_mode,
         llm_model=llm_model,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
         story_mode=story_mode,
         genre=genre,
         tone=tone,
@@ -531,10 +564,12 @@ def _run_scene_workflow(
         llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
+        agent_depth=agent_depth,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
     print(f"Story mode: {result['story_mode']}")
+    print(f"Agent depth: {result['agent_depth']}")
     if result["scene_brief"].get("genre"):
         print(f"Genre: {result['scene_brief']['genre']}")
     if result["scene_brief"].get("tone"):
@@ -698,6 +733,7 @@ def _run_story_workflow(
     llm_mode: str = "mock",
     llm_model: str | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     story_mode: str = "original_story",
     genre: str | None = None,
     tone: str | None = None,
@@ -707,6 +743,7 @@ def _run_story_workflow(
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     save_output: bool = False,
+    agent_depth: str = "balanced",
 ) -> int:
     from src.agents.story_workflow import run_story_workflow
 
@@ -725,12 +762,15 @@ def _run_story_workflow(
         llm_mode=llm_mode,
         llm_model=llm_model,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
         llm_timeout=llm_timeout,
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
+        agent_depth=agent_depth,
     )
 
     plan = result["story_plan"]
+    print(f"Agent depth: {result['agent_depth']}")
     print(f"Title: {plan['title']}")
     if plan.get("architect_mode"):
         print(f"Architect mode: {plan['architect_mode']}")
@@ -802,8 +842,10 @@ def _run_continue_story_workflow(
     llm_model: str | None = None,
     llm_timeout: float | None = None,
     llm_num_predict: int | None = None,
+    llm_keep_alive: str | None = None,
     max_revision_rounds: int = 0,
     save_output: bool = False,
+    agent_depth: str = "balanced",
 ) -> int:
     from src.agents.continue_story_workflow import run_continue_story_workflow
 
@@ -820,13 +862,16 @@ def _run_continue_story_workflow(
         llm_model=llm_model,
         llm_timeout=llm_timeout,
         llm_num_predict=llm_num_predict,
+        llm_keep_alive=llm_keep_alive,
         max_revision_rounds=max_revision_rounds,
+        agent_depth=agent_depth,
     )
 
     scene = result["continuation_scene"]
     draft = scene["draft"]
     decision = result["narrative_decision"]
     print(f"Source story: {result['source_story_dir']}")
+    print(f"Agent depth: {result['agent_depth']}")
     print(f"Title: {result['story_memory'].get('title', '')}")
     print(f"Scene idea: {result['scene_idea']}")
     if result.get("user_intent"):
@@ -900,6 +945,7 @@ def main(argv: list[str] | None = None) -> int:
             llm_mode=args.llm_mode,
             llm_model=args.llm_model,
             llm_num_predict=args.llm_num_predict,
+            llm_keep_alive=args.llm_keep_alive,
             story_mode=args.story_mode,
             genre=args.genre,
             tone=args.tone,
@@ -909,6 +955,7 @@ def main(argv: list[str] | None = None) -> int:
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
             save_output=args.save_output,
+            agent_depth=args.agent_depth,
         )
     if args.command == "create-story":
         return _run_story_workflow(
@@ -921,6 +968,7 @@ def main(argv: list[str] | None = None) -> int:
             llm_mode=args.llm_mode,
             llm_model=args.llm_model,
             llm_num_predict=args.llm_num_predict,
+            llm_keep_alive=args.llm_keep_alive,
             story_mode=args.story_mode,
             genre=args.genre,
             tone=args.tone,
@@ -930,6 +978,7 @@ def main(argv: list[str] | None = None) -> int:
             max_revision_rounds=args.max_revision_rounds,
             force_revision=args.force_revision,
             save_output=args.save_output,
+            agent_depth=args.agent_depth,
         )
     if args.command == "continue-story":
         return _run_continue_story_workflow(
@@ -945,8 +994,10 @@ def main(argv: list[str] | None = None) -> int:
             llm_model=args.llm_model,
             llm_timeout=args.llm_timeout,
             llm_num_predict=args.llm_num_predict,
+            llm_keep_alive=args.llm_keep_alive,
             max_revision_rounds=args.max_revision_rounds,
             save_output=args.save_output,
+            agent_depth=args.agent_depth,
         )
 
     parser.error(f"Unknown command: {args.command}")
