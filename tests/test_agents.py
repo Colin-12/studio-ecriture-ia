@@ -326,6 +326,9 @@ def test_user_intent_agent_detects_anais_as_focus_candidate() -> None:
 
     assert result["focus_candidate"] == "Anaïs"
     assert result["desired_action"] == "comprendre ou vérifier une vérité cachée"
+    assert result["narrative_focus"] == "Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking."
+    assert "Ne pas faire dAnaïs" in result["do_not_invert"]
+    assert len(result["role_boundaries"]) >= 2
     assert result["intent_strength"] == "medium"
 
 
@@ -756,6 +759,12 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
                 "focus_candidate": "Anaïs",
                 "desired_action": "comprendre ou vérifier une vérité cachée",
                 "dramatic_question": "Que revele vraiment cette direction ?",
+                "narrative_focus": "Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking.",
+                "do_not_invert": "Ne pas faire dAnaïs la personne qui a attiré Trisha sur le parking.",
+                "role_boundaries": [
+                    "Anaïs reste celle qui enquête, doute ou cherche à comprendre.",
+                    "Trisha reste la manipulatrice possible ou la source de lambiguïté.",
+                ],
                 "author_constraints": ["Anais veut comprendre si Trisha l'a volontairement attiree sur le parking."],
                 "ambiguity_notes": "Le focus propose est une intention utilisateur et peut etre discute par les agents.",
                 "intent_strength": "medium",
@@ -779,6 +788,8 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     assert "User focus candidate: Anaïs" in prompt
     assert "User desired action: comprendre ou vérifier une vérité cachée" in prompt
     assert "User dramatic question: Que revele vraiment cette direction ?" in prompt
+    assert "User narrative focus: Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking." in prompt
+    assert "User do not invert: Ne pas faire dAnaïs la personne qui a attiré Trisha sur le parking." in prompt
     assert "Write 150 to 220 words." in prompt
     assert "Never write phrases like: I am unable to generate" in prompt
     assert "Protagonist: Marie" in prompt

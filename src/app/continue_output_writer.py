@@ -38,6 +38,9 @@ def save_continue_output(result: dict, output_dir: str | Path | None = None) -> 
                 f"- focus_candidate: {user_intent.get('focus_candidate', '')}",
                 f"- desired_action: {user_intent.get('desired_action', '')}",
                 f"- dramatic_question: {user_intent.get('dramatic_question', '')}",
+                f"- narrative_focus: {user_intent.get('narrative_focus', '')}",
+                f"- do_not_invert: {user_intent.get('do_not_invert', '')}",
+                "- role_boundaries: " + " | ".join(user_intent.get("role_boundaries", [])),
                 f"- intent_strength: {user_intent.get('intent_strength', '')}",
                 "",
             ]

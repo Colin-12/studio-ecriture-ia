@@ -618,6 +618,8 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
                 "focus_candidate": "Anaïs",
                 "desired_action": "comprendre ou vérifier une vérité cachée",
                 "dramatic_question": "Que revele vraiment cette direction ?",
+                "narrative_focus": "Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking.",
+                "do_not_invert": "Ne pas faire dAnaïs la personne qui a attiré Trisha sur le parking.",
                 "intent_strength": "medium",
             },
             "continuation_scene": {
@@ -646,6 +648,7 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
     assert "User intent:" in output
     assert "focus_candidate: Anaïs" in output
     assert "desired_action: comprendre ou vérifier une vérité cachée" in output
+    assert "narrative_focus: Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking." in output
     assert "Stylist mode: llm" in output
     assert "Narrative decision:" in output
     assert "accepted additions count: 1" in output

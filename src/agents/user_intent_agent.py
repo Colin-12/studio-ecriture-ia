@@ -40,6 +40,23 @@ class UserIntentAgent(BaseAgent):
         else:
             dramatic_question = "Quelle est la suite la plus coherente a partir du canon existant ?"
 
+        if (
+            ("anaïs" in normalized or "anais" in normalized)
+            and "trisha" in normalized
+            and any(token in normalized for token in ["attirée", "attiree", "parking"])
+        ):
+            narrative_focus = "Anaïs cherche à comprendre si Trisha a volontairement orchestré la scène du parking."
+            do_not_invert = "Ne pas faire dAnaïs la personne qui a attiré Trisha sur le parking."
+            role_boundaries = [
+                "Anaïs reste celle qui enquête, doute ou cherche à comprendre.",
+                "Trisha reste la manipulatrice possible ou la source de lambiguïté.",
+                "La scène peut commencer par Trisha seulement si le doute dAnaïs reste le centre dramatique.",
+            ]
+        else:
+            narrative_focus = source_text or main_character
+            do_not_invert = ""
+            role_boundaries = []
+
         author_constraints = [source_text] if source_text else ["Respecter la direction utilisateur si elle est compatible avec le canon."]
         ambiguity_notes = "Le focus propose est une intention utilisateur et peut etre discute par les agents."
         if scene_idea:
@@ -54,6 +71,9 @@ class UserIntentAgent(BaseAgent):
             "focus_candidate": focus_candidate,
             "desired_action": desired_action,
             "dramatic_question": dramatic_question,
+            "narrative_focus": narrative_focus,
+            "do_not_invert": do_not_invert,
+            "role_boundaries": role_boundaries,
             "author_constraints": author_constraints,
             "ambiguity_notes": ambiguity_notes,
             "intent_strength": intent_strength,

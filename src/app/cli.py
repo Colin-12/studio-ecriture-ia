@@ -835,6 +835,9 @@ def _run_continue_story_workflow(
         print(f"   focus_candidate: {user_intent.get('focus_candidate', '')}")
         print(f"   desired_action: {user_intent.get('desired_action', '')}")
         print(f"   dramatic_question: {user_intent.get('dramatic_question', '')}")
+        print(f"   narrative_focus: {user_intent.get('narrative_focus', '')}")
+        if user_intent.get("do_not_invert"):
+            print(f"   do_not_invert: {user_intent.get('do_not_invert', '')}")
         print(f"   intent_strength: {user_intent.get('intent_strength', '')}")
     if draft.get("stylist_mode"):
         print(f"Stylist mode: {draft['stylist_mode']}")
