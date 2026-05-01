@@ -1,209 +1,128 @@
 # Studio d'ecriture IA par agents
 
-Projet personnel local pour construire un systeme d'ecriture assistee par IA oriente multi-agents, avec une progression par phases.
+## Resume
 
-## Objectif
+Studio d'ecriture IA local base sur une `writers room` multi-agents.
 
-L'objectif final est de produire des romans longs avec un systeme multi-agents specialise. Cette premiere phase se limite volontairement au systeme de memoire, afin de poser une base simple, lisible et exploitable avant d'ajouter la generation.
+Le projet genere soit une scene, soit un recit court en `3` scenes a partir d'une idee, avec un workflow narratif structure, `Ollama` en local, une memoire inter-scenes simple et un export Markdown exploitable.
 
-## Scope de la Phase 1
+## Fonctionnalites principales
 
-La Phase 1 couvre uniquement :
+- generation de scene avec `run-scene`
+- generation de recit court en `3` scenes avec `create-story`
+- workflow narratif multi-agents
+- utilisation locale de `Ollama`
+- decisions narratives avec `NarrativeDecisionAgent`
+- memoire inter-scenes avec `canon_so_far`
+- export Markdown + `story_memory.json`
 
-- l'ingestion de contenus sources
-- la structuration d'une memoire locale
-- le stockage de connaissances et metadonnees
-- la retrieval pour retrouver des informations utiles
-- les premiers liens de type graphe entre elements memorises
+## Architecture actuelle
 
-Cette phase n'implemente pas :
-
-- les agents de generation
-- LangGraph
-- Claude
-- Groq
-- Streamlit
-
-## Stack memoire prevue
-
-- `ChromaDB` pour le stockage vectoriel local
-- `sentence-transformers` pour les embeddings
-- `SQLite` via `SQLAlchemy` pour les donnees structurees
-- `networkx` pour les relations de type graphe
-- `pandas`, `pydantic`, `pyyaml` et `python-dotenv` pour l'ingestion, la configuration et la validation
-- `pytest` pour les tests
-
-## Structure du projet
+Le workflow `create-story` suit actuellement cette structure :
 
 ```text
-data/raw/
-data/processed/
-data/chroma/
-manuscript/source_novel/
-src/ingest/
-src/memory/
-src/retrieval/
-src/graph/
-src/app/
-db/
-tests/
-configs/
+StoryArchitect
+  -> Scene workflow
+       -> SceneArchitect
+       -> DevilAdvocate
+       -> Visionary
+       -> EmotionGuardian
+       -> Stylist / Ollama
+       -> Editor
+       -> QualityEvaluator
+       -> BetaReader
+       -> CommercialEditor
+       -> NarrativeDecision
+  -> Documentalist
+  -> story_memory.json
 ```
 
-## Installation prevue
+`StoryArchitectAgent` construit un plan en `3` scenes : `trigger`, `confrontation`, `decision`.
 
-Les commandes ci-dessous sont preparees pour la suite, mais ne sont pas executees automatiquement.
+Chaque scene peut recevoir :
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
+- le plan de scene
+- le `story_context`
+- le `canon_so_far`, c'est-a-dire un resume simple des scenes deja generees
 
-## Demo locale Phase 1
+`NarrativeDecisionAgent` intervient apres chaque scene pour :
 
-Cette sequence permet de tester la memoire localement sur un roman source en Markdown.
+- accepter ou rejeter des ajouts narratifs simples
+- produire des `canon_updates`
+- ajouter des contraintes utiles pour la suite si necessaire
 
-### 1. Initialiser la base SQLite
-
-```bash
-python -m src.memory.init_db
-```
-
-### 2. Ingerer les chapitres Markdown
-
-Les fichiers `.md` doivent etre places dans `manuscript/source_novel/`.
-
-```bash
-python -m src.app.cli ingest
-```
-
-### 3. Lister les chapitres avec la CLI
-
-```bash
-python -m src.app.cli list-chapters
-```
-
-### 4. Indexer les chapitres dans ChromaDB
-
-```bash
-python -m src.app.cli index
-```
-
-### 5. Lancer une recherche semantique
-
-Exemple avec la requete `the creation of the being` :
-
-```bash
-python -m src.app.cli search "the creation of the being"
-```
-
-### 6. Interroger le Continuiste simple
-
-Exemple avec la question `where does the creature learn language?` :
-
-```bash
-python -m src.app.cli continuity "where does the creature learn language?"
-```
-
-Cette commande affiche :
-
-- les passages semantiques retrouves
-- les evenements structures pertinents
-- une conclusion courte et deterministe, sans `LLM`
-
-### 7. Lancer le workflow run-scene
-
-Exemple complet :
-
-```bash
-python -m src.app.cli run-scene "Un homme decouvre que ses souvenirs ont ete modifies par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --force-revision --max-revision-rounds 1 --save-output
-```
-
-Ce workflow utilise la chaine suivante :
-
-- `SceneArchitect`
-- `DevilAdvocate`
-- `Visionary`
-- `EmotionGuardian`
-- `Continuity`
-- `Stylist`
-- `Editor`
-- `QualityEvaluator`
-- `BetaReader`
-- `CommercialEditor`
-- boucle de revision
-- sauvegarde Markdown optionnelle
-
-`EmotionGuardian` ajoute avant le draft :
-
-- `emotional_core`
-- `internal_conflict`
-- `fear_or_desire`
-- `emotional_risk`
-- `suggested_emotional_beat`
-
-`BetaReader` ajoute une reaction lecteur simple avec :
-
-- `confusion_points`
-- `engagement_points`
-- `boredom_risks`
-- `would_continue_reading`
-
-`CommercialEditor` ajoute une lecture publication / marche avec :
-
-- `hook_score`
-- `market_angle`
-- `title_suggestions`
-- `format_suggestion`
-- `publication_risk`
-
-Notes :
-
-- `Ollama` est utilise localement, sans API payante
-- `--story-mode original_story` desactive l'usage d'un canon existant
-- `--max-revision-rounds` borne strictement la revision, donc sans boucle infinie
-- `--save-output` sauvegarde le resultat dans `outputs/` au format Markdown
-
-### 8. Lancer les tests
-
-```bash
-python -m pytest -q
-```
-
-### 9. Lancer create-story
-
-Exemple complet :
-
-```bash
-python -m src.app.cli create-story "Un homme decouvre que ses souvenirs ont ete modifies par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-timeout 240 --max-revision-rounds 0 --save-output
-```
-
-Cette commande :
-
-- construit un plan narratif court en `3` scenes
-- utilise un schema `trigger -> confrontation -> decision`
-- genere chaque scene avec le workflow `run-scene`
-- passe un `canon_so_far` simple des scenes deja generees vers les scenes suivantes
-- ajoute un `NarrativeDecisionAgent` apres chaque scene pour arbitrer les ajouts et preparer le canon
-
-Si `--save-output` est utilise, la commande cree un dossier Markdown dans `outputs/stories/`.
-Ce dossier contient des fichiers Markdown par scene, un `summary.md` et un `story_memory.json` avec une memoire simple du recit original.
-
-## Configuration Ollama recommandee
-
-Configuration de reference validee pour `create-story` en francais :
+## Commande de demo recommandee
 
 ```bash
 python -m src.app.cli create-story "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0 --save-output
 ```
 
-Notes :
+Configuration recommandee :
 
-- `qwen2.5:3b` est recommande pour la generation de scenes avec le `StylistAgent`
-- `qwen2.5:1.5b` est plus leger, mais moins fiable pour la prose narrative francaise et plus sensible aux sorties meta
-- `--save-output` exporte les scenes en Markdown dans `outputs/stories/` ainsi qu'un `story_memory.json`
+- `qwen2.5:3b` pour la generation de scenes en francais
+- `--max-revision-rounds 0` pour une execution plus directe du MVP
 
-## Etat actuel
+## Sorties generees
 
-Le depot contient maintenant un MVP local de `writer's room` : memoire, workflow scene complet, `create-story` avec `Ollama`, `NarrativeDecisionAgent`, `canon_so_far` inter-scenes, export Markdown et `story_memory.json`.
+Avec `--save-output`, le projet cree un dossier de sortie de ce type :
+
+```text
+outputs/stories/YYYYMMDD_HHMMSS_story/
+  story_plan.md
+  scene_01.md
+  scene_02.md
+  scene_03.md
+  summary.md
+  story_memory.json
+```
+
+Ces fichiers permettent de relire :
+
+- le plan narratif
+- les scenes generees
+- les decisions narratives par scene
+- un resume global
+- une memoire narrative simple reutilisable
+
+## Exemple de resultat attendu
+
+Exemple court de structure :
+
+- `Title: La memoire reecrite`
+- `Stylist mode: llm`
+- `Narrative decision: accepted additions / canon updates`
+- `Saved story output: outputs/stories/...`
+
+## Installation rapide
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python -m pytest -q
+ollama pull qwen2.5:3b
+ollama serve
+```
+
+Ensuite, lancer la commande de demo `create-story`.
+
+## Tests
+
+- etat actuel : `109 passed`
+- un warning `ChromaDB` peut apparaitre selon l'environnement, mais il est non bloquant pour le MVP actuel
+
+## Limites actuelles
+
+- la qualite litteraire reste variable selon le prompt et le modele local
+- `qwen2.5:1.5b` est plus leger et souvent plus rapide, mais moins fiable pour la prose narrative francaise
+- plusieurs agents restent deterministes par conception
+- l'interface graphique n'est pas encore implementee
+- la memoire narrative reste simple, mais elle est deja fonctionnelle pour un recit court
+
+## Prochaines etapes
+
+- activer plus de `LLM` par agent quand c'est utile
+- mieux extraire personnages, lieux, objets et elements de canon
+- ajouter un workflow `continue-story`
+- proposer une interface `Streamlit` ou web
+- ameliorer la qualite stylistique et la stabilite narrative
