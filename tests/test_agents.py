@@ -8,6 +8,7 @@ from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
 from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.editor_agent import EditorAgent
+from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
@@ -270,6 +271,45 @@ def test_stylist_agent_returns_dict() -> None:
     assert "Marie decouvre une lettre cachee" in result["draft_text"]
     assert "Strongest angle: Center the scene on the consequence of the discovery." in result["draft_text"]
     assert "Emotional core: The scene should expose the wound behind the discovery." in result["draft_text"]
+
+
+def test_narrative_decision_agent_returns_expected_fields() -> None:
+    agent = NarrativeDecisionAgent()
+
+    result = agent.run(
+        {
+            "story_plan": {"title": "La memoire reecrite"},
+            "scene_result": {
+                "story_scene": {
+                    "scene_number": 1,
+                    "scene_role": "trigger",
+                    "concrete_action": "Thomas compare une photo a son souvenir.",
+                    "immediate_stakes": "Perdre la seule preuve fiable de son identite.",
+                },
+                "draft": {
+                    "draft_text": (
+                        "Thomas etudie une photo ancienne et comprend qu'un souvenir intime a ete modifie. "
+                        "L'image reste liee a l'archive qui contredit sa memoire."
+                    )
+                },
+            },
+            "canon_so_far": [],
+            "story_context": {
+                "protagonist": "Thomas",
+                "core_mystery": "Les souvenirs de Thomas ont ete modifies par une IA.",
+                "central_evidence": "Une archive, une photo ou un message contredit un souvenir intime.",
+                "main_threat": "Thomas risque de perdre la seule preuve fiable de son identite.",
+            },
+        }
+    )
+
+    assert "accepted_additions" in result
+    assert "rejected_additions" in result
+    assert "canon_updates" in result
+    assert "next_scene_constraints" in result
+    assert "decision_notes" in result
+    assert result["accepted_additions"]
+    assert any("Thomas" in update for update in result["canon_updates"])
 
 
 def test_stylist_agent_integrates_narrative_parameters() -> None:

@@ -56,6 +56,7 @@ def save_scene_output(result: dict, output_dir: str | Path = "outputs") -> Path:
     continuity = result.get("continuity", {})
     draft = result.get("draft", {})
     commercial_editor = result.get("commercial_editor", {})
+    narrative_decision = result.get("narrative_decision", {})
 
     lines = [
         "# Scene Output",
@@ -149,6 +150,22 @@ def save_scene_output(result: dict, output_dir: str | Path = "outputs") -> Path:
                 "",
             ]
         )
+
+    if narrative_decision:
+        lines.extend(
+            [
+                "## Narrative decisions",
+                f"- `accepted_additions_count`: {len(narrative_decision.get('accepted_additions') or [])}",
+                f"- `rejected_additions_count`: {len(narrative_decision.get('rejected_additions') or [])}",
+                f"- `canon_updates_count`: {len(narrative_decision.get('canon_updates') or [])}",
+                f"- `decision_notes`: {narrative_decision.get('decision_notes', '')}",
+            ]
+        )
+        for item in narrative_decision.get("canon_updates") or []:
+            lines.append(f"- Canon update: {item}")
+        for item in narrative_decision.get("next_scene_constraints") or []:
+            lines.append(f"- Next scene constraint: {item}")
+        lines.append("")
 
     if result.get("revised_draft"):
         lines.extend(

@@ -439,6 +439,42 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
     assert len(captured["scene_contexts"][2]["canon_so_far"]) == 2
     assert captured["scene_contexts"][2]["canon_so_far"][1]["scene_number"] == 2
     assert captured["scene_contexts"][2]["canon_so_far"][1]["scene_role"] == "confrontation"
+    assert captured["scene_contexts"][2]["canon_so_far"][1]["canon_updates"]
+
+
+def test_run_story_workflow_adds_narrative_decision_to_each_scene(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.agents.story_workflow.run_scene_workflow",
+        lambda **kwargs: {
+            "scene_idea": kwargs["scene_idea"],
+            "story_mode": kwargs["story_mode"],
+            "scene_brief": {
+                "scene_goal": kwargs["scene_idea"],
+                "required_context": "Context",
+                "conflict": "Conflict",
+                "expected_output": "Output",
+            },
+            "draft": {
+                "draft_text": (
+                    "Thomas etudie une archive qui contredit son souvenir. "
+                    "La preuve reste liee au mystere de la memoire modifiee."
+                )
+            },
+        },
+    )
+
+    result = run_story_workflow(
+        story_idea="Un homme decouvre que ses souvenirs ont ete modifies par une IA",
+        db_path="db/novel_memory.sqlite",
+        chroma_dir="data/chroma",
+        collection_name="novel_memory",
+        language="fr",
+    )
+
+    assert len(result["scenes"]) == 3
+    assert result["scenes"][0]["narrative_decision"]["accepted_additions"]
+    assert "canon_updates" in result["scenes"][1]["narrative_decision"]
+    assert result["scenes"][2]["narrative_decision"]["decision_notes"]
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:
@@ -782,6 +818,13 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
                 "visionary": {"alternatives": [], "strongest_angle": "", "symbolic_layer": ""},
                 "continuity": {"conclusion": "No evidence found."},
                 "draft": {"draft_text": "Draft 1", "style_notes": []},
+                "narrative_decision": {
+                    "accepted_additions": [{"key": "protagonist", "value": "Character"}],
+                    "rejected_additions": [],
+                    "canon_updates": ["Character keeps the letter."],
+                    "next_scene_constraints": ["Keep pressure on the evidence."],
+                    "decision_notes": "No major contradiction detected.",
+                },
                 "quality_evaluation": None,
             },
             {
@@ -797,6 +840,13 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
                 "visionary": {"alternatives": [], "strongest_angle": "", "symbolic_layer": ""},
                 "continuity": {"conclusion": "No evidence found."},
                 "draft": {"draft_text": "Draft 2", "style_notes": []},
+                "narrative_decision": {
+                    "accepted_additions": [],
+                    "rejected_additions": [],
+                    "canon_updates": [],
+                    "next_scene_constraints": [],
+                    "decision_notes": "No major contradiction detected.",
+                },
                 "quality_evaluation": None,
             },
             {
@@ -812,6 +862,13 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
                 "visionary": {"alternatives": [], "strongest_angle": "", "symbolic_layer": ""},
                 "continuity": {"conclusion": "No evidence found."},
                 "draft": {"draft_text": "Draft 3", "style_notes": []},
+                "narrative_decision": {
+                    "accepted_additions": [],
+                    "rejected_additions": [],
+                    "canon_updates": ["The final choice changes the evidence status."],
+                    "next_scene_constraints": [],
+                    "decision_notes": "No major contradiction detected.",
+                },
                 "quality_evaluation": None,
             },
         ],
@@ -840,10 +897,16 @@ def test_save_story_output_creates_expected_files(tmp_path: Path) -> None:
     assert (story_dir / "summary.md").exists()
     assert (story_dir / "story_memory.json").exists()
     plan_content = (story_dir / "story_plan.md").read_text(encoding="utf-8")
+    scene_content = (story_dir / "scene_01.md").read_text(encoding="utf-8")
+    summary_content = (story_dir / "summary.md").read_text(encoding="utf-8")
     assert "[trigger]" in plan_content
     assert "Turning point: Turning 1" in plan_content
+    assert "## Narrative decisions" in scene_content
+    assert "Character keeps the letter." in scene_content
+    assert "## Narrative decisions" in summary_content
     story_memory = json.loads((story_dir / "story_memory.json").read_text(encoding="utf-8"))
     assert story_memory["canon_summary"] == "Canon"
     assert len(story_memory["events"]) == 3
     assert story_memory["events"][0]["scene_role"] == "trigger"
     assert story_memory["decisions"][0]["story_mode"] == "original_story"
+    assert len(story_memory["narrative_decisions"]) == 3

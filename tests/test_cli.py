@@ -417,6 +417,13 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
                         "scene_idea": "Scene 1",
                         "scene_goal": "Goal 1",
                     },
+                    "narrative_decision": {
+                        "accepted_additions": [{"key": "protagonist", "value": "Thomas"}],
+                        "rejected_additions": [],
+                        "canon_updates": ["Thomas garde une preuve."],
+                        "next_scene_constraints": ["Keep pressure on the evidence."],
+                        "decision_notes": "No major contradiction detected.",
+                    },
                 }
             ],
             "global_summary": "Summary",
@@ -442,6 +449,10 @@ def test_run_story_workflow_prints_story_memory_section(monkeypatch, capsys) -> 
     assert "Architect fallback: Ollama request timed out." in output
     assert "Stylist mode: deterministic_fallback" in output
     assert "Stylist fallback: Ollama request timed out." in output
+    assert "Narrative decision:" in output
+    assert "accepted additions count: 1" in output
+    assert "rejected additions count: 0" in output
+    assert "canon updates count: 1" in output
     assert "Story memory:" in output
     assert "Canon summary: Canon summary" in output
     assert "Events: 3" in output

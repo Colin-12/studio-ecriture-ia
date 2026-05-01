@@ -702,6 +702,21 @@ def _run_story_workflow(
             print(f"   Stylist mode: {scene['draft']['stylist_mode']}")
         if scene["draft"].get("stylist_fallback_reason"):
             print(f"   Stylist fallback: {scene['draft']['stylist_fallback_reason']}")
+        if scene.get("narrative_decision"):
+            decision = scene["narrative_decision"]
+            print("   Narrative decision:")
+            print(
+                "      accepted additions count: "
+                + str(len(decision.get("accepted_additions") or []))
+            )
+            print(
+                "      rejected additions count: "
+                + str(len(decision.get("rejected_additions") or []))
+            )
+            print(
+                "      canon updates count: "
+                + str(len(decision.get("canon_updates") or []))
+            )
         print(f"   Draft: {scene['draft']['draft_text']}")
 
     print("Global summary:")

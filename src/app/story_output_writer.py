@@ -52,6 +52,11 @@ def save_story_output(result: dict, output_dir: str | Path = "outputs/stories") 
         scene_path.rename(story_dir / f"scene_{index:02d}.md")
 
     story_memory = result.get("story_memory")
+    narrative_decisions = [
+        scene.get("narrative_decision")
+        for scene in result.get("scenes") or []
+        if scene.get("narrative_decision")
+    ]
     if story_memory is None:
         first_scene = (result.get("scenes") or [{}])[0]
         scene_brief = first_scene.get("scene_brief", {})
@@ -87,7 +92,11 @@ def save_story_output(result: dict, output_dir: str | Path = "outputs/stories") 
                     if value
                 }
             ],
+            "narrative_decisions": narrative_decisions,
         }
+    elif narrative_decisions:
+        story_memory = dict(story_memory)
+        story_memory["narrative_decisions"] = narrative_decisions
     story_memory_path.write_text(
         json.dumps(story_memory, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -99,5 +108,14 @@ def save_story_output(result: dict, output_dir: str | Path = "outputs/stories") 
         result.get("global_summary", ""),
         "",
     ]
+    if narrative_decisions:
+        summary_lines.extend(
+            [
+                "## Narrative decisions",
+                f"- Scenes with decisions: {len(narrative_decisions)}",
+                f"- Total canon updates: {sum(len(item.get('canon_updates') or []) for item in narrative_decisions)}",
+                "",
+            ]
+        )
     summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
     return story_dir

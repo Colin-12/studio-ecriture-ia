@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from src.agents.documentalist_agent import DocumentalistAgent
+from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.workflow import run_scene_workflow
 
 
-def _build_canon_entry(scene: dict, scene_result: dict) -> dict:
+def _build_canon_entry(scene: dict, scene_result: dict, canon_updates: list[str] | None = None) -> dict:
     draft_text = ((scene_result.get("draft") or {}).get("draft_text") or "").strip()
     summary_parts = [
         scene.get("protagonist", ""),
@@ -23,6 +24,7 @@ def _build_canon_entry(scene: dict, scene_result: dict) -> dict:
         "scene_role": scene.get("scene_role", ""),
         "summary": summary[:220],
         "draft_excerpt": draft_text[:300],
+        "canon_updates": list(canon_updates or []),
     }
 
 
@@ -117,6 +119,7 @@ def run_story_workflow(
         story_plan=story_plan,
         language=language,
     )
+    narrative_decision_agent = NarrativeDecisionAgent()
 
     scenes = []
     canon_so_far = []
@@ -158,8 +161,23 @@ def run_story_workflow(
             force_revision=force_revision,
         )
         scene_result["story_scene"] = scene
+        narrative_decision = narrative_decision_agent.run(
+            {
+                "story_plan": story_plan,
+                "scene_result": scene_result,
+                "canon_so_far": canon_so_far,
+                "story_context": story_context,
+            }
+        )
+        scene_result["narrative_decision"] = narrative_decision
         scenes.append(scene_result)
-        canon_so_far.append(_build_canon_entry(scene, scene_result))
+        canon_so_far.append(
+            _build_canon_entry(
+                scene,
+                scene_result,
+                canon_updates=narrative_decision.get("canon_updates"),
+            )
+        )
 
     global_summary = _build_global_summary(language)
 
