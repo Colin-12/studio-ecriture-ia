@@ -7,6 +7,25 @@ from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.workflow import run_scene_workflow
 
 
+def _build_canon_entry(scene: dict, scene_result: dict) -> dict:
+    draft_text = ((scene_result.get("draft") or {}).get("draft_text") or "").strip()
+    summary_parts = [
+        scene.get("protagonist", ""),
+        scene.get("concrete_action", ""),
+        scene.get("turning_point", ""),
+    ]
+    summary = " ".join(part.strip() for part in summary_parts if part and part.strip())
+    if not summary:
+        summary = scene.get("scene_goal", "") or scene.get("scene_idea", "")
+
+    return {
+        "scene_number": scene.get("scene_number"),
+        "scene_role": scene.get("scene_role", ""),
+        "summary": summary[:220],
+        "draft_excerpt": draft_text[:300],
+    }
+
+
 def _build_global_summary(language: str | None) -> str:
     if (language or "").lower() == "fr":
         return (
@@ -100,6 +119,7 @@ def run_story_workflow(
     )
 
     scenes = []
+    canon_so_far = []
     for scene in story_plan["scene_outline"]:
         scene_context = {
             key: scene[key]
@@ -113,6 +133,7 @@ def run_story_workflow(
             if key in scene
         }
         scene_context.update(story_context)
+        scene_context["canon_so_far"] = list(canon_so_far)
         scene_prompt = (
             f"{scene['scene_idea']} Goal: {scene['scene_goal']} "
             f"Conflict: {scene['conflict']} Turning point: {scene['turning_point']}"
@@ -138,6 +159,7 @@ def run_story_workflow(
         )
         scene_result["story_scene"] = scene
         scenes.append(scene_result)
+        canon_so_far.append(_build_canon_entry(scene, scene_result))
 
     global_summary = _build_global_summary(language)
 

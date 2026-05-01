@@ -388,6 +388,7 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
     def fake_run_scene_workflow(**kwargs):
         captured["timeouts"].append(kwargs["llm_timeout"])
         captured["scene_contexts"].append(kwargs["scene_context"])
+        scene_number = len(captured["scene_contexts"])
         return {
             "scene_idea": kwargs["scene_idea"],
             "story_mode": kwargs["story_mode"],
@@ -397,7 +398,13 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
                 "conflict": "Conflict",
                 "expected_output": "Output",
             },
-            "draft": {"draft_text": "Draft"},
+            "draft": {
+                "draft_text": (
+                    f"Draft scene {scene_number}. "
+                    "Thomas trouve une preuve concrete qui fissure son souvenir intime. "
+                    "La tension monte pendant qu'il verifie ce qu'il croyait certain."
+                )
+            },
         }
 
     monkeypatch.setattr(
@@ -421,8 +428,17 @@ def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) ->
     assert "photo" in captured["scene_contexts"][0]["central_evidence"].lower()
     assert "identite" in captured["scene_contexts"][0]["main_threat"].lower()
     assert captured["scene_contexts"][0]["forbidden_inventions"]
+    assert captured["scene_contexts"][0]["canon_so_far"] == []
     assert captured["scene_contexts"][1]["concrete_action"]
+    assert len(captured["scene_contexts"][1]["canon_so_far"]) == 1
+    assert captured["scene_contexts"][1]["canon_so_far"][0]["scene_number"] == 1
+    assert captured["scene_contexts"][1]["canon_so_far"][0]["scene_role"] == "trigger"
+    assert captured["scene_contexts"][1]["canon_so_far"][0]["summary"]
+    assert captured["scene_contexts"][1]["canon_so_far"][0]["draft_excerpt"].startswith("Draft scene 1.")
     assert captured["scene_contexts"][2]["immediate_stakes"]
+    assert len(captured["scene_contexts"][2]["canon_so_far"]) == 2
+    assert captured["scene_contexts"][2]["canon_so_far"][1]["scene_number"] == 2
+    assert captured["scene_contexts"][2]["canon_so_far"][1]["scene_role"] == "confrontation"
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:

@@ -687,6 +687,14 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
             "concrete_action": "Elle déplie la lettre sous une lampe.",
             "obstacle": "Un bruit dans le couloir la coupe dans son geste.",
             "immediate_stakes": "Perdre la seule preuve avant de comprendre.",
+            "canon_so_far": [
+                {
+                    "scene_number": 1,
+                    "scene_role": "trigger",
+                    "summary": "Marie trouve une lettre qui contredit un souvenir precise.",
+                    "draft_excerpt": "Marie hesite avant d'ouvrir la lettre.",
+                }
+            ],
             "expected_output": "This field should not be included in the prompt.",
         },
         {"conclusion": "Structured memory points to: The creature learns language in chapter 13."},
@@ -699,6 +707,9 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
 
     assert "Write the scene now. Do not explain. Do not refuse. Do not analyze the task." in prompt
     assert "Do not contradict these story facts." in prompt
+    assert "Use this previous canon. Do not contradict it." in prompt
+    assert "Previous canon:" in prompt
+    assert "Canon scene 1 [trigger]: Marie trouve une lettre qui contredit un souvenir precise." in prompt
     assert "Write 150 to 220 words." in prompt
     assert "Never write phrases like: I am unable to generate" in prompt
     assert "Protagonist: Marie" in prompt
@@ -723,6 +734,31 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     assert "Continuity conclusion:" not in prompt
     assert "Strongest angle:" not in prompt
     assert "Symbolic layer:" not in prompt
+
+
+def test_stylist_agent_deterministic_draft_includes_previous_canon() -> None:
+    agent = StylistAgent()
+
+    result = agent.run(
+        {
+            "scene_brief": {
+                "scene_goal": "Marie decouvre une lettre cachee",
+                "conflict": "The discovery should create tension around hidden information.",
+                "canon_so_far": [
+                    {
+                        "scene_number": 1,
+                        "scene_role": "trigger",
+                        "summary": "Marie trouve une lettre qui contredit un souvenir precise.",
+                        "draft_excerpt": "Marie hesite avant d'ouvrir la lettre.",
+                    }
+                ],
+            },
+            "continuity": {"conclusion": "No evidence found."},
+        }
+    )
+
+    assert "Previous canon:" in result["draft_text"]
+    assert "Canon scene 1 [trigger]: Marie trouve une lettre qui contredit un souvenir precise." in result["draft_text"]
 
 
 def test_stylist_agent_builds_french_llm_prompt_with_natural_prose_instruction() -> None:

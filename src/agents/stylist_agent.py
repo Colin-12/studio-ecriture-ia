@@ -91,6 +91,7 @@ class StylistAgent(BaseAgent):
             "Write 150 to 220 words.",
             "Never write phrases like: I am unable to generate, This scene, The character, The goal of the scene.",
         ]
+        canon_lines = self._format_previous_canon(scene_brief.get("canon_so_far"))
         if is_french:
             instruction_lines.extend(
                 [
@@ -104,6 +105,7 @@ class StylistAgent(BaseAgent):
                 for line in [
                     *instruction_lines,
                     "Do not contradict these story facts.",
+                    *canon_lines,
                     f"Protagonist: {scene_brief.get('protagonist', '')}",
                     f"Core mystery: {scene_brief.get('core_mystery', '')}",
                     f"Central evidence: {scene_brief.get('central_evidence', '')}",
@@ -127,6 +129,21 @@ class StylistAgent(BaseAgent):
                 if line
             ]
         )
+
+    def _format_previous_canon(self, canon_so_far: list[dict] | None) -> list[str]:
+        if not canon_so_far:
+            return []
+
+        lines = ["Use this previous canon. Do not contradict it.", "Previous canon:"]
+        for entry in canon_so_far:
+            scene_number = entry.get("scene_number", "")
+            scene_role = entry.get("scene_role", "")
+            summary = (entry.get("summary") or "").strip()
+            excerpt = (entry.get("draft_excerpt") or "").strip()[:120]
+            details = summary or excerpt
+            if details:
+                lines.append(f"Canon scene {scene_number} [{scene_role}]: {details}")
+        return lines
 
     def _build_revision_prompt(
         self,
@@ -224,6 +241,7 @@ class StylistAgent(BaseAgent):
         editor_notes: list[str],
         fallback_reason: str | None = None,
         fallback_mode: str = "deterministic",
+        canon_so_far: list[dict] | None = None,
     ) -> dict:
         revision_focus = ", ".join(revision_targets)
         draft_parts = [
@@ -249,6 +267,8 @@ class StylistAgent(BaseAgent):
             f"Suggested emotional beat: {suggested_emotional_beat}",
             "Expected movement: the scene should advance the immediate narrative situation.",
         ]
+        for canon_line in self._format_previous_canon(canon_so_far):
+            draft_parts.append(canon_line)
         if revision_targets:
             draft_parts.append(f"Revision focus: {revision_focus}")
         if editor_notes:
@@ -299,6 +319,7 @@ class StylistAgent(BaseAgent):
         concrete_action = scene_brief.get("concrete_action", "")
         obstacle = scene_brief.get("obstacle", "")
         immediate_stakes = scene_brief.get("immediate_stakes", "")
+        canon_so_far = scene_brief.get("canon_so_far") or []
         genre = scene_brief.get("genre", "")
         tone = scene_brief.get("tone", "")
         pov = scene_brief.get("pov", "")
@@ -344,6 +365,7 @@ class StylistAgent(BaseAgent):
                     editor_notes=editor_notes,
                     fallback_reason=str(exc),
                     fallback_mode="deterministic_fallback",
+                    canon_so_far=canon_so_far,
                 )
             if self.llm_mode != "mock" and self._is_invalid_llm_draft(draft_text):
                 return self._build_deterministic_draft(
@@ -371,6 +393,7 @@ class StylistAgent(BaseAgent):
                     editor_notes=editor_notes,
                     fallback_reason="Invalid LLM draft: meta/refusal detected.",
                     fallback_mode="deterministic_fallback",
+                    canon_so_far=canon_so_far,
                 )
             mode_note = "Mock LLM mode was used for this draft."
             if self.llm_mode == "ollama":
@@ -410,4 +433,5 @@ class StylistAgent(BaseAgent):
             language=language,
             revision_targets=revision_targets,
             editor_notes=editor_notes,
+            canon_so_far=canon_so_far,
         )
