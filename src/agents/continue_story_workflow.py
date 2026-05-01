@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from src.agents.narrative_decision_agent import NarrativeDecisionAgent
+from src.agents.user_intent_agent import UserIntentAgent
 from src.agents.workflow import run_scene_workflow
 
 
@@ -15,7 +16,7 @@ def _read_optional_text(path: Path) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
-def _build_scene_context(story_memory: dict, extra_texts: dict[str, str]) -> dict:
+def _build_scene_context(story_memory: dict, extra_texts: dict[str, str], user_intent: dict | None = None) -> dict:
     return {
         "title": story_memory.get("title", ""),
         "premise": story_memory.get("premise", ""),
@@ -30,6 +31,7 @@ def _build_scene_context(story_memory: dict, extra_texts: dict[str, str]) -> dic
         "story_brief_text": extra_texts.get("story_brief", ""),
         "characters_text": extra_texts.get("characters", ""),
         "protagonist": ((story_memory.get("characters") or [{}])[0].get("name", "")),
+        "user_intent": user_intent or {},
         "forbidden_inventions": [
             "Do not contradict the existing canon.",
             "Do not replace the established protagonist without clear justification.",
@@ -69,7 +71,14 @@ def run_continue_story_workflow(
         "characters": _read_optional_text(story_path / "characters.md") or "",
     }
     final_scene_idea = _build_final_scene_idea(scene_idea, direction)
-    scene_context = _build_scene_context(story_memory, extra_texts)
+    user_intent = UserIntentAgent().run(
+        {
+            "direction": direction,
+            "scene_idea": scene_idea,
+            "story_memory": story_memory,
+        }
+    )
+    scene_context = _build_scene_context(story_memory, extra_texts, user_intent=user_intent)
 
     continuation_scene = run_scene_workflow(
         scene_idea=final_scene_idea,
@@ -112,4 +121,5 @@ def run_continue_story_workflow(
         "direction": direction,
         "continuation_scene": continuation_scene,
         "narrative_decision": narrative_decision,
+        "user_intent": user_intent,
     }

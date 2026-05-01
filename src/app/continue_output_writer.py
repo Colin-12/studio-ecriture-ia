@@ -20,6 +20,7 @@ def save_continue_output(result: dict, output_dir: str | Path | None = None) -> 
     beta_reader = scene.get("beta_reader", {})
     commercial_editor = scene.get("commercial_editor", {})
     narrative_decision = result.get("narrative_decision", {})
+    user_intent = result.get("user_intent", {})
 
     lines = [
         "# Continuation Output",
@@ -29,20 +30,35 @@ def save_continue_output(result: dict, output_dir: str | Path | None = None) -> 
         f"Direction: {result.get('direction', '')}",
         f"Scene idea: {result.get('scene_idea', '')}",
         "",
-        "## Draft",
-        draft.get("draft_text", ""),
-        "",
-        "## Editor checklist",
-        f"- has_goal: {editor.get('has_goal', False)}",
-        f"- has_conflict: {editor.get('has_conflict', False)}",
-        f"- has_context: {editor.get('has_context', False)}",
-        f"- has_draft: {editor.get('has_draft', False)}",
-        "",
-        "## Quality evaluation",
-        f"- needs_revision: {quality.get('needs_revision', False)}",
-        f"- revision_targets: {', '.join(quality.get('revision_targets') or []) or 'none'}",
-        "",
     ]
+    if user_intent:
+        lines.extend(
+            [
+                "## User intent",
+                f"- focus_candidate: {user_intent.get('focus_candidate', '')}",
+                f"- desired_action: {user_intent.get('desired_action', '')}",
+                f"- dramatic_question: {user_intent.get('dramatic_question', '')}",
+                f"- intent_strength: {user_intent.get('intent_strength', '')}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Draft",
+            draft.get("draft_text", ""),
+            "",
+            "## Editor checklist",
+            f"- has_goal: {editor.get('has_goal', False)}",
+            f"- has_conflict: {editor.get('has_conflict', False)}",
+            f"- has_context: {editor.get('has_context', False)}",
+            f"- has_draft: {editor.get('has_draft', False)}",
+            "",
+            "## Quality evaluation",
+            f"- needs_revision: {quality.get('needs_revision', False)}",
+            f"- revision_targets: {', '.join(quality.get('revision_targets') or []) or 'none'}",
+            "",
+        ]
+    )
 
     if beta_reader:
         lines.extend(

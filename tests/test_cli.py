@@ -614,6 +614,12 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
             "story_memory": {"title": "Le retour de Trisha"},
             "scene_idea": "Continuer le recit depuis Anais.",
             "direction": kwargs["direction"],
+            "user_intent": {
+                "focus_candidate": "Anaïs",
+                "desired_action": "comprendre ou vérifier une vérité cachée",
+                "dramatic_question": "Que revele vraiment cette direction ?",
+                "intent_strength": "medium",
+            },
             "continuation_scene": {
                 "draft": {
                     "stylist_mode": "llm",
@@ -637,6 +643,9 @@ def test_run_continue_story_workflow_prints_summary(monkeypatch, capsys) -> None
     assert exit_code == 0
     assert "Source story: examples/trisha_revenge_story" in output
     assert "Title: Le retour de Trisha" in output
+    assert "User intent:" in output
+    assert "focus_candidate: Anaïs" in output
+    assert "desired_action: comprendre ou vérifier une vérité cachée" in output
     assert "Stylist mode: llm" in output
     assert "Narrative decision:" in output
     assert "accepted additions count: 1" in output

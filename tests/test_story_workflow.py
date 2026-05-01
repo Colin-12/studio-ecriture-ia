@@ -542,9 +542,11 @@ def test_run_continue_story_workflow_reads_story_memory_and_passes_scene_context
     assert captured["scene_context"]["title"] == "Le retour de Trisha"
     assert captured["scene_context"]["characters"][0]["name"] == "Trisha"
     assert "parking" in json.dumps(captured["scene_context"]["locations"])
+    assert captured["scene_context"]["user_intent"]["focus_candidate"] == "Anaïs"
     assert result["story_memory"]["title"] == "Le retour de Trisha"
     assert "continuation_scene" in result
     assert "narrative_decision" in result
+    assert result["user_intent"]["focus_candidate"] == "Anaïs"
 
 
 def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
@@ -581,6 +583,12 @@ def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
             "canon_updates": ["Anais garde le secret."],
             "decision_notes": "No major contradiction detected.",
         },
+        "user_intent": {
+            "focus_candidate": "Anaïs",
+            "desired_action": "comprendre ou vérifier une vérité cachée",
+            "dramatic_question": "Que revele vraiment cette direction : Anais veut comprendre. ?",
+            "intent_strength": "medium",
+        },
     }
 
     output_path = save_continue_output(result)
@@ -590,6 +598,7 @@ def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
     assert "Continuation Output" in content
     assert "Anais veut comprendre." in content
     assert "Narrative decision" in content
+    assert "User intent" in content
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:

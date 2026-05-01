@@ -12,6 +12,7 @@ from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent
+from src.agents.user_intent_agent import UserIntentAgent
 from src.agents.visionary_agent import VisionaryAgent
 from src.agents.workflow import run_scene_workflow
 from src.llm.client import LLMClient
@@ -310,6 +311,22 @@ def test_narrative_decision_agent_returns_expected_fields() -> None:
     assert "decision_notes" in result
     assert result["accepted_additions"]
     assert any("Thomas" in update for update in result["canon_updates"])
+
+
+def test_user_intent_agent_detects_anais_as_focus_candidate() -> None:
+    agent = UserIntentAgent()
+
+    result = agent.run(
+        {
+            "direction": "Anais veut comprendre si Trisha l'a volontairement attiree sur le parking.",
+            "scene_idea": None,
+            "story_memory": {"characters": [{"name": "Trisha"}]},
+        }
+    )
+
+    assert result["focus_candidate"] == "Anaïs"
+    assert result["desired_action"] == "comprendre ou vérifier une vérité cachée"
+    assert result["intent_strength"] == "medium"
 
 
 def test_stylist_agent_integrates_narrative_parameters() -> None:
@@ -735,6 +752,14 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
                     "draft_excerpt": "Marie hesite avant d'ouvrir la lettre.",
                 }
             ],
+            "user_intent": {
+                "focus_candidate": "Anaïs",
+                "desired_action": "comprendre ou vérifier une vérité cachée",
+                "dramatic_question": "Que revele vraiment cette direction ?",
+                "author_constraints": ["Anais veut comprendre si Trisha l'a volontairement attiree sur le parking."],
+                "ambiguity_notes": "Le focus propose est une intention utilisateur et peut etre discute par les agents.",
+                "intent_strength": "medium",
+            },
             "expected_output": "This field should not be included in the prompt.",
         },
         {"conclusion": "Structured memory points to: The creature learns language in chapter 13."},
@@ -750,6 +775,10 @@ def test_stylist_agent_builds_short_prompt_for_llm() -> None:
     assert "Use this previous canon. Do not contradict it." in prompt
     assert "Previous canon:" in prompt
     assert "Canon scene 1 [trigger]: Marie trouve une lettre qui contredit un souvenir precise." in prompt
+    assert "User intent below is a creative preference, not established canon." in prompt
+    assert "User focus candidate: Anaïs" in prompt
+    assert "User desired action: comprendre ou vérifier une vérité cachée" in prompt
+    assert "User dramatic question: Que revele vraiment cette direction ?" in prompt
     assert "Write 150 to 220 words." in prompt
     assert "Never write phrases like: I am unable to generate" in prompt
     assert "Protagonist: Marie" in prompt

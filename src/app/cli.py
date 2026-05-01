@@ -829,6 +829,13 @@ def _run_continue_story_workflow(
     print(f"Source story: {result['source_story_dir']}")
     print(f"Title: {result['story_memory'].get('title', '')}")
     print(f"Scene idea: {result['scene_idea']}")
+    if result.get("user_intent"):
+        user_intent = result["user_intent"]
+        print("User intent:")
+        print(f"   focus_candidate: {user_intent.get('focus_candidate', '')}")
+        print(f"   desired_action: {user_intent.get('desired_action', '')}")
+        print(f"   dramatic_question: {user_intent.get('dramatic_question', '')}")
+        print(f"   intent_strength: {user_intent.get('intent_strength', '')}")
     if draft.get("stylist_mode"):
         print(f"Stylist mode: {draft['stylist_mode']}")
     print(f"Draft: {draft.get('draft_text', '')}")

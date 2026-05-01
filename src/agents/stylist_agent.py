@@ -92,6 +92,7 @@ class StylistAgent(BaseAgent):
             "Never write phrases like: I am unable to generate, This scene, The character, The goal of the scene.",
         ]
         canon_lines = self._format_previous_canon(scene_brief.get("canon_so_far"))
+        user_intent_lines = self._format_user_intent(scene_brief.get("user_intent"))
         if is_french:
             instruction_lines.extend(
                 [
@@ -106,6 +107,7 @@ class StylistAgent(BaseAgent):
                     *instruction_lines,
                     "Do not contradict these story facts.",
                     *canon_lines,
+                    *user_intent_lines,
                     f"Protagonist: {scene_brief.get('protagonist', '')}",
                     f"Core mystery: {scene_brief.get('core_mystery', '')}",
                     f"Central evidence: {scene_brief.get('central_evidence', '')}",
@@ -144,6 +146,21 @@ class StylistAgent(BaseAgent):
             if details:
                 lines.append(f"Canon scene {scene_number} [{scene_role}]: {details}")
         return lines
+
+    def _format_user_intent(self, user_intent: dict | None) -> list[str]:
+        if not user_intent:
+            return []
+
+        lines = [
+            "User intent below is a creative preference, not established canon.",
+            f"User focus candidate: {user_intent.get('focus_candidate', '')}",
+            f"User desired action: {user_intent.get('desired_action', '')}",
+            f"User dramatic question: {user_intent.get('dramatic_question', '')}",
+            "User author constraints: " + " | ".join(user_intent.get("author_constraints", [])),
+            f"User ambiguity notes: {user_intent.get('ambiguity_notes', '')}",
+            f"User intent strength: {user_intent.get('intent_strength', '')}",
+        ]
+        return [line for line in lines if line.strip()]
 
     def _build_revision_prompt(
         self,
@@ -242,6 +259,7 @@ class StylistAgent(BaseAgent):
         fallback_reason: str | None = None,
         fallback_mode: str = "deterministic",
         canon_so_far: list[dict] | None = None,
+        user_intent: dict | None = None,
     ) -> dict:
         revision_focus = ", ".join(revision_targets)
         draft_parts = [
@@ -269,6 +287,8 @@ class StylistAgent(BaseAgent):
         ]
         for canon_line in self._format_previous_canon(canon_so_far):
             draft_parts.append(canon_line)
+        for user_intent_line in self._format_user_intent(user_intent):
+            draft_parts.append(user_intent_line)
         if revision_targets:
             draft_parts.append(f"Revision focus: {revision_focus}")
         if editor_notes:
@@ -320,6 +340,7 @@ class StylistAgent(BaseAgent):
         obstacle = scene_brief.get("obstacle", "")
         immediate_stakes = scene_brief.get("immediate_stakes", "")
         canon_so_far = scene_brief.get("canon_so_far") or []
+        user_intent = scene_brief.get("user_intent") or {}
         genre = scene_brief.get("genre", "")
         tone = scene_brief.get("tone", "")
         pov = scene_brief.get("pov", "")
@@ -366,6 +387,7 @@ class StylistAgent(BaseAgent):
                     fallback_reason=str(exc),
                     fallback_mode="deterministic_fallback",
                     canon_so_far=canon_so_far,
+                    user_intent=user_intent,
                 )
             if self.llm_mode != "mock" and self._is_invalid_llm_draft(draft_text):
                 return self._build_deterministic_draft(
@@ -394,6 +416,7 @@ class StylistAgent(BaseAgent):
                     fallback_reason="Invalid LLM draft: meta/refusal detected.",
                     fallback_mode="deterministic_fallback",
                     canon_so_far=canon_so_far,
+                    user_intent=user_intent,
                 )
             mode_note = "Mock LLM mode was used for this draft."
             if self.llm_mode == "ollama":
@@ -434,4 +457,5 @@ class StylistAgent(BaseAgent):
             revision_targets=revision_targets,
             editor_notes=editor_notes,
             canon_so_far=canon_so_far,
+            user_intent=user_intent,
         )
