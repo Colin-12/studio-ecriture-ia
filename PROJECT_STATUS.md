@@ -28,11 +28,14 @@ Le depot est deja pousse sur GitHub et a jour.
 - `create-story` operationnel pour generer un recit court en `3` scenes
 - `StoryArchitectAgent` structure le recit en `3` actes :
   `trigger`, `confrontation`, `decision`
+- `NarrativeDecisionAgent` integre apres chaque scene pour arbitrer les ajouts et preparer le canon
 - `story_mode` disponible :
   `existing_novel` ou `original_story`
 - `StylistAgent` peut fonctionner en mode deterministe, en mode `mock`, ou via `Ollama` local
 - `Ollama` local supporte `qwen2.5:3b`, sans API payante
 - workflow `create-story` avec `Ollama` local valide avec `qwen2.5:3b`
+- `canon_so_far` transmet un resume simple des scenes precedentes aux scenes suivantes
+- `NarrativeDecisionAgent` genere des `canon_updates` et des contraintes simples pour la suite
 - parametres narratifs supportes dans `run-scene` :
   `--genre`, `--tone`, `--pov`, `--language`
 - timeout LLM configurable avec `--llm-timeout`
@@ -45,11 +48,16 @@ Le depot est deja pousse sur GitHub et a jour.
 - la revision est bornee par `max_revision_rounds`, donc sans boucle infinie
 - `--save-output` sauvegarde les scenes en Markdown dans `outputs/`
 - `create-story --save-output` sauvegarde les recits dans `outputs/stories/`
+- `create-story --save-output` exporte aussi `summary.md` et `story_memory.json`
 - interface `CLI` disponible pour :
   `ingest`, `index`, `search`, `continuity`, `run-scene`, `create-story`, `list-chapters`, `list-characters`, `list-locations`, `list-events`
 - graphe `NetworkX` genere dans `data/processed/frankenstein_graph.json`
 - documentation de validation memoire disponible pour la Phase 1
-- tests locaux passes : `106 passed`
+- derniere validation reelle `create-story` :
+  `python -m src.app.cli create-story "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0 --save-output`
+- resultat valide :
+  `Stylist mode: llm` sur les `3` scenes, `NarrativeDecision` present apres chaque scene, `canon updates` generes, sauvegarde dans `outputs/stories/`, depot `git clean`
+- tests locaux passes : `109 passed`
 
 ## Limites actuelles
 

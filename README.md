@@ -184,9 +184,11 @@ Cette commande :
 - construit un plan narratif court en `3` scenes
 - utilise un schema `trigger -> confrontation -> decision`
 - genere chaque scene avec le workflow `run-scene`
+- passe un `canon_so_far` simple des scenes deja generees vers les scenes suivantes
+- ajoute un `NarrativeDecisionAgent` apres chaque scene pour arbitrer les ajouts et preparer le canon
 
 Si `--save-output` est utilise, la commande cree un dossier Markdown dans `outputs/stories/`.
-Ce dossier contient aussi un fichier `story_memory.json` avec une memoire simple du recit original.
+Ce dossier contient des fichiers Markdown par scene, un `summary.md` et un `story_memory.json` avec une memoire simple du recit original.
 
 ## Configuration Ollama recommandee
 
@@ -200,7 +202,8 @@ Notes :
 
 - `qwen2.5:3b` est recommande pour la generation de scenes avec le `StylistAgent`
 - `qwen2.5:1.5b` est plus leger, mais moins fiable pour la prose narrative francaise et plus sensible aux sorties meta
+- `--save-output` exporte les scenes en Markdown dans `outputs/stories/` ainsi qu'un `story_memory.json`
 
 ## Etat actuel
 
-Le depot contient maintenant le squelette propre de la Phase 1 du systeme de memoire. Les prochaines etapes pourront ajouter les modules d'ingestion, de stockage, d'indexation et de retrieval sans sur-ingenierie.
+Le depot contient maintenant un MVP local de `writer's room` : memoire, workflow scene complet, `create-story` avec `Ollama`, `NarrativeDecisionAgent`, `canon_so_far` inter-scenes, export Markdown et `story_memory.json`.
