@@ -5,8 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.memory.database import init_db
+from src.memory.knowledge import CharacterKnowledge
 
 DEFAULT_DB_PATH = Path("db/novel_memory.sqlite")
+
+_ = CharacterKnowledge
 
 
 def main() -> None:
