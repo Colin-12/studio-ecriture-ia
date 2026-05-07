@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import pytest
 
@@ -6,8 +7,8 @@ from src.agents.beta_reader_agent import BetaReaderAgent
 from src.agents.commercial_editor_agent import CommercialEditorAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
-from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.editor_agent import EditorAgent
+from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.narrative_decision_agent import NarrativeDecisionAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
@@ -1297,7 +1298,7 @@ def test_run_scene_workflow_only_activates_visionary_llm_in_deep(monkeypatch) ->
         },
     )
 
-    captured = {"use_llm_values": []}
+    captured: dict[str, list[Any]] = {"use_llm_values": []}
 
     def fake_visionary_init(
         self,

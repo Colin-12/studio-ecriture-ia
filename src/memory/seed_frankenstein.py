@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 from sqlalchemy import select
 
 from src.memory.database import get_session, init_db
 from src.memory.models import Chapter, Character, Event, Location, Novel
 
-
 DEFAULT_DB_PATH = Path("db/novel_memory.sqlite")
+
+
+class EventSeed(TypedDict):
+    title: str
+    chapter_number: int
+    location_name: str
+    description: str
+    sequence_order: int
 
 CHARACTERS = [
     ("Victor Frankenstein", {"role": "protagonist"}),
@@ -27,7 +35,7 @@ CHARACTERS = [
     ("Safie", {"role": "visitor"}),
 ]
 
-LOCATIONS = [
+LOCATIONS: list[tuple[str, dict[str, str]]] = [
     ("Geneva", {}),
     ("Ingolstadt", {}),
     ("The De Lacey cottage", {}),
@@ -36,7 +44,7 @@ LOCATIONS = [
     ("Arctic Ocean", {}),
 ]
 
-EVENTS = [
+EVENTS: list[EventSeed] = [
     {
         "title": "Victor studies natural philosophy",
         "chapter_number": 2,

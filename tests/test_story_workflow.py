@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
+from typing import Any
 
-from src.agents.documentalist_agent import DocumentalistAgent
 from src.agents.continue_story_workflow import run_continue_story_workflow
+from src.agents.documentalist_agent import DocumentalistAgent
 from src.agents.story_architect_agent import StoryArchitectAgent
 from src.agents.story_workflow import run_story_workflow
 from src.app.continue_output_writer import save_continue_output
@@ -392,7 +393,7 @@ def test_run_story_workflow_returns_story_plan_and_three_scenes(monkeypatch) -> 
 
 
 def test_run_story_workflow_passes_llm_timeout_to_scene_workflow(monkeypatch) -> None:
-    captured = {"timeouts": [], "scene_contexts": []}
+    captured: dict[str, list[Any]] = {"timeouts": [], "scene_contexts": []}
 
     def fake_run_scene_workflow(**kwargs):
         captured["timeouts"].append(kwargs["llm_timeout"])
@@ -625,7 +626,7 @@ def test_save_continue_output_creates_markdown_file(tmp_path: Path) -> None:
 
 
 def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> None:
-    captured = {"models": []}
+    captured: dict[str, list[Any]] = {"models": []}
 
     def fake_run_scene_workflow(**kwargs):
         captured["models"].append(kwargs["llm_model"])
@@ -659,7 +660,7 @@ def test_run_story_workflow_passes_llm_model_to_scene_workflow(monkeypatch) -> N
 
 
 def test_run_story_workflow_passes_llm_num_predict_to_scene_workflow(monkeypatch) -> None:
-    captured = {"num_predicts": []}
+    captured: dict[str, list[Any]] = {"num_predicts": []}
 
     def fake_run_scene_workflow(**kwargs):
         captured["num_predicts"].append(kwargs["llm_num_predict"])
@@ -693,7 +694,7 @@ def test_run_story_workflow_passes_llm_num_predict_to_scene_workflow(monkeypatch
 
 
 def test_run_story_workflow_passes_llm_keep_alive_to_scene_workflow(monkeypatch) -> None:
-    captured = {"keep_alives": []}
+    captured: dict[str, list[Any]] = {"keep_alives": []}
 
     def fake_run_scene_workflow(**kwargs):
         captured["keep_alives"].append(kwargs["llm_keep_alive"])
@@ -727,7 +728,7 @@ def test_run_story_workflow_passes_llm_keep_alive_to_scene_workflow(monkeypatch)
 
 
 def test_run_story_workflow_passes_separate_llm_flags(monkeypatch) -> None:
-    captured = {
+    captured: dict[str, Any] = {
         "architect_use_llm": None,
         "architect_llm_mode": None,
         "architect_llm_model": None,

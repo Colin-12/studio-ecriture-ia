@@ -7,3 +7,6 @@ pydantic
 pyyaml
 pytest
 python-dotenv
+ruff
+mypy
+sqlalchemy[mypy]

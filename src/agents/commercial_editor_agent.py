@@ -12,7 +12,6 @@ class CommercialEditorAgent(BaseAgent):
         super().__init__(name="CommercialEditorAgent", role="commercial_editor")
 
     def run(self, input_data: dict) -> dict:
-        scene_idea = input_data.get("scene_idea", "")
         scene_brief = input_data.get("scene_brief") or {}
         draft_text = (input_data.get("draft_text") or "").strip()
         quality_evaluation = input_data.get("quality_evaluation") or {}

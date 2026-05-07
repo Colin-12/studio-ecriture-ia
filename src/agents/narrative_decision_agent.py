@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from src.agents.base import BaseAgent
 
 
@@ -11,9 +13,12 @@ class NarrativeDecisionAgent(BaseAgent):
     def __init__(self) -> None:
         super().__init__(name="NarrativeDecisionAgent", role="narrative_decision")
 
-    def _build_story_facts(self, story_context: dict) -> list[dict]:
-        accepted_additions = []
-        canon_updates = []
+    def _build_story_facts(
+        self,
+        story_context: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        accepted_additions: list[dict[str, Any]] = []
+        canon_updates: list[str] = []
         for key in ["protagonist", "core_mystery", "central_evidence", "main_threat"]:
             value = story_context.get(key)
             if value:
@@ -30,8 +35,8 @@ class NarrativeDecisionAgent(BaseAgent):
         central_mystery = str(story_context.get("core_mystery", "")).lower()
 
         accepted_additions, canon_updates = self._build_story_facts(story_context)
-        rejected_additions = []
-        next_scene_constraints = []
+        rejected_additions: list[dict[str, Any]] = []
+        next_scene_constraints: list[str] = []
 
         if scene.get("concrete_action"):
             accepted_additions.append(
@@ -85,8 +90,10 @@ class NarrativeDecisionAgent(BaseAgent):
                 break
 
         canon_updates = list(dict.fromkeys(item for item in canon_updates if item))
-        accepted_additions = list(dict.fromkeys(tuple(sorted(item.items())) for item in accepted_additions))
-        accepted_additions = [dict(items) for items in accepted_additions]
+        unique_accepted = list(
+            dict.fromkeys(tuple(sorted(item.items())) for item in accepted_additions)
+        )
+        accepted_additions = [dict(items) for items in unique_accepted]
 
         decision_notes = "No major contradiction detected. Keep the central mystery active."
         if rejected_additions:

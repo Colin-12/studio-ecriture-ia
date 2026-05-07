@@ -11,7 +11,6 @@ from src.graph.coherence_graph import CoherenceGraph
 from src.memory.database import get_session
 from src.memory.models import Character, Event, Location, Novel
 
-
 DEFAULT_DB_PATH = Path("db/novel_memory.sqlite")
 DEFAULT_OUTPUT_PATH = Path("data/processed/frankenstein_graph.json")
 

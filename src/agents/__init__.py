@@ -6,8 +6,8 @@ from .commercial_editor_agent import CommercialEditorAgent
 from .continuity_agent import ContinuityAgent
 from .devil_advocate_agent import DevilAdvocateAgent
 from .documentalist_agent import DocumentalistAgent
-from .emotion_guardian_agent import EmotionGuardianAgent
 from .editor_agent import EditorAgent
+from .emotion_guardian_agent import EmotionGuardianAgent
 from .quality_evaluator_agent import QualityEvaluatorAgent
 from .scene_architect_agent import SceneArchitectAgent
 from .story_architect_agent import StoryArchitectAgent

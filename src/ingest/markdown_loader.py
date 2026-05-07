@@ -11,7 +11,6 @@ from sqlalchemy import select
 from src.memory.database import get_session, init_db
 from src.memory.models import Chapter, Novel
 
-
 CHAPTER_HEADER_RE = re.compile(r"^#\s*Chapter\s*(\d+)\s*-\s*(.+?)\s*$", re.IGNORECASE)
 GENERIC_HEADER_RE = re.compile(r"^#\s*(.+?)\s*$")
 

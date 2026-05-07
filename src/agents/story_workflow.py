@@ -125,8 +125,8 @@ def run_story_workflow(
     )
     narrative_decision_agent = NarrativeDecisionAgent()
 
-    scenes = []
-    canon_so_far = []
+    scenes: list[dict] = []
+    canon_so_far: list[dict] = []
     for scene in story_plan["scene_outline"]:
         scene_context = {
             key: scene[key]

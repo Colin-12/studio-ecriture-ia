@@ -7,8 +7,8 @@ from src.agents.beta_reader_agent import BetaReaderAgent
 from src.agents.commercial_editor_agent import CommercialEditorAgent
 from src.agents.continuity_agent import ContinuityAgent
 from src.agents.devil_advocate_agent import DevilAdvocateAgent
-from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.editor_agent import EditorAgent
+from src.agents.emotion_guardian_agent import EmotionGuardianAgent
 from src.agents.quality_evaluator_agent import QualityEvaluatorAgent
 from src.agents.scene_architect_agent import SceneArchitectAgent
 from src.agents.stylist_agent import StylistAgent

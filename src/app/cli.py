@@ -13,7 +13,6 @@ from sqlalchemy.orm import selectinload
 from src.memory.database import get_session
 from src.memory.models import Chapter, Character, Event, Location, Novel
 
-
 DEFAULT_SETTINGS_PATH = Path("configs/settings.yaml")
 
 
@@ -405,12 +404,12 @@ def _list_events(db_path: str | Path) -> int:
             print("No novel found in the database.")
             return 1
 
-        events = session.execute(
+        events = list(session.execute(
             select(Event)
             .options(selectinload(Event.chapter))
             .where(Event.novel_id == novel.id)
             .order_by(Event.chapter_id, Event.sequence_order, Event.id)
-        ).scalars().all()
+        ).scalars().all())
         if not events:
             print("No events found in the database.")
             return 1

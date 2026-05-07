@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-
 QUALITY_CRITERIA = [
     "originality",
     "narrative_tension",

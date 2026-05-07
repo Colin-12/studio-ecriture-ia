@@ -6,7 +6,6 @@ from pathlib import Path
 
 from src.memory.database import init_db
 
-
 DEFAULT_DB_PATH = Path("db/novel_memory.sqlite")
 
 

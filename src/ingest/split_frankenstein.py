@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 INPUT_PATH = Path("data/raw/frankenstein.txt")
 OUTPUT_DIR = Path("manuscript/source_novel")
 END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK"

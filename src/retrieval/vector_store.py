@@ -7,7 +7,7 @@ from typing import Any
 
 import chromadb
 from chromadb.api.models.Collection import Collection
-from chromadb.api.types import QueryResult
+from chromadb.api.types import Metadata, QueryResult
 from sqlalchemy import select
 
 from src.memory.database import get_session
@@ -15,7 +15,7 @@ from src.memory.models import Chapter
 from src.retrieval.chunking import chunk_text
 
 
-def get_chroma_client(persist_dir: str | Path) -> chromadb.PersistentClient:
+def get_chroma_client(persist_dir: str | Path) -> Any:
     """Return a persistent ChromaDB client."""
     directory = Path(persist_dir)
     directory.mkdir(parents=True, exist_ok=True)
@@ -23,7 +23,7 @@ def get_chroma_client(persist_dir: str | Path) -> chromadb.PersistentClient:
 
 
 def get_or_create_collection(
-    client: chromadb.PersistentClient,
+    client: Any,
     collection_name: str,
 ) -> Collection:
     """Return an existing collection or create it if needed."""
@@ -45,7 +45,7 @@ def index_chapters(
 
         ids: list[str] = []
         documents: list[str] = []
-        metadatas: list[dict[str, Any]] = []
+        metadatas: list[Metadata] = []
 
         for chapter in chapters:
             chunks = chunk_text(chapter.full_text)

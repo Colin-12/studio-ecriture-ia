@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from src.app.cli import _run_continue_story_workflow, _run_scene_workflow, _run_story_workflow, build_parser, load_settings
+from src.app.cli import (
+    _run_continue_story_workflow,
+    _run_scene_workflow,
+    _run_story_workflow,
+    build_parser,
+    load_settings,
+)
 
 
 def test_load_settings_reads_yaml_file(tmp_path: Path) -> None:
