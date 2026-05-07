@@ -7,7 +7,8 @@ import re
 import unicodedata
 
 from src.agents.base import BaseAgent
-from src.llm.client import LLMClient
+from src.llm.base import LLMResponse
+from src.llm.router import get_llm_for_agent
 
 
 class StoryArchitectAgent(BaseAgent):
@@ -21,25 +22,40 @@ class StoryArchitectAgent(BaseAgent):
         llm_model: str | None = None,
         llm_num_predict: int | None = None,
         llm_keep_alive: str | None = None,
+        llm_profile: str = "default",
     ) -> None:
         super().__init__(name="StoryArchitectAgent", role="story_architect")
         self.use_llm = use_llm
         self.llm_mode = llm_mode
-        if llm_timeout is None:
-            self.llm_client = LLMClient(
-                mode=llm_mode,
-                model=llm_model,
-                num_predict=llm_num_predict,
-                keep_alive=llm_keep_alive,
-            )
-        else:
-            self.llm_client = LLMClient(
-                mode=llm_mode,
-                model=llm_model,
-                num_predict=llm_num_predict,
-                keep_alive=llm_keep_alive,
-                timeout=llm_timeout,
-            )
+        self.llm_timeout = int(llm_timeout or 120)
+        provider_override: str | None = llm_mode
+        if llm_profile != "default" and llm_mode == "mock" and llm_model is None:
+            provider_override = None
+        model_override = llm_model
+        if provider_override == "ollama" and model_override is None:
+            model_override = "qwen2.5:3b"
+        elif provider_override == "mock" and model_override is None:
+            model_override = "mock"
+        self.llm_client = get_llm_for_agent(
+            "story_architect",
+            profile=llm_profile,
+            overrides={
+                "provider": provider_override,
+                "model": model_override,
+                "num_predict": llm_num_predict,
+                "keep_alive": llm_keep_alive,
+                "timeout": self.llm_timeout,
+            },
+        )
+
+    def _generate_text(self, prompt: str) -> str:
+        try:
+            response = self.llm_client.generate(prompt=prompt, timeout=self.llm_timeout)
+        except TypeError:
+            response = self.llm_client.generate(prompt)
+        if isinstance(response, LLMResponse):
+            return response.text
+        return response
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -336,7 +352,7 @@ class StoryArchitectAgent(BaseAgent):
             language=language,
         )
         try:
-            llm_response = self.llm_client.generate(prompt)
+            llm_response = self._generate_text(prompt)
             llm_plan = self._parse_llm_plan(llm_response)
         except (RuntimeError, TimeoutError, ValueError) as exc:
             return self._build_deterministic_plan(

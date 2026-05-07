@@ -78,6 +78,17 @@ def test_build_parser_parses_run_scene_with_use_llm() -> None:
     assert args.llm_mode == "mock"
 
 
+def test_build_parser_parses_run_scene_with_llm_profile() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        ["run-scene", "Marie decouvre une lettre cachee", "--llm-profile", "free_only"]
+    )
+
+    assert args.command == "run-scene"
+    assert args.llm_profile == "free_only"
+
+
 def test_build_parser_parses_run_scene_with_ollama_mode() -> None:
     parser = build_parser()
 

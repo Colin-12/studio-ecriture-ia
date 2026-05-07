@@ -64,6 +64,7 @@ def run_continue_story_workflow(
     llm_keep_alive: str | None = None,
     max_revision_rounds: int = 0,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> dict:
     story_path = Path(story_dir)
     story_memory_path = story_path / "story_memory.json"
@@ -103,6 +104,7 @@ def run_continue_story_workflow(
         max_revision_rounds=max_revision_rounds,
         force_revision=False,
         agent_depth=agent_depth,
+        llm_profile=llm_profile,
     )
 
     narrative_decision = NarrativeDecisionAgent().run(

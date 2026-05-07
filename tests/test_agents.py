@@ -1367,8 +1367,8 @@ def test_run_scene_workflow_does_not_crash_when_stylist_falls_back(monkeypatch) 
     )
 
     monkeypatch.setattr(
-        "src.agents.stylist_agent.LLMClient.generate",
-        lambda self, prompt: (_ for _ in ()).throw(RuntimeError("Ollama request timed out.")),
+        "src.llm.providers.mock_provider.MockProvider.generate",
+        lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("Ollama request timed out.")),
     )
 
     result = run_scene_workflow(

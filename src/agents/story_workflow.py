@@ -98,16 +98,28 @@ def run_story_workflow(
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> dict:
     """Build a simple three-scene story from an original idea."""
-    architect = StoryArchitectAgent(
-        use_llm=use_architect_llm,
-        llm_mode=llm_mode,
-        llm_model=llm_model,
-        llm_num_predict=llm_num_predict,
-        llm_keep_alive=llm_keep_alive,
-        llm_timeout=llm_timeout,
-    )
+    if llm_profile != "default":
+        architect = StoryArchitectAgent(
+            use_llm=use_architect_llm,
+            llm_mode=llm_mode,
+            llm_model=llm_model,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+            llm_timeout=llm_timeout,
+            llm_profile=llm_profile,
+        )
+    else:
+        architect = StoryArchitectAgent(
+            use_llm=use_architect_llm,
+            llm_mode=llm_mode,
+            llm_model=llm_model,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+            llm_timeout=llm_timeout,
+        )
     documentalist = DocumentalistAgent()
     story_plan = architect.run(
         {
@@ -165,6 +177,7 @@ def run_story_workflow(
             max_revision_rounds=max_revision_rounds,
             force_revision=force_revision,
             agent_depth=agent_depth,
+            llm_profile=llm_profile,
         )
         scene_result["story_scene"] = scene
         narrative_decision = narrative_decision_agent.run(

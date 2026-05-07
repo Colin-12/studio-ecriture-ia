@@ -95,6 +95,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama keep_alive value to keep the model loaded between calls.",
     )
     run_scene_parser.add_argument(
+        "--llm-profile",
+        default="default",
+        help="LLM routing profile name from configs/llm_profiles/.",
+    )
+    run_scene_parser.add_argument(
         "--story-mode",
         choices=["existing_novel", "original_story"],
         default="existing_novel",
@@ -167,6 +172,11 @@ def build_parser() -> argparse.ArgumentParser:
     create_story_parser.add_argument(
         "--llm-keep-alive",
         help="Optional Ollama keep_alive value to keep the model loaded between calls.",
+    )
+    create_story_parser.add_argument(
+        "--llm-profile",
+        default="default",
+        help="LLM routing profile name from configs/llm_profiles/.",
     )
     create_story_parser.add_argument(
         "--story-mode",
@@ -248,6 +258,11 @@ def build_parser() -> argparse.ArgumentParser:
     continue_story_parser.add_argument(
         "--llm-keep-alive",
         help="Optional Ollama keep_alive value to keep the model loaded between calls.",
+    )
+    continue_story_parser.add_argument(
+        "--llm-profile",
+        default="default",
+        help="LLM routing profile name from configs/llm_profiles/.",
     )
     continue_story_parser.add_argument(
         "--max-revision-rounds",
@@ -542,6 +557,7 @@ def _run_scene_workflow(
     force_revision: bool = False,
     save_output: bool = False,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> int:
     from src.agents.workflow import run_scene_workflow
 
@@ -564,6 +580,7 @@ def _run_scene_workflow(
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
         agent_depth=agent_depth,
+        llm_profile=llm_profile,
     )
 
     print(f"Scene idea: {result['scene_idea']}")
@@ -747,6 +764,7 @@ def _run_story_workflow(
     force_revision: bool = False,
     save_output: bool = False,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> int:
     from src.agents.story_workflow import run_story_workflow
 
@@ -770,6 +788,7 @@ def _run_story_workflow(
         max_revision_rounds=max_revision_rounds,
         force_revision=force_revision,
         agent_depth=agent_depth,
+        llm_profile=llm_profile,
     )
 
     plan = result["story_plan"]
@@ -853,6 +872,7 @@ def _run_continue_story_workflow(
     max_revision_rounds: int = 0,
     save_output: bool = False,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> int:
     from src.agents.continue_story_workflow import run_continue_story_workflow
 
@@ -872,6 +892,7 @@ def _run_continue_story_workflow(
         llm_keep_alive=llm_keep_alive,
         max_revision_rounds=max_revision_rounds,
         agent_depth=agent_depth,
+        llm_profile=llm_profile,
     )
 
     scene = result["continuation_scene"]
@@ -952,7 +973,7 @@ def main(argv: list[str] | None = None) -> int:
             db_path,
             chroma_dir,
             collection_name,
-            use_llm=args.use_llm,
+            use_llm=args.use_llm or args.llm_profile != "default",
             llm_mode=args.llm_mode,
             llm_model=args.llm_model,
             llm_num_predict=args.llm_num_predict,
@@ -967,6 +988,7 @@ def main(argv: list[str] | None = None) -> int:
             force_revision=args.force_revision,
             save_output=args.save_output,
             agent_depth=args.agent_depth,
+            llm_profile=args.llm_profile,
         )
     if args.command == "create-story":
         return _run_story_workflow(
@@ -974,7 +996,7 @@ def main(argv: list[str] | None = None) -> int:
             db_path,
             chroma_dir,
             collection_name,
-            use_llm=args.use_llm,
+            use_llm=args.use_llm or args.llm_profile != "default",
             use_architect_llm=args.use_architect_llm,
             llm_mode=args.llm_mode,
             llm_model=args.llm_model,
@@ -990,6 +1012,7 @@ def main(argv: list[str] | None = None) -> int:
             force_revision=args.force_revision,
             save_output=args.save_output,
             agent_depth=args.agent_depth,
+            llm_profile=args.llm_profile,
         )
     if args.command == "continue-story":
         return _run_continue_story_workflow(
@@ -1000,7 +1023,7 @@ def main(argv: list[str] | None = None) -> int:
             tone=args.tone,
             pov=args.pov,
             language=args.language,
-            use_llm=args.use_llm,
+            use_llm=args.use_llm or args.llm_profile != "default",
             llm_mode=args.llm_mode,
             llm_model=args.llm_model,
             llm_timeout=args.llm_timeout,
@@ -1009,6 +1032,7 @@ def main(argv: list[str] | None = None) -> int:
             max_revision_rounds=args.max_revision_rounds,
             save_output=args.save_output,
             agent_depth=args.agent_depth,
+            llm_profile=args.llm_profile,
         )
 
     parser.error(f"Unknown command: {args.command}")

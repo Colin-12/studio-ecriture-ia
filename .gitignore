@@ -10,6 +10,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pytest_tmp_codex/
 .coverage
 .coverage.*
 htmlcov/
@@ -20,6 +21,7 @@ dist/
 # Environments and secrets
 .env
 .env.*
+!.env.example
 
 # Databases
 *.db
@@ -41,4 +43,5 @@ Thumbs.db
 *.log
 data/raw/
 outputs/
+logs/
 examples/trisha_revenge_story/continuations/

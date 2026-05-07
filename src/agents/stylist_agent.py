@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from src.agents.base import BaseAgent
-from src.llm.client import LLMClient
+from src.llm.base import LLMResponse
+from src.llm.router import get_llm_for_agent
 
 
 class StylistAgent(BaseAgent):
@@ -49,25 +50,40 @@ class StylistAgent(BaseAgent):
         llm_model: str | None = None,
         llm_num_predict: int | None = None,
         llm_keep_alive: str | None = None,
+        llm_profile: str = "default",
     ) -> None:
         super().__init__(name="StylistAgent", role="styling")
         self.use_llm = use_llm
         self.llm_mode = llm_mode
-        if llm_timeout is None:
-            self.llm_client = LLMClient(
-                mode=llm_mode,
-                model=llm_model,
-                num_predict=llm_num_predict,
-                keep_alive=llm_keep_alive,
-            )
-        else:
-            self.llm_client = LLMClient(
-                mode=llm_mode,
-                model=llm_model,
-                num_predict=llm_num_predict,
-                keep_alive=llm_keep_alive,
-                timeout=llm_timeout,
-            )
+        self.llm_timeout = int(llm_timeout or 120)
+        provider_override: str | None = llm_mode
+        if llm_profile != "default" and llm_mode == "mock" and llm_model is None:
+            provider_override = None
+        model_override = llm_model
+        if provider_override == "ollama" and model_override is None:
+            model_override = "qwen2.5:3b"
+        elif provider_override == "mock" and model_override is None:
+            model_override = "mock"
+        self.llm_client = get_llm_for_agent(
+            "stylist",
+            profile=llm_profile,
+            overrides={
+                "provider": provider_override,
+                "model": model_override,
+                "num_predict": llm_num_predict,
+                "keep_alive": llm_keep_alive,
+                "timeout": self.llm_timeout,
+            },
+        )
+
+    def _generate_text(self, prompt: str) -> str:
+        try:
+            response = self.llm_client.generate(prompt=prompt, timeout=self.llm_timeout)
+        except TypeError:
+            response = self.llm_client.generate(prompt)
+        if isinstance(response, LLMResponse):
+            return response.text
+        return response
 
     def _build_prompt(
         self,
@@ -386,7 +402,7 @@ class StylistAgent(BaseAgent):
             if revision_targets and previous_draft:
                 prompt = self._build_revision_prompt(previous_draft, revision_targets)
             try:
-                draft_text = self.llm_client.generate(prompt)
+                draft_text = self._generate_text(prompt)
             except Exception as exc:
                 return self._build_deterministic_draft(
                     protagonist=protagonist,

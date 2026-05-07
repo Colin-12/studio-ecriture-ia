@@ -35,28 +35,51 @@ def run_scene_workflow(
     max_revision_rounds: int = 1,
     force_revision: bool = False,
     agent_depth: str = "balanced",
+    llm_profile: str = "default",
 ) -> dict:
     """Run a minimal scene workflow across a deterministic writer's room."""
     architect = SceneArchitectAgent()
     devil_advocate = DevilAdvocateAgent()
-    visionary = VisionaryAgent(
-        use_llm=agent_depth == "deep" and use_llm,
-        llm_mode=llm_mode,
-        llm_model=llm_model,
-        llm_timeout=llm_timeout,
-        llm_num_predict=llm_num_predict,
-        llm_keep_alive=llm_keep_alive,
-    )
+    if llm_profile != "default":
+        visionary = VisionaryAgent(
+            use_llm=agent_depth == "deep" and use_llm,
+            llm_mode=llm_mode,
+            llm_model=llm_model,
+            llm_timeout=llm_timeout,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+            llm_profile=llm_profile,
+        )
+    else:
+        visionary = VisionaryAgent(
+            use_llm=agent_depth == "deep" and use_llm,
+            llm_mode=llm_mode,
+            llm_model=llm_model,
+            llm_timeout=llm_timeout,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+        )
     emotion_guardian = EmotionGuardianAgent()
     continuity = ContinuityAgent()
-    stylist = StylistAgent(
-        use_llm=use_llm,
-        llm_mode=llm_mode,
-        llm_timeout=llm_timeout,
-        llm_model=llm_model,
-        llm_num_predict=llm_num_predict,
-        llm_keep_alive=llm_keep_alive,
-    )
+    if llm_profile != "default":
+        stylist = StylistAgent(
+            use_llm=use_llm,
+            llm_mode=llm_mode,
+            llm_timeout=llm_timeout,
+            llm_model=llm_model,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+            llm_profile=llm_profile,
+        )
+    else:
+        stylist = StylistAgent(
+            use_llm=use_llm,
+            llm_mode=llm_mode,
+            llm_timeout=llm_timeout,
+            llm_model=llm_model,
+            llm_num_predict=llm_num_predict,
+            llm_keep_alive=llm_keep_alive,
+        )
     editor = EditorAgent()
     quality_evaluator = QualityEvaluatorAgent()
     beta_reader = BetaReaderAgent()

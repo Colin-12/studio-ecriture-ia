@@ -22,6 +22,7 @@ Le depot contient aussi `examples/trisha_revenge_story/`, un exemple canonise po
 - memoire inter-scenes avec `canon_so_far`
 - export Markdown + `story_memory.json`
 - support local de `Ollama`
+- routing LLM configurable par agent avec `--llm-profile`
 - `--agent-depth {fast, balanced, deep}`
 - `--llm-keep-alive` pour garder le modele Ollama charge
 
@@ -34,7 +35,7 @@ StoryArchitect
        -> DevilAdvocate
        -> Visionary
        -> EmotionGuardian
-       -> Stylist / Ollama
+      -> Stylist / LLM Router
        -> Editor
        -> QualityEvaluator
        -> BetaReader
@@ -64,6 +65,37 @@ Notes :
 
 - `qwen2.5:3b` est la configuration recommandee pour le `StylistAgent`
 - `--llm-keep-alive` peut etre utilise pour garder le modele charge entre plusieurs appels
+
+## Configuration LLM
+
+La couche LLM est configuree via `configs/llm_routing.yaml` ou un profil dans
+`configs/llm_profiles/`.
+
+Exemple avec le profil gratuit :
+
+```bash
+python -m src.app.cli run-scene "Marie decouvre une lettre cachee" --llm-profile free_only
+```
+
+Les anciens flags restent prioritaires pour une session :
+
+```bash
+python -m src.app.cli run-scene "Marie decouvre une lettre cachee" --use-llm --llm-mode ollama --llm-model qwen2.5:3b
+```
+
+Variables d'environnement attendues dans `.env` :
+
+```text
+GROQ_API_KEY=
+GOOGLE_API_KEY=
+MISTRAL_API_KEY=
+HF_API_KEY=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+OLLAMA_HOST=http://localhost:11434
+```
+
+Chaque appel est journalise dans `logs/llm_usage.jsonl`.
 
 ## Exemple continue-story
 
