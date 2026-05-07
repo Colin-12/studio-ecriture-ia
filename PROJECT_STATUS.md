@@ -2,52 +2,56 @@
 
 ## Etat actuel
 
-Le projet `Studio d'ecriture IA par agents` est un MVP local de `writers room` narrative.
+Deux chantiers complétés sur la branche phase-1-completion :
+- ruff + mypy configurés (pyproject.toml), 119 tests passent
+- Abstraction LLM provider-agnostique opérationnelle
 
-Il supporte maintenant :
+## Décision actuelle
 
-- `run-scene`
-- `create-story`
-- `continue-story`
-- un exemple canonise : `examples/trisha_revenge_story/`
-- `NarrativeDecisionAgent`
-- `UserIntentAgent`
-- `canon_so_far` inter-scenes
-- `story_memory.json`
-- export Markdown
-- `--agent-depth {fast, balanced, deep}`
-- `--llm-keep-alive` pour `Ollama`
+- Prototype agentique taggeré v0.3-agents-prototype
+- Expansion agentique gelée temporairement
+- Branche phase-1-completion active
+- Priorité : compléter les trois tests mémoire Phase 1
 
-## Ce qui fonctionne deja
+## Diagnostic Phase 1
 
-- memoire locale Phase 1 exploitable
-- `run-scene` operationnel avec workflow agentique complet
-- `create-story` operationnel pour generer un recit court en `3` scenes
-- `continue-story` operationnel pour prolonger un recit canonise sans modifier le canon source
-- `StoryArchitectAgent` pour structurer un recit court
-- `NarrativeDecisionAgent` pour arbitrer les ajouts et produire des `canon_updates`
-- `UserIntentAgent` pour interpreter la direction utilisateur comme intention creative non canonique
-- `Ollama` local supporte `qwen2.5:3b`
-- configuration recommandee actuelle :
-  `--llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420`
-- `--llm-keep-alive` disponible pour garder le modele charge
-- `agent_depth` disponible avec :
-  `fast`, `balanced`, `deep`
-- sorties Markdown disponibles pour scene, story et continuation
-- warning `ChromaDB` connu mais non bloquant
-- tests locaux passes : `122 passed`
+- Retrieval sémantique Frankenstein : fonctionnel
+- Mémoire structurée : existe mais seedée manuellement
+- Trois capacités critiques non validées :
+  a. extraction automatique d'événements depuis la prose
+  b. état épistémique des personnages (CharacterKnowledge)
+  c. setup/payoff seedé et testé
 
-## Limites actuelles
+## Refonte LLM  complétée
 
-- plusieurs agents restent deterministes
-- la qualite des drafts depend encore fortement du modele local
-- la memoire narrative reste simple
-- pas d'interface graphique
-- pas de `LLM` distant ou payant
+- src/llm/ : interface LLMProvider abstraite + 5 providers + 2 stubs
+- configs/llm_routing.yaml : routing par agent
+- configs/llm_profiles/ : free_only, local_only, mixed_budget
+- Fallback automatique sur RateLimitError
+- logs/llm_usage.jsonl : observabilité par session
+- Flag CLI --llm-profile opérationnel
+- Compatibilité descendante --llm-mode préservée
 
-## Prochaine etape recommandee
+## Tests Phase 1 à construire
 
-- faire varier davantage les agents selon `agent_depth`
-- enrichir la deliberation entre agents
-- renforcer `continue-story`
-- ameliorer la qualite stylistique et la stabilite narrative
+### Test 1  Extraction automatique d'événements
+Objectif : lire un chapitre Markdown et produire des événements structurés sans saisie manuelle.
+Référence : frankenstein_events_reference.json (15-20 événements, établie par lecture humaine).
+Critères : precision >= 0.60, recall >= 0.50, <= 2 hallucinations par chapitre.
+Code attendu : src/memory/event_extractor.py, tests/test_event_extractor.py
+
+### Test 2  État épistémique des personnages
+Objectif : répondre à "que sait un personnage à un chapitre donné ?".
+Table : CharacterKnowledge(id, character_id, fact, learned_at_chapter, source_event_id, belief_status, confidence).
+belief_status : true / false / suspected / hidden (obligatoire  couvre mensonge, secret, ambiguïté).
+Critères : 0% de fuite temporelle (faits appris après N exclus), 4 valeurs de belief_status couvertes.
+Code attendu : src/memory/knowledge.py, tests/test_character_knowledge.py
+
+### Test 3  Setup / Payoff fonctionnel
+Objectif : suivre ce qui est planté, payé, partiellement payé.
+Enrichissement : champ progress (planted / partially_paid / fully_paid) + payoff_chapters (JSON list).
+Critères : 5 setups seedés, 3 requêtes testées à chapitres différents, au moins 1 partially_paid correct.
+Code attendu : src/memory/setup_payoff.py, tests/test_setup_payoff.py
+
+### Gate de sortie Phase 1
+Les trois tests ci-dessus doivent passer leurs critères chiffrés avant toute nouvelle feature agentique.
