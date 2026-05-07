@@ -1,6 +1,9 @@
-"""Deterministic stylist agent producing a simple draft."""
+"""Stylist agent producing drafts from scene briefs and memory context."""
 
 from __future__ import annotations
+
+import json
+from typing import Any
 
 from src.agents.base import BaseAgent
 from src.llm.base import LLMResponse
@@ -76,9 +79,13 @@ class StylistAgent(BaseAgent):
             },
         )
 
-    def _generate_text(self, prompt: str) -> str:
+    def _generate_text(self, prompt: str, system: str | None = None) -> str:
         try:
-            response = self.llm_client.generate(prompt=prompt, timeout=self.llm_timeout)
+            response = self.llm_client.generate(
+                prompt=prompt,
+                system=system,
+                timeout=self.llm_timeout,
+            )
         except TypeError:
             response = self.llm_client.generate(prompt)
         if isinstance(response, LLMResponse):
@@ -105,6 +112,8 @@ class StylistAgent(BaseAgent):
             conflict,
         )
 
+        scene_text = self._scene_brief_to_text(scene_brief)
+        system_lines = self._build_memory_system_prompt(scene_text, continuity)
         instruction_lines = [
             "Write the scene now. Do not explain. Do not refuse. Do not analyze the task.",
             "Write 150 to 220 words.",
@@ -125,8 +134,10 @@ class StylistAgent(BaseAgent):
                 for line in [
                     *instruction_lines,
                     "Do not contradict these story facts.",
+                    *system_lines,
                     *canon_lines,
                     *user_intent_lines,
+                    f"Scene brief: {scene_text}",
                     f"Protagonist: {scene_brief.get('protagonist', '')}",
                     f"Core mystery: {scene_brief.get('core_mystery', '')}",
                     f"Central evidence: {scene_brief.get('central_evidence', '')}",
@@ -156,6 +167,97 @@ class StylistAgent(BaseAgent):
                 if line
             ]
         )
+
+    def _build_memory_system_prompt(
+        self,
+        scene_text: str,
+        continuity: dict,
+    ) -> list[str]:
+        lines = [
+            "Continuity memory constraints:",
+            "Respect the following open setups, character knowledge, and recent events.",
+        ]
+
+        open_setups = continuity.get("open_setups") or []
+        if open_setups:
+            lines.append("Open setups:")
+            for setup in open_setups:
+                payoff_chapters = setup.get("payoff_chapters") or []
+                lines.append(
+                    "- "
+                    f"{setup.get('setup_text', '')} "
+                    f"(progress={setup.get('progress', '')}, "
+                    f"setup_chapter={setup.get('setup_chapter', '')}, "
+                    f"payoff_chapters={payoff_chapters})"
+                )
+
+        character_states = self._filter_character_states_for_scene(
+            continuity.get("character_states") or [],
+            scene_text,
+        )
+        if character_states:
+            lines.append("Character epistemic state:")
+            for state in character_states:
+                knowledge = state.get("knowledge") or []
+                facts = [
+                    f"{fact.get('fact', '')} [{fact.get('belief_status', '')}]"
+                    for fact in knowledge
+                    if fact.get("fact")
+                ]
+                if facts:
+                    lines.append(f"- {state.get('character', '')}: {' | '.join(facts)}")
+
+        recent_events = continuity.get("recent_events") or []
+        if recent_events:
+            lines.append("Recent events:")
+            for event in recent_events[-5:]:
+                lines.append(
+                    "- "
+                    f"ch.{event.get('chapter_number', '?')}: "
+                    f"{event.get('title', '')} - {event.get('description', '')}"
+                )
+
+        warnings = continuity.get("warnings") or []
+        if warnings:
+            lines.append("Continuity warnings:")
+            lines.extend(f"- {warning}" for warning in warnings)
+
+        return lines
+
+    def _filter_character_states_for_scene(
+        self,
+        character_states: list[dict[str, Any]],
+        scene_text: str,
+    ) -> list[dict[str, Any]]:
+        normalized_scene = scene_text.lower()
+        present = [
+            state
+            for state in character_states
+            if str(state.get("character", "")).lower() in normalized_scene
+        ]
+        if present:
+            return present
+        return [state for state in character_states if state.get("knowledge")]
+
+    def _scene_brief_to_text(self, scene_brief: dict[str, Any]) -> str:
+        for key in ("brief", "scene_brief", "scene_idea", "scene_goal"):
+            value = scene_brief.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return json.dumps(scene_brief, ensure_ascii=False)
+
+    def _normalize_scene_brief(self, raw_scene_brief: object, input_data: dict) -> dict[str, Any]:
+        if isinstance(raw_scene_brief, dict):
+            scene_brief = dict(raw_scene_brief)
+        elif isinstance(raw_scene_brief, str):
+            scene_brief = {"brief": raw_scene_brief}
+        else:
+            scene_brief = {"brief": str(input_data.get("brief") or "")}
+
+        for key in ("genre", "tone", "pov", "language"):
+            if key in input_data and key not in scene_brief:
+                scene_brief[key] = input_data[key]
+        return scene_brief
 
     def _format_previous_canon(self, canon_so_far: list[dict] | None) -> list[str]:
         if not canon_so_far:
@@ -349,7 +451,10 @@ class StylistAgent(BaseAgent):
         }
 
     def run(self, input_data: dict) -> dict:
-        scene_brief = input_data.get("scene_brief") or {}
+        scene_brief = self._normalize_scene_brief(
+            input_data.get("scene_brief") or input_data.get("brief") or {},
+            input_data,
+        )
         continuity = input_data.get("continuity") or {}
         visionary = input_data.get("visionary") or {}
         emotion_guardian = input_data.get("emotion_guardian") or {}
@@ -402,7 +507,15 @@ class StylistAgent(BaseAgent):
             if revision_targets and previous_draft:
                 prompt = self._build_revision_prompt(previous_draft, revision_targets)
             try:
-                draft_text = self._generate_text(prompt)
+                draft_text = self._generate_text(
+                    prompt,
+                    system="\n".join(
+                        self._build_memory_system_prompt(
+                            self._scene_brief_to_text(scene_brief),
+                            continuity,
+                        )
+                    ),
+                )
             except Exception as exc:
                 return self._build_deterministic_draft(
                     protagonist=protagonist,
@@ -471,9 +584,11 @@ class StylistAgent(BaseAgent):
                     canon_so_far=canon_so_far,
                     user_intent=user_intent,
                 )
-            mode_note = "Mock LLM mode was used for this draft."
+            mode_note = "LLM mode was used for this draft."
             if self.llm_mode == "ollama":
                 mode_note = "Ollama LLM mode was used for this draft."
+            elif self.llm_mode == "mock":
+                mode_note = "Mock LLM mode was used for this draft."
             style_notes = [
                 mode_note,
                 "Replace the mock client with a real LLM client later.",
