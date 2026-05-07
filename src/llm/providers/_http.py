@@ -31,6 +31,8 @@ def post_json(
         headers={
             "Content-Type": "application/json",
             "User-Agent": "studio-ecriture-ia/1.0",
+            "Accept": "application/json",
+            "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
             **(headers or {}),
         },
         method="POST",
