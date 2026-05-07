@@ -1,0 +1,162 @@
+[
+  {
+    "title": "Victor leaves Geneva for Ingolstadt",
+    "chapter_number": 3,
+    "characters": ["Victor Frankenstein", "Elizabeth Lavenza", "Alphonse Frankenstein"],
+    "locations": ["Geneva", "Ingolstadt"],
+    "event_type": "departure",
+    "importance": 3
+  },
+  {
+    "title": "Victor meets Professor Krempe",
+    "chapter_number": 3,
+    "characters": ["Victor Frankenstein", "M. Krempe"],
+    "locations": ["Ingolstadt"],
+    "event_type": "meeting",
+    "importance": 2
+  },
+  {
+    "title": "Victor meets Professor Waldman",
+    "chapter_number": 3,
+    "characters": ["Victor Frankenstein", "M. Waldman"],
+    "locations": ["Ingolstadt"],
+    "event_type": "meeting",
+    "importance": 3
+  },
+  {
+    "title": "Victor commits himself to modern science",
+    "chapter_number": 3,
+    "characters": ["Victor Frankenstein", "M. Waldman"],
+    "locations": ["Ingolstadt"],
+    "event_type": "decision",
+    "importance": 4
+  },
+  {
+    "title": "Victor studies chemistry obsessively",
+    "chapter_number": 4,
+    "characters": ["Victor Frankenstein"],
+    "locations": ["Ingolstadt"],
+    "event_type": "study",
+    "importance": 3
+  },
+  {
+    "title": "Victor investigates decay and the human frame",
+    "chapter_number": 4,
+    "characters": ["Victor Frankenstein"],
+    "locations": ["Ingolstadt"],
+    "event_type": "investigation",
+    "importance": 4
+  },
+  {
+    "title": "Victor discovers the principle of life",
+    "chapter_number": 4,
+    "characters": ["Victor Frankenstein"],
+    "locations": ["Ingolstadt"],
+    "event_type": "discovery",
+    "importance": 5
+  },
+  {
+    "title": "Victor begins constructing a creature",
+    "chapter_number": 4,
+    "characters": ["Victor Frankenstein"],
+    "locations": ["Ingolstadt"],
+    "event_type": "creation",
+    "importance": 5
+  },
+  {
+    "title": "Victor animates the creature",
+    "chapter_number": 5,
+    "characters": ["Victor Frankenstein", "The Creature"],
+    "locations": ["Ingolstadt"],
+    "event_type": "creation",
+    "importance": 5
+  },
+  {
+    "title": "Victor flees from the creature",
+    "chapter_number": 5,
+    "characters": ["Victor Frankenstein", "The Creature"],
+    "locations": ["Ingolstadt"],
+    "event_type": "flight",
+    "importance": 5
+  },
+  {
+    "title": "Henry Clerval arrives in Ingolstadt",
+    "chapter_number": 5,
+    "characters": ["Victor Frankenstein", "Henry Clerval"],
+    "locations": ["Ingolstadt"],
+    "event_type": "arrival",
+    "importance": 4
+  },
+  {
+    "title": "Victor falls into a nervous fever",
+    "chapter_number": 5,
+    "characters": ["Victor Frankenstein", "Henry Clerval"],
+    "locations": ["Ingolstadt"],
+    "event_type": "illness",
+    "importance": 4
+  },
+  {
+    "title": "Victor receives news of William's murder",
+    "chapter_number": 7,
+    "characters": ["Victor Frankenstein", "Alphonse Frankenstein", "William Frankenstein"],
+    "locations": ["Ingolstadt", "Geneva"],
+    "event_type": "message",
+    "importance": 5
+  },
+  {
+    "title": "Victor sees the creature near Geneva",
+    "chapter_number": 7,
+    "characters": ["Victor Frankenstein", "The Creature"],
+    "locations": ["Geneva"],
+    "event_type": "sighting",
+    "importance": 5
+  },
+  {
+    "title": "Victor suspects the creature murdered William",
+    "chapter_number": 7,
+    "characters": ["Victor Frankenstein", "The Creature", "William Frankenstein"],
+    "locations": ["Geneva"],
+    "event_type": "realization",
+    "importance": 5
+  },
+  {
+    "title": "Justine is accused of William's murder",
+    "chapter_number": 7,
+    "characters": ["Justine Moritz", "William Frankenstein", "Victor Frankenstein"],
+    "locations": ["Geneva"],
+    "event_type": "accusation",
+    "importance": 4
+  },
+  {
+    "title": "The creature observes the De Lacey family",
+    "chapter_number": 12,
+    "characters": ["The Creature", "De Lacey", "Felix De Lacey", "Agatha De Lacey"],
+    "locations": ["The De Lacey cottage"],
+    "event_type": "observation",
+    "importance": 4
+  },
+  {
+    "title": "The creature helps the De Laceys in secret",
+    "chapter_number": 12,
+    "characters": ["The Creature", "De Lacey", "Felix De Lacey", "Agatha De Lacey"],
+    "locations": ["The De Lacey cottage"],
+    "event_type": "secret_help",
+    "importance": 3
+  },
+  {
+    "title": "The creature learns language from the De Laceys",
+    "chapter_number": 13,
+    "characters": ["The Creature", "Felix De Lacey", "Agatha De Lacey", "Safie"],
+    "locations": ["The De Lacey cottage"],
+    "event_type": "learning",
+    "importance": 5
+  },
+  {
+    "title": "Safie arrives at the De Lacey cottage",
+    "chapter_number": 13,
+    "characters": ["Safie", "Felix De Lacey", "Agatha De Lacey", "The Creature"],
+    "locations": ["The De Lacey cottage"],
+    "event_type": "arrival",
+    "importance": 4
+  }
+]
