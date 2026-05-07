@@ -28,7 +28,11 @@ def post_json(
     http_request = request.Request(
         url=url,
         data=body,
-        headers={"Content-Type": "application/json", **(headers or {})},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "studio-ecriture-ia/1.0",
+            **(headers or {}),
+        },
         method="POST",
     )
 
