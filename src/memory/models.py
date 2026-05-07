@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -108,6 +108,12 @@ class Event(Base):
 
 class SetupPayoff(Base):
     __tablename__ = "setup_payoffs"
+    __table_args__ = (
+        CheckConstraint(
+            "progress in ('planted', 'partially_paid', 'fully_paid')",
+            name="ck_setup_payoffs_progress",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id"), nullable=False)
@@ -120,6 +126,12 @@ class SetupPayoff(Base):
     setup_text: Mapped[str] = mapped_column(Text, nullable=False)
     payoff_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    progress: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="planted",
+    )
+    payoff_chapters: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     novel: Mapped["Novel"] = relationship(back_populates="setup_payoffs")
     setup_chapter: Mapped[Optional["Chapter"]] = relationship(
