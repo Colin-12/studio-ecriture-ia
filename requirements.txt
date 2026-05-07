@@ -10,3 +10,4 @@ python-dotenv
 ruff
 mypy
 sqlalchemy[mypy]
+langgraph>=0.2.0
