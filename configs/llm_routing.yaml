@@ -1,3 +1,9 @@
+# Routing validé par benchmark stylist — 3 briefs, 2 lecteurs indépendants
+# Gemini 2.5 Flash : score moyen 4.6/5
+# Groq Llama 3.3 70B : score moyen 2.9/5
+# Groq Llama 3.1 8B : score moyen 2.3/5
+# Ollama qwen2.5:3b : score moyen 1.2/5 — prose exclue, JSON uniquement
+
 default:
   provider: groq
   model: llama-3.1-8b-instant
@@ -19,6 +25,9 @@ agents:
     model: gemini-2.5-flash
     temperature: 0.6
     max_tokens: 1500
+    fallback:
+      provider: groq
+      model: llama-3.3-70b-versatile
 
   story_architect:
     provider: gemini
@@ -26,35 +35,50 @@ agents:
     temperature: 0.6
     max_tokens: 2000
 
-  continuity:
-    provider: groq
-    model: llama-3.3-70b-versatile
-    temperature: 0.2
-    max_tokens: 1000
-
-  devil_advocate:
-    provider: groq
-    model: llama-3.1-8b-instant
-    temperature: 0.6
-    max_tokens: 800
-
-  visionary:
-    provider: groq
-    model: llama-3.1-8b-instant
-    temperature: 0.9
-    max_tokens: 800
-
   emotion_guardian:
     provider: gemini
     model: gemini-2.5-flash
     temperature: 0.5
     max_tokens: 800
+    fallback:
+      provider: groq
+      model: llama-3.3-70b-versatile
 
   editor:
     provider: gemini
     model: gemini-2.5-flash
     temperature: 0.4
     max_tokens: 1500
+    fallback:
+      provider: groq
+      model: llama-3.3-70b-versatile
+
+  devil_advocate:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    temperature: 0.6
+    max_tokens: 800
+    fallback:
+      provider: groq
+      model: llama-3.1-8b-instant
+
+  visionary:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    temperature: 0.9
+    max_tokens: 800
+    fallback:
+      provider: groq
+      model: llama-3.1-8b-instant
+
+  continuity:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    temperature: 0.2
+    max_tokens: 1000
+    fallback:
+      provider: groq
+      model: llama-3.1-8b-instant
 
   quality_evaluator:
     provider: gemini
