@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 from pathlib import Path
 
@@ -98,6 +99,20 @@ def render() -> None:
         open_setups = sum(1 for s in setups if s.progress == "planted")
         st.metric("Setups ouverts", open_setups)
         st.metric("Contradictions détectées", _count_warnings(db_path, novel_id))
+
+    # ------------------------------------------------------------------
+    # Chapitres écrits (fichiers Markdown validés)
+    # ------------------------------------------------------------------
+    st.divider()
+    st.subheader("Chapitres écrits")
+    disk_chapters = list_chapters(novel_id)
+    if disk_chapters:
+        for ch in disk_chapters:
+            mod = datetime.datetime.fromtimestamp(ch["modified_at"]).strftime("%d/%m/%Y %H:%M")
+            with st.expander(f"Chapitre {ch['num']} — modifié le {mod}"):
+                st.markdown(ch["content"])
+    else:
+        st.caption("Aucun chapitre validé.")
 
     # ------------------------------------------------------------------
     # Usage LLM session
@@ -229,6 +244,33 @@ def _render_empty_state() -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def list_chapters(novel_id: int) -> list[dict]:
+    """Scan manuscript/novels/{novel_id}/chapter_*.md (excludes drafts/).
+
+    Returns a list of dicts sorted by chapter number:
+    {num, path, content, modified_at}
+    """
+    base = Path(f"manuscript/novels/{novel_id}")
+    if not base.exists():
+        return []
+    results: list[dict] = []
+    for path in base.glob("chapter_*.md"):
+        num_str = path.stem.replace("chapter_", "")
+        try:
+            num = int(num_str)
+        except ValueError:
+            num = 0
+        results.append(
+            {
+                "num": num,
+                "path": path,
+                "content": path.read_text(encoding="utf-8"),
+                "modified_at": path.stat().st_mtime,
+            }
+        )
+    return sorted(results, key=lambda x: x["num"])
 
 
 def _get_engine(db_path: str):  # type: ignore[return]

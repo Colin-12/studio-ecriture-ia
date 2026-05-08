@@ -76,9 +76,10 @@ def run_debate(
     llm_profile: str = "default",
     db_path: str = "db/novel_memory.sqlite",
     chroma_dir: str = "data/chroma",
-    collection_name: str = "frankenstein",
+    collection_name: str = "",
 ) -> DebateState:
     """Run the debate graph and return the final state."""
+    effective_collection = collection_name or f"novel_{novel_id}"
     initial_state: DebateState = {
         "scene_idea": scene_idea,
         "genre": genre,
@@ -90,7 +91,7 @@ def run_debate(
         "llm_profile": llm_profile,
         "db_path": db_path,
         "chroma_dir": chroma_dir,
-        "collection_name": collection_name,
+        "collection_name": effective_collection,
         "hard_constraints": {},
         "creative_directives": {},
         "continuity_report": {},

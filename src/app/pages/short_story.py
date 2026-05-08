@@ -124,11 +124,13 @@ def _run_generation(
     try:
         from src.agents.workflow import run_scene_workflow
 
+        _novel_id = us.get_active_novel_id()
+        _collection = f"novel_{_novel_id}" if _novel_id else "novel_short"
         result = run_scene_workflow(
             scene_idea=scene_idea,
             db_path="db/novel_memory.sqlite",
             chroma_dir="data/chroma",
-            collection_name="frankenstein",
+            collection_name=_collection,
             use_llm=True,
             story_mode="original_story",
             genre=genre,

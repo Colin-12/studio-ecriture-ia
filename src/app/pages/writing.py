@@ -815,7 +815,7 @@ def _build_base_state(
         "llm_profile": llm_profile,
         "db_path": db_path,
         "chroma_dir": "data/chroma",
-        "collection_name": "frankenstein",
+        "collection_name": f"novel_{int(novel_meta.get('id', 1))}",
         "hard_constraints": {},
         "creative_directives": {},
         "continuity_report": {},

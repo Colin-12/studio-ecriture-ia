@@ -160,6 +160,8 @@ def render_create_novel_wizard(db_path: str) -> int | None:
                 description,
             )
 
+            _init_chroma_collection(novel_id)
+
             if characters_text.strip():
                 _create_characters(db_path, novel_id, characters_text)
 
@@ -199,6 +201,17 @@ def _clear_wizard_state() -> None:
         "wizard_constraints",
     ]:
         st.session_state.pop(key, None)
+
+
+def _init_chroma_collection(novel_id: int) -> None:
+    """Create the per-novel ChromaDB collection (no-op if it already exists)."""
+    try:
+        import chromadb
+
+        client = chromadb.PersistentClient(path="data/chroma")
+        client.get_or_create_collection(f"novel_{novel_id}")
+    except Exception:
+        pass
 
 
 def _create_characters(db_path: str, novel_id: int, characters_text: str) -> None:
