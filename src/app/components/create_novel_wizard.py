@@ -174,7 +174,7 @@ def render_create_novel_wizard(db_path: str) -> int | None:
             _clear_wizard_state()
             st.session_state["writing_step"] = "step_0"
             st.session_state["writing_chapter_number"] = 1
-            st.session_state["sidebar_nav"] = "Écriture"
+            st.session_state["_nav_target"] = "Écriture"
             st.rerun()
 
     return None

@@ -136,7 +136,7 @@ def render() -> None:
         ):
             st.session_state["writing_step"] = "step_0"
             st.session_state["writing_chapter_number"] = 1
-            st.session_state["sidebar_nav"] = "Écriture"
+            st.session_state["_nav_target"] = "Écriture"
             st.rerun()
 
     elif in_progress_ch > 0:
@@ -150,7 +150,7 @@ def render() -> None:
         ):
             st.session_state["writing_step"] = "step_0"
             st.session_state["writing_chapter_number"] = ch_num
-            st.session_state["sidebar_nav"] = "Écriture"
+            st.session_state["_nav_target"] = "Écriture"
             st.rerun()
 
     else:
@@ -163,8 +163,26 @@ def render() -> None:
         ):
             st.session_state["writing_step"] = "step_0"
             st.session_state["writing_chapter_number"] = next_num
-            st.session_state["sidebar_nav"] = "Écriture"
+            st.session_state["_nav_target"] = "Écriture"
             st.rerun()
+
+    # ------------------------------------------------------------------
+    # Paramètres / suppression
+    # ------------------------------------------------------------------
+    st.divider()
+    with st.expander("⚙️ Paramètres du roman"):
+        st.warning("Cette action est irréversible pour les données UI.")
+        if st.button("🗑️ Supprimer ce roman", type="secondary", key="btn_delete_novel"):
+            if st.session_state.get("confirm_delete"):
+                nm.delete_novel(db_path, novel_id)
+                us.set_active_novel_id(None)
+                st.session_state.pop("confirm_delete", None)
+                st.rerun()
+            else:
+                st.session_state["confirm_delete"] = True
+                st.rerun()
+        if st.session_state.get("confirm_delete"):
+            st.error("Clique à nouveau sur Supprimer pour confirmer.")
 
 
 # ---------------------------------------------------------------------------

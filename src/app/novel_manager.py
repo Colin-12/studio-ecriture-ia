@@ -74,3 +74,10 @@ def update_novel_status(db_path: str, novel_id: int, status: str) -> None:
             (status, novel_id),
         )
         conn.commit()
+
+
+def delete_novel(db_path: str, novel_id: int) -> None:
+    """Supprime un roman de la table ui_novels."""
+    with _connect(db_path) as conn:
+        conn.execute("DELETE FROM ui_novels WHERE id = ?", (novel_id,))
+        conn.commit()

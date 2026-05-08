@@ -119,6 +119,11 @@ pages = [PAGE_DASHBOARD, PAGE_WRITING, PAGE_MEMORY, PAGE_SHORT]
 if story_mode == "Récit court":
     pages = [PAGE_DASHBOARD, PAGE_SHORT]
 
+# Apply programmatic navigation requested by page-level buttons
+_nav_target = st.session_state.pop("_nav_target", None)
+if _nav_target and _nav_target in pages:
+    st.session_state["sidebar_nav"] = _nav_target
+
 selected_page = st.sidebar.radio("Navigation", pages, key="sidebar_nav")
 
 if st.session_state.get("show_create_wizard"):
