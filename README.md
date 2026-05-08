@@ -69,7 +69,7 @@ Notes :
 ## Interface Streamlit
 
 ```bash
-streamlit run src/app/streamlit_app.py
+PYTHONPATH=. streamlit run src/app/streamlit_app.py
 ```
 
 4 pages disponibles :
