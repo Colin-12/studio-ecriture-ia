@@ -46,3 +46,8 @@ outputs/
 logs/
 examples/trisha_revenge_story/continuations/
 results/
+.claude/
+
+# Chapitres et brouillons générés (locaux)
+manuscript/novels/**/chapter_*.md
+manuscript/novels/**/drafts/
