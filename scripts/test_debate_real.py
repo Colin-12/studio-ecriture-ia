@@ -11,12 +11,9 @@ USAGE_LOG = Path("logs/llm_usage.jsonl")
 
 def main() -> None:
     state = run_debate(
-        scene_idea=(
-            "Victor rencontre la creature sur les glaciers du Mont Blanc "
-            "et l'ecoute raconter son histoire"
-        ),
-        genre="roman gothique",
-        tone="sombre",
+        scene_idea="un petit garçon se rend compte que les dessins qu'il fait prennent vie",
+        genre="fantastique",
+        tone="mélancolique et contemplatif",
         language="fr",
         chapter_number=11,
         novel_id=1,
