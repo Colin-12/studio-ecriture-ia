@@ -6,7 +6,7 @@
 
 default:
   provider: groq
-  model: llama-3.1-8b-instant
+  model: llama-3.3-70b-versatile
   temperature: 0.7
   max_tokens: 1000
 
@@ -99,7 +99,7 @@ agents:
 
   beta_reader:
     provider: groq
-    model: llama-3.1-8b-instant
+    model: llama-3.3-70b-versatile
     temperature: 0.5
     max_tokens: 600
     response_format: json
