@@ -172,17 +172,33 @@ def render() -> None:
     st.divider()
     with st.expander("⚙️ Paramètres du roman"):
         st.warning("Cette action est irréversible pour les données UI.")
-        if st.button("🗑️ Supprimer ce roman", type="secondary", key="btn_delete_novel"):
-            if st.session_state.get("confirm_delete"):
-                nm.delete_novel(db_path, novel_id)
-                us.set_active_novel_id(None)
-                st.session_state.pop("confirm_delete", None)
-                st.rerun()
-            else:
+        if not st.session_state.get("confirm_delete"):
+            if st.button("🗑️ Supprimer ce roman", type="secondary", key="btn_delete_novel"):
                 st.session_state["confirm_delete"] = True
                 st.rerun()
-        if st.session_state.get("confirm_delete"):
-            st.error("Clique à nouveau sur Supprimer pour confirmer.")
+        else:
+            st.error("Confirmer la suppression de ce roman ?")
+            col_confirm, col_cancel = st.columns(2)
+            with col_confirm:
+                if st.button(
+                    "🗑️ Confirmer la suppression",
+                    type="primary",
+                    key="btn_delete_confirm",
+                    use_container_width=True,
+                ):
+                    nm.delete_novel(db_path, novel_id)
+                    us.set_active_novel_id(None)
+                    st.session_state.pop("confirm_delete", None)
+                    st.rerun()
+            with col_cancel:
+                if st.button(
+                    "Annuler",
+                    type="secondary",
+                    key="btn_delete_cancel",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop("confirm_delete", None)
+                    st.rerun()
 
 
 # ---------------------------------------------------------------------------

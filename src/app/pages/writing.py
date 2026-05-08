@@ -168,16 +168,16 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 
     with col1:
         if st.button("🔷 Générer un blueprint", type="primary", key="btn_blueprint"):
-            if not brief.strip():
-                st.warning("Décris l'impulsion du chapitre avant de continuer.")
-                return
-            _save_step0_inputs(brief, pov_label, tone)
+            effective_brief = brief.strip() or (
+                "Écrire le prochain chapitre du roman en respectant le canon narratif établi."
+            )
+            _save_step0_inputs(effective_brief, pov_label, tone)
             with st.spinner("Génération du blueprint…"):
                 try:
                     result = _run_blueprint(
                         novel_meta=novel_meta,
                         chapter_number=chapter_number,
-                        brief=brief.strip(),
+                        brief=effective_brief,
                         pov=_POV_KEYS[pov_label],
                         tone=tone or "neutre",
                         db_path=db_path,
@@ -197,16 +197,16 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 
     with col2:
         if st.button("⚡ Générer directement", key="btn_direct"):
-            if not brief.strip():
-                st.warning("Décris l'impulsion du chapitre avant de continuer.")
-                return
-            _save_step0_inputs(brief, pov_label, tone)
+            effective_brief = brief.strip() or (
+                "Écrire le prochain chapitre du roman en respectant le canon narratif établi."
+            )
+            _save_step0_inputs(effective_brief, pov_label, tone)
             with st.spinner("Génération complète en cours…"):
                 try:
                     state = _run_full_debate(
                         novel_meta=novel_meta,
                         chapter_number=chapter_number,
-                        brief=brief.strip(),
+                        brief=effective_brief,
                         pov=_POV_KEYS[pov_label],
                         tone=tone or "neutre",
                         db_path=db_path,
