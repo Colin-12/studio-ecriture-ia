@@ -66,6 +66,21 @@ Notes :
 - `qwen2.5:3b` est la configuration recommandee pour le `StylistAgent`
 - `--llm-keep-alive` peut etre utilise pour garder le modele charge entre plusieurs appels
 
+## Interface Streamlit
+
+```bash
+streamlit run src/app/streamlit_app.py
+```
+
+4 pages disponibles :
+
+- **Tableau de bord** : statistiques du roman actif, usage LLM session, prochaine action
+- **Écriture** (mode Roman long) : génération via le graphe de débat, validation chapitres, canon
+- **Mémoire / Canon** : timeline, personnages, événements, setups, contradictions
+- **Récit court** : génération standalone avec export Markdown et promotion en roman long
+
+Sélecteur de profil LLM, mode exécution et agent depth dans la barre latérale.
+
 ## Configuration LLM
 
 La couche LLM est configuree via `configs/llm_routing.yaml` ou un profil dans
