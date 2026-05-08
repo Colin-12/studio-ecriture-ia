@@ -22,7 +22,7 @@ class GroqProvider(LLMProvider):
     provider_name = "groq"
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    def __init__(self, model: str = "llama-3.1-8b-instant") -> None:
+    def __init__(self, model: str = "llama-3.3-70b-versatile") -> None:
         load_dotenv()
         self.model = model
         self.api_key = os.getenv("GROQ_API_KEY")
