@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from src.agents.debate_nodes import (
     architect_node,
     continuity_node,
+    contract_parser_node,
     devil_node,
     editor_node,
     emotion_node,
@@ -31,6 +32,7 @@ def build_debate_graph() -> StateGraph:
     """Build the LangGraph debate topology."""
     graph = StateGraph(DebateState)
 
+    graph.add_node("contract_parser", contract_parser_node)
     graph.add_node("continuity", continuity_node)
     graph.add_node("architect_initial", _architect_initial_node)
     graph.add_node("devil", devil_node)
@@ -41,7 +43,8 @@ def build_debate_graph() -> StateGraph:
     graph.add_node("stylist", stylist_node)
     graph.add_node("editor", editor_node)
 
-    graph.add_edge(START, "continuity")
+    graph.add_edge(START, "contract_parser")
+    graph.add_edge("contract_parser", "continuity")
     graph.add_edge("continuity", "architect_initial")
     graph.add_edge("architect_initial", "devil")
     graph.add_edge("devil", "visionary")
@@ -88,6 +91,8 @@ def run_debate(
         "db_path": db_path,
         "chroma_dir": chroma_dir,
         "collection_name": collection_name,
+        "hard_constraints": {},
+        "creative_directives": {},
         "continuity_report": {},
         "scene_brief": "",
         "critiques": [],

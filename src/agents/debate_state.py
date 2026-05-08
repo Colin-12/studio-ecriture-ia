@@ -29,6 +29,9 @@ class DebateState(TypedDict):
     emotion_notes: Annotated[list[str], operator.add]
     final_brief: str
 
+    hard_constraints: dict
+    creative_directives: dict
+
     draft: str
     quality_score: int
     quality_feedback: str
