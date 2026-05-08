@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import ProviderUnavailableError, RateLimitError
+from src.llm.rate_limiter import get_rate_limiter
 from src.llm.registry import create_provider
 from src.llm.usage_logger import log_llm_call
 
@@ -96,11 +97,13 @@ class ConfiguredLLMProvider(LLMProvider):
         provider_name = getattr(provider, "provider_name", provider.__class__.__name__)
         model = getattr(provider, "model", "")
         started_at = time.perf_counter()
+        limiter = get_rate_limiter()
         try:
             if not provider.is_available():
                 raise ProviderUnavailableError(
                     f"{provider_name} provider is not configured or available.",
                 )
+            limiter.wait_if_needed(provider_name, config["max_tokens"])
             response = provider.generate(
                 prompt=prompt,
                 system=system,
@@ -131,6 +134,7 @@ class ConfiguredLLMProvider(LLMProvider):
             success=True,
             error=None,
         )
+        limiter.record_usage(provider_name, response.output_tokens or config["max_tokens"])
         return response
 
     def is_available(self) -> bool:

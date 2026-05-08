@@ -19,7 +19,7 @@ agents:
     response_format: json
     fallback:
       provider: groq
-      model: llama-3.1-8b-instant
+      model: llama-3.3-70b-versatile
 
   stylist:
     provider: gemini
@@ -70,7 +70,7 @@ agents:
     max_tokens: 800
     fallback:
       provider: groq
-      model: llama-3.1-8b-instant
+      model: llama-3.3-70b-versatile
 
   visionary:
     provider: groq
@@ -79,7 +79,7 @@ agents:
     max_tokens: 800
     fallback:
       provider: groq
-      model: llama-3.1-8b-instant
+      model: llama-3.3-70b-versatile
 
   continuity:
     provider: groq
@@ -88,7 +88,7 @@ agents:
     max_tokens: 1000
     fallback:
       provider: groq
-      model: llama-3.1-8b-instant
+      model: llama-3.3-70b-versatile
 
   quality_evaluator:
     provider: gemini
