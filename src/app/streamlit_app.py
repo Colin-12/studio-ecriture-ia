@@ -54,19 +54,10 @@ with st.sidebar:
         us.set_active_novel_id(None)
 
     # Nouveau roman
-    with st.expander("➕ Nouveau roman"):
-        new_title = st.text_input("Titre", key="new_title")
-        new_genre = st.text_input("Genre", value="roman", key="new_genre")
-        new_lang = st.selectbox("Langue", ["fr", "en"], key="new_lang")
-        new_desc = st.text_area("Description courte", key="new_desc", height=80)
-        if st.button("Créer", key="btn_create_novel"):
-            if new_title.strip():
-                nid = nm.create_novel(db_path, new_title.strip(), new_genre, new_lang, new_desc)
-                us.set_active_novel_id(nid)
-                st.success(f"Roman « {new_title} » créé.")
-                st.rerun()
-            else:
-                st.warning("Le titre est obligatoire.")
+    if st.button("➕ Nouveau roman", key="btn_sidebar_new_novel", use_container_width=True):
+        st.session_state["show_create_wizard"] = True
+        st.session_state["sidebar_create"] = True
+        st.rerun()
 
     st.divider()
 
@@ -130,7 +121,11 @@ if story_mode == "Récit court":
 
 selected_page = st.sidebar.radio("Navigation", pages, key="sidebar_nav")
 
-if selected_page == PAGE_DASHBOARD:
+if st.session_state.get("show_create_wizard"):
+    from src.app.components.create_novel_wizard import render_create_novel_wizard
+
+    render_create_novel_wizard(db_path)
+elif selected_page == PAGE_DASHBOARD:
     dashboard.render()
 elif selected_page == PAGE_WRITING:
     writing.render()

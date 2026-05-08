@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.app import novel_manager as nm
 from src.app import ui_state as us
+from src.app.components.create_novel_wizard import render_create_novel_wizard
 from src.memory.models import Chapter, Novel, SetupPayoff
 
 
@@ -20,15 +21,25 @@ def render() -> None:
     novel_id = us.get_active_novel_id()
     db_path = us.get_db_path()
 
+    # ------------------------------------------------------------------
+    # Empty state — no novels at all
+    # ------------------------------------------------------------------
+    if not nm.list_novels(db_path):
+        if st.session_state.get("show_create_wizard"):
+            render_create_novel_wizard(db_path)
+        else:
+            _render_empty_state()
+        return
+
     if novel_id is None:
         st.info("Sélectionnez ou créez un roman dans la barre latérale.")
         return
 
     novel_meta = nm.get_novel(db_path, novel_id)
 
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Infos roman
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     col1, col2 = st.columns([2, 1])
     with col1:
         st.subheader(novel_meta.get("title", "—"))
@@ -39,9 +50,9 @@ def render() -> None:
         if desc := novel_meta.get("description"):
             st.write(desc)
 
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Statistiques chapitres (ORM)
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     engine = _get_engine(db_path)
     with Session(engine) as session:
         novel_orm = session.get(Novel, novel_id)
@@ -53,7 +64,6 @@ def render() -> None:
             setups = list(novel_orm.setup_payoffs)
 
     total_ch = len(chapters)
-    # Les chapitres "validés" sont ceux dont le summary est non nul (convention UI)
     validated_ch = sum(1 for c in chapters if c.summary)
     in_progress_ch = total_ch - validated_ch
 
@@ -65,9 +75,9 @@ def render() -> None:
 
     st.divider()
 
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Dernière prose
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     col_prose, col_stats = st.columns([3, 2])
 
     with col_prose:
@@ -85,16 +95,13 @@ def render() -> None:
             st.caption("Aucun chapitre.")
 
     with col_stats:
-        # Setups ouverts
         open_setups = sum(1 for s in setups if s.progress == "planted")
         st.metric("Setups ouverts", open_setups)
-
-        # Contradictions : on lit le log LLM pour proxy (warnings dans le debug)
         st.metric("Contradictions détectées", _count_warnings(db_path, novel_id))
 
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Usage LLM session
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     st.subheader("Usage LLM — session courante")
     session_start = us.get_session_start()
     llm_rows = _read_llm_usage(session_start)
@@ -114,20 +121,75 @@ def render() -> None:
     else:
         st.caption("Aucun appel LLM cette session.")
 
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Prochaine action recommandée
-    # ---------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     st.divider()
     st.subheader("Prochaine action recommandée")
+
     if total_ch == 0:
-        st.success("→ Commencer le premier chapitre")
+        if st.button(
+            "✍️ Écrire le chapitre 1 →",
+            type="primary",
+            use_container_width=True,
+            key="btn_dash_write_ch1",
+        ):
+            st.session_state["writing_step"] = "step_0"
+            st.session_state["writing_chapter_number"] = 1
+            st.session_state["sidebar_nav"] = "Écriture"
+            st.rerun()
+
     elif in_progress_ch > 0:
         in_progress = [c for c in chapters if not c.summary]
-        ch_num = in_progress[0].number if in_progress else "?"
-        st.info(f"→ Continuer le chapitre {ch_num}")
+        ch_num = in_progress[0].number if in_progress else total_ch
+        if st.button(
+            f"▶️ Continuer le chapitre {ch_num} →",
+            type="primary",
+            use_container_width=True,
+            key="btn_dash_continue",
+        ):
+            st.session_state["writing_step"] = "step_0"
+            st.session_state["writing_chapter_number"] = ch_num
+            st.session_state["sidebar_nav"] = "Écriture"
+            st.rerun()
+
     else:
         next_num = total_ch + 1
-        st.info(f"→ Écrire le chapitre {next_num}")
+        if st.button(
+            f"✨ Écrire le chapitre {next_num} →",
+            type="primary",
+            use_container_width=True,
+            key="btn_dash_next",
+        ):
+            st.session_state["writing_step"] = "step_0"
+            st.session_state["writing_chapter_number"] = next_num
+            st.session_state["sidebar_nav"] = "Écriture"
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Empty state
+# ---------------------------------------------------------------------------
+
+
+def _render_empty_state() -> None:
+    st.markdown("## 📖 Aucun roman pour l'instant")
+    st.markdown(
+        "Crée ton premier projet pour commencer à écrire avec la writer's room."
+    )
+
+    _, center, _ = st.columns([1, 2, 1])
+    with center:
+        if st.button(
+            "✨ Créer mon premier roman",
+            type="primary",
+            use_container_width=True,
+            key="btn_empty_create",
+        ):
+            st.session_state["show_create_wizard"] = True
+            st.rerun()
+
+    st.markdown("*Ou importer un texte existant (bientôt disponible)*")
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +202,6 @@ def _get_engine(db_path: str):  # type: ignore[return]
 
 
 def _count_warnings(db_path: str, novel_id: int) -> int:
-    """Proxy: count log lines mentioning 'warning' for this novel."""
     log_path = Path("logs/llm_usage.jsonl")
     if not log_path.exists():
         return 0
