@@ -1,72 +1,48 @@
-# Studio d'ecriture IA par agents
+# Studio d'écriture IA
 
-## Resume
+Studio d'écriture multi-agents pour romans longs. Une *writer's room* automatisée où des agents LLM débattent, se challengent et arbitrent avant de produire la prose — chapitre après chapitre.
 
-Studio d'ecriture IA local base sur une `writers room` multi-agents.
+## Principe
 
-Le projet supporte maintenant deux modes principaux :
+Chaque chapitre passe par un graphe de débat LangGraph :
 
-- `create-story` : creer un recit court en `3` scenes a partir d'une impulsion humaine
-- `continue-story` : continuer un recit existant a partir d'un canon + une direction humaine
+1. **Contract Parser** extrait les contraintes rigides du brief auteur (personnages, événement central, interdictions).
+2. **Continuiste** interroge la mémoire sémantique (ChromaDB) et structurée (SQLite).
+3. **Architecte** formule le brief initial.
+4. **Avocat du Diable** et **Visionnaire** challengent le brief en parallèle.
+5. **Gardien de l'Émotion** vérifie la cohérence émotionnelle.
+6. **Architecte** arbitre et produit le brief final.
+7. **Styliste** (Gemini 2.5 Flash) rédige la prose.
+8. **Éditeur** note et déclenche une révision si le score < 3/5.
 
-Le depot contient aussi `examples/trisha_revenge_story/`, un exemple canonise pour tester la continuation de recit sans imposer la suite.
+Les `hard_constraints` extraites à l'étape 1 sont injectées dans tous les prompts : les agents créatifs peuvent enrichir la zone libre, jamais modifier le contrat narratif.
 
-## Fonctionnalites principales
+## Architecture
 
-- generation de scene avec `run-scene`
-- generation de recit court en `3` scenes avec `create-story`
-- continuation de recit avec `continue-story`
-- workflow narratif multi-agents
-- `NarrativeDecisionAgent` pour arbitrer les ajouts et preparer le canon
-- `UserIntentAgent` pour interpreter la direction utilisateur dans `continue-story` sans modifier le canon
-- memoire inter-scenes avec `canon_so_far`
-- export Markdown + `story_memory.json`
-- support local de `Ollama`
-- routing LLM configurable par agent avec `--llm-profile`
-- `--agent-depth {fast, balanced, deep}`
-- `--llm-keep-alive` pour garder le modele Ollama charge
+```
+Roman
+  Chapitres (SQLite + Markdown)
+    Graphe de débat (LangGraph)
+      contract_parser -> continuity -> architect_initial
+      -> [devil_advocate | visionary | emotion_guardian]
+      -> architect_arbitrate -> stylist -> editor
+      -> (révision si score < 3, max 2 tours)
 
-## Architecture actuelle
-
-```text
-StoryArchitect
-  -> Scene workflow
-       -> SceneArchitect
-       -> DevilAdvocate
-       -> Visionary
-       -> EmotionGuardian
-      -> Stylist / LLM Router
-       -> Editor
-       -> QualityEvaluator
-       -> BetaReader
-       -> CommercialEditor
-       -> NarrativeDecision
-  -> Documentalist
-  -> story_memory.json
+Mémoire composite
+  ChromaDB  — recherche sémantique par roman (collection novel_{id})
+  SQLite    — chapitres, personnages, événements, setup/payoffs
+  NetworkX  — graphe de cohérence narratif
 ```
 
-En mode `continue-story`, la direction humaine est d'abord interpretee par `UserIntentAgent`, puis injectee comme intention creative non canonique dans le contexte de scene.
+**Routing LLM validé par benchmark** (3 briefs, 2 lecteurs indépendants) :
 
-## Profondeur agentique
+| Modèle | Score | Usage |
+|--------|-------|-------|
+| Gemini 2.5 Flash | 4.6/5 | Prose (stylist, editor, architect) |
+| Groq Llama 3.3 70B | 2.9/5 | Challenge (devil, visionary, continuity) |
+| Ollama qwen2.5:3b | 1.2/5 | JSON uniquement (event_extractor) |
 
-- `fast` : agents mostly deterministic, LLM mainly for stylist
-- `balanced` : default writer room with deterministic analysis agents and LLM stylist
-- `deep` : reserved for deeper LLM-based agent deliberation
-
-## Commande recommandee
-
-Configuration de reference pour `create-story` en francais :
-
-```bash
-python -m src.app.cli create-story "Un homme découvre que ses souvenirs ont été modifiés par une IA" --story-mode original_story --genre thriller --tone sombre --pov first_person --language fr --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --max-revision-rounds 0 --save-output
-```
-
-Notes :
-
-- `qwen2.5:3b` est la configuration recommandee pour le `StylistAgent`
-- `--llm-keep-alive` peut etre utilise pour garder le modele charge entre plusieurs appels
-
-## Interface Streamlit
+## Interface
 
 ```bash
 PYTHONPATH=. streamlit run src/app/streamlit_app.py
@@ -74,98 +50,84 @@ PYTHONPATH=. streamlit run src/app/streamlit_app.py
 
 4 pages disponibles :
 
-- **Tableau de bord** : statistiques du roman actif, usage LLM session, prochaine action
-- **Écriture** (mode Roman long) : génération via le graphe de débat, validation chapitres, canon
-- **Mémoire / Canon** : timeline, personnages, événements, setups, contradictions
-- **Récit court** : génération standalone avec export Markdown et promotion en roman long
+- **Tableau de bord** — métriques du roman, chapitres écrits, prochaine action recommandée
+- **Écriture** — wizard 4 étapes (blueprint → contrat → débat → prose → mémoire)
+- **Mémoire / Canon** — timeline, personnages, événements, setup/payoffs, contradictions
+- **Récit court** — génération one-shot avec export Markdown
 
-Sélecteur de profil LLM, mode exécution et agent depth dans la barre latérale.
+L'onboarding guide les nouveaux utilisateurs vers la création du premier roman et le premier chapitre.
 
-## Configuration LLM
+## Installation
 
-La couche LLM est configuree via `configs/llm_routing.yaml` ou un profil dans
-`configs/llm_profiles/`.
-
-Exemple avec le profil gratuit :
+**Prérequis :** Python 3.11+, Ollama (optionnel, pour modèles locaux)
 
 ```bash
-python -m src.app.cli run-scene "Marie decouvre une lettre cachee" --llm-profile free_only
+git clone https://github.com/Colin-12/studio-ecriture-ia
+cd studio-ecriture-ia
+python -m venv .venv
+source .venv/Scripts/activate   # Windows Git Bash
+pip install -r requirements.txt
 ```
 
-Les anciens flags restent prioritaires pour une session :
+**Configuration :**
 
 ```bash
-python -m src.app.cli run-scene "Marie decouvre une lettre cachee" --use-llm --llm-mode ollama --llm-model qwen2.5:3b
+cp .env.example .env
+# Renseigner GROQ_API_KEY et GOOGLE_API_KEY dans .env
 ```
 
-Variables d'environnement attendues dans `.env` :
+Variables utilisées :
 
-```text
+```
 GROQ_API_KEY=
 GOOGLE_API_KEY=
-MISTRAL_API_KEY=
-HF_API_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
 OLLAMA_HOST=http://localhost:11434
 ```
 
-Chaque appel est journalise dans `logs/llm_usage.jsonl`.
+Chaque appel LLM est journalisé dans `logs/llm_usage.jsonl`.
 
-## Exemple continue-story
+## Stack technique
 
-```bash
-python -m src.app.cli continue-story examples/trisha_revenge_story --direction "Anaïs veut comprendre si Trisha la volontairement attirée sur le parking." --use-llm --llm-mode ollama --llm-model qwen2.5:3b --llm-timeout 180 --llm-num-predict 420 --llm-keep-alive 10m --agent-depth fast --save-output
-```
+| Composant | Rôle |
+|-----------|------|
+| LangGraph >= 0.2 | Orchestration du graphe de débat avec état |
+| Gemini 2.5 Flash | Prose et arbitrage (Google AI Studio) |
+| Groq Llama 3.3 70B | Agents de challenge (vitesse, coût nul) |
+| ChromaDB | Recherche sémantique par roman |
+| SQLite + SQLAlchemy | Mémoire structurée (romans, chapitres, events) |
+| NetworkX | Graphe de cohérence narrative |
+| Streamlit | Interface utilisateur |
+| YAML routing | Configuration par agent et par profil LLM |
 
-## Sorties generees
-
-Avec `--save-output`, le projet genere des sorties Markdown exploitables :
-
-- `outputs/` pour `run-scene`
-- `outputs/stories/` pour `create-story`
-- `continuations/` dans le dossier canon source pour `continue-story`
-
-`create-story` exporte notamment :
-
-```text
-outputs/stories/YYYYMMDD_HHMMSS_story/
-  story_plan.md
-  scene_01.md
-  scene_02.md
-  scene_03.md
-  summary.md
-  story_memory.json
-```
-
-## Installation rapide
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python -m pytest -q
-ollama pull qwen2.5:3b
-ollama serve
-```
+Profils LLM disponibles : `mixed_budget`, `free_only`, `local_only`.  
+Rate limiting token-bucket intégré (Groq : 5 500 TPM).
 
 ## Tests
 
-- etat actuel : `122 passed`
-- un warning `ChromaDB` peut apparaitre selon l'environnement, mais il est non bloquant
+```bash
+pytest -q --ignore=tests/test_cli.py
+```
 
-## Limites actuelles
+151 tests — ruff + mypy clean sur 75 fichiers sources.
 
-- la qualite litteraire reste variable selon le modele local
-- `qwen2.5:1.5b` est plus leger mais moins fiable pour la prose narrative francaise
-- plusieurs agents restent deterministes
-- l'interface graphique n'est pas encore faite
-- la memoire narrative reste simple, mais elle est deja fonctionnelle
+## Roadmap
 
-## Prochaines etapes
+**Fait**
 
-- activer plus de `LLM` par agent selon `agent_depth`
-- mieux extraire personnages, lieux, objets et canon
-- enrichir `continue-story`
-- ajouter une interface `Streamlit` ou web
-- ameliorer la qualite stylistique
+- Mémoire narrative composite : ChromaDB + SQLite + NetworkX
+- Continuiste enrichi et Styliste Gemini 2.5 Flash
+- Graphe de débat LangGraph validé avec vrais appels API
+- Benchmark Styliste documenté (3 briefs, blind review)
+- Interface Streamlit wizard 4 étapes
+- Contraintes rigides (contract parser) préservées entre agents
+- Rate limiter token-bucket pour Groq
+- Onboarding guidé et création de roman en mini-wizard
+- Collection ChromaDB par roman (`novel_{id}`)
+
+**En cours / à venir**
+
+- Prompts agents plus concis
+- Déploiement Streamlit Cloud
+- Premier roman complet généré bout en bout
+- Historique des versions de chapitres
+- Export PDF
