@@ -278,22 +278,80 @@ def emotion_node(state: DebateState) -> dict[str, Any]:
 
 
 def stylist_node(state: DebateState) -> dict[str, Any]:
-    """Draft prose from the arbitrated brief and continuity report."""
+    """Draft prose scene by scene (multi-scene) or as a single block (legacy)."""
+    chapter_plan: list[dict] = state.get("chapter_plan") or []
+
+    if not chapter_plan:
+        # Legacy single-scene path — backward compatible
+        constraint_block = _format_hard_constraints(state.get("hard_constraints") or {})
+        parts: list[str] = []
+        if constraint_block:
+            parts += [constraint_block, _STYLIST_CONSTRAINT]
+        parts += [
+            "Write the scene prose now. Do not explain the task.",
+            f"Final brief: {state.get('final_brief') or _current_brief(state)}",
+            f"Genre: {state['genre']}",
+            f"Tone: {state['tone']}",
+            f"POV: {state['pov']}",
+            f"Language: {state['language']}",
+            "Respect this continuity report:",
+            _compact_json(state.get("continuity_report", {})),
+        ]
+        return {"draft": _generate("stylist", state, "\n".join(parts))}
+
+    # Multi-scene path
+    idx = state.get("current_scene_index", 0)
+    scene = chapter_plan[idx]
+
     constraint_block = _format_hard_constraints(state.get("hard_constraints") or {})
-    parts: list[str] = []
+    parts = []
     if constraint_block:
         parts += [constraint_block, _STYLIST_CONSTRAINT]
+
+    # Transition context from previous scene
+    scenes_drafted: list[dict] = state.get("scenes_drafted") or []
+    last_words_ctx = ""
+    if scenes_drafted:
+        last_words = scenes_drafted[-1].get("last_words", "")
+        if last_words:
+            last_words_ctx = f"Fin de la scène précédente (contexte de transition) :\n{last_words}"
+
     parts += [
         "Write the scene prose now. Do not explain the task.",
-        f"Final brief: {state.get('final_brief') or _current_brief(state)}",
+        f"Brief du chapitre : {state.get('final_brief') or _current_brief(state)}",
+        f"Scène {scene['scene_number']} : {scene['title']}",
+        f"Objectif : {scene['objective']}",
+        f"Registre émotionnel : {scene['emotional_beat']}",
         f"Genre: {state['genre']}",
-        f"Tone: {state['tone']}",
+        f"Ton: {state['tone']}",
         f"POV: {state['pov']}",
         f"Language: {state['language']}",
+        f"Directive de rythme : {scene['pacing']}",
+        f"Style de cette scène : {scene['style_directive']}",
+        f"Longueur cible : {scene['estimated_words']} mots (± 20%)",
+        f"Cette scène doit se terminer sur : {scene['ends_on']}",
+    ]
+    if state.get("scene_brief"):
+        parts.append(f"Micro-brief de scène : {state['scene_brief']}")
+    if last_words_ctx:
+        parts.append(last_words_ctx)
+    parts += [
         "Respect this continuity report:",
         _compact_json(state.get("continuity_report", {})),
     ]
-    return {"draft": _generate("stylist", state, "\n".join(parts))}
+
+    prose = _generate("stylist", state, "\n".join(parts))
+    words = prose.split()
+    return {
+        "scenes_drafted": [
+            {
+                "scene_number": scene["scene_number"],
+                "prose": prose,
+                "word_count": len(words),
+                "last_words": " ".join(words[-150:]),
+            }
+        ]
+    }
 
 
 def editor_node(state: DebateState) -> dict[str, Any]:
@@ -314,6 +372,220 @@ def editor_node(state: DebateState) -> dict[str, Any]:
         "quality_score": _parse_quality_score(response),
         "quality_feedback": response,
     }
+
+
+_CHAPTER_ARCHITECT_SYSTEM = (
+    "Tu es un architecte narratif expert. Tu planifies "
+    "des chapitres de roman avec une structure de scènes "
+    "variée et rythmée. Tu varies intentionnellement : "
+    "- la longueur des scènes (200 à 1500 mots) "
+    "- le rythme (slow/medium/fast/cut) "
+    "- le registre émotionnel de chaque scène "
+    "- la façon dont chaque scène se termine "
+    "Tu évites la monotonie à tout prix. "
+    "Réponds uniquement en JSON valide."
+)
+
+_CHAPTER_PLAN_FORMAT = """\
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "title": "string",
+      "objective": "string — ce que cette scène accomplit",
+      "emotional_beat": "string — état émotionnel dominant",
+      "estimated_words": 600,
+      "pacing": "slow|medium|fast|cut",
+      "style_directive": "string — ex: dialogue dense, flux de conscience",
+      "ends_on": "hook|ambiguous|resolution|cut"
+    }
+  ]
+}"""
+
+_RHYTHM_GUARDIAN_SYSTEM = (
+    "Tu es un gardien du rythme narratif. Tu analyses "
+    "un plan de chapitre et corriges la monotonie. "
+    "Tu varies les longueurs, les tempos, les fins de scènes. "
+    "Un bon chapitre respire — il accélère, ralentit, "
+    "surprend. Réponds uniquement en JSON valide."
+)
+
+_CHAPTER_PLAN_FIELDS = {
+    "scene_number", "title", "objective", "emotional_beat",
+    "estimated_words", "pacing", "style_directive", "ends_on",
+}
+
+
+def chapter_architect_node(state: DebateState) -> dict[str, Any]:
+    """Plan the full chapter as 2-6 scenes before any generation."""
+    brief = state.get("final_brief") or state.get("scene_brief") or state["scene_idea"]
+    user_prompt = "\n".join([
+        f"Brief du chapitre : {brief}",
+        f"Genre : {state['genre']}",
+        f"Ton : {state['tone']}",
+        f"Langue : {state['language']}",
+        f"Contraintes : {_compact_json(state.get('hard_constraints') or {})}",
+        f"Contexte mémoire : {_compact_json(state.get('continuity_report') or {})}",
+        "",
+        "Nombre de scènes : entre 2 et 6 selon la complexité du brief.",
+        "Un chapitre d'action → 4-6 scènes courtes.",
+        "Un chapitre contemplatif → 2-3 scènes longues.",
+        "",
+        f"Format JSON attendu :\n{_CHAPTER_PLAN_FORMAT}",
+    ])
+    llm = get_llm_for_agent("chapter_architect", profile=state.get("llm_profile", "default"))
+    try:
+        response = llm.generate(
+            prompt=user_prompt,
+            system=_CHAPTER_ARCHITECT_SYSTEM,
+            response_format="json",
+        )
+        raw = response.text if isinstance(response, LLMResponse) else str(response)
+        parsed = json.loads(raw)
+        scenes: list[dict] = parsed.get("scenes", [])
+        if not scenes or not isinstance(scenes, list):
+            raise ValueError("empty scenes")
+        for s in scenes:
+            if not _CHAPTER_PLAN_FIELDS.issubset(s.keys()):
+                raise ValueError("missing fields")
+    except Exception:
+        scenes = _default_chapter_plan(state)
+    return {"chapter_plan": scenes, "current_scene_index": 0}
+
+
+def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
+    """Check chapter plan rhythm variety; correct if monotone."""
+    plan: list[dict] = state.get("chapter_plan") or []
+    if not plan:
+        return {}
+
+    issues = _detect_rhythm_issues(plan)
+    if not issues:
+        return {}
+
+    user_prompt = "\n".join([
+        f"Plan de chapitre : {_compact_json(plan)}",
+        "",
+        f"Problèmes détectés : {', '.join(issues)}",
+        "",
+        "Corrige le plan pour introduire de la variété.",
+        "Retourne le plan complet corrigé.",
+        '{"scenes": [...]}',
+    ])
+    llm = get_llm_for_agent("rhythm_guardian", profile=state.get("llm_profile", "default"))
+    try:
+        response = llm.generate(
+            prompt=user_prompt,
+            system=_RHYTHM_GUARDIAN_SYSTEM,
+            response_format="json",
+        )
+        raw = response.text if isinstance(response, LLMResponse) else str(response)
+        parsed = json.loads(raw)
+        scenes = parsed.get("scenes", [])
+        if scenes and isinstance(scenes, list):
+            return {"chapter_plan": scenes}
+    except Exception:
+        pass
+    return {}
+
+
+def scene_challenge_node(state: DebateState) -> dict[str, Any]:
+    """Mini-debate for scenes 2+ (devil 2 bullets, visionary 50 words, architect 30-word brief)."""
+    plan: list[dict] = state.get("chapter_plan") or []
+    idx = state.get("current_scene_index", 0)
+    if idx >= len(plan):
+        return {}
+
+    scene = plan[idx]
+    chapter_brief = (state.get("final_brief") or _current_brief(state))[:300]
+
+    devil_prompt = "\n".join([
+        f"Scène {scene['scene_number']} : {scene['title']}",
+        f"Objectif : {scene['objective']}",
+        f"Contexte chapitre : {chapter_brief}",
+        "Give EXACTLY 2 bullet points on weaknesses of this scene plan.",
+        "Each bullet: under 15 words.",
+        "Format: • [problem]: [explanation]",
+        "No preamble.",
+    ])
+    devil_critique = _generate("devil_advocate", state, devil_prompt)
+
+    visionary_prompt = "\n".join([
+        f"Scène {scene['scene_number']} : {scene['title']} — {scene['objective']}",
+        "Propose ONE alternative approach for this scene, maximum 50 words.",
+        "No preamble.",
+    ])
+    visionary_alt = _generate("visionary", state, visionary_prompt)
+
+    arb_prompt = "\n".join([
+        f"Plan : {scene['title']} — {scene['objective']}",
+        f"Critique : {devil_critique}",
+        f"Alternative : {visionary_alt}",
+        "Produce a micro-brief for this scene in MAXIMUM 30 words.",
+        "Flowing prose, no bullet points.",
+    ])
+    micro_brief = _generate("scene_architect", state, arb_prompt)
+    return {"scene_brief": micro_brief}
+
+
+def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
+    """Assemble drafted scenes into a complete chapter (deterministic, no LLM)."""
+    scenes_drafted: list[dict] = state.get("scenes_drafted") or []
+
+    if not scenes_drafted:
+        # Legacy: draft already set by single-scene stylist
+        existing = state.get("draft", "")
+        return {"chapter_assembled": existing, "draft": existing}
+
+    plan: list[dict] = state.get("chapter_plan") or []
+    pacing_map: dict[int, str] = {
+        s["scene_number"]: s.get("pacing", "medium") for s in plan
+    }
+
+    parts: list[str] = []
+    for scene in sorted(scenes_drafted, key=lambda s: s["scene_number"]):
+        if parts:
+            pacing = pacing_map.get(scene["scene_number"], "medium")
+            parts.append("\n* * *\n" if pacing == "cut" else "")
+        parts.append(scene["prose"])
+
+    assembled = "\n".join(parts)
+    return {"chapter_assembled": assembled, "draft": assembled}
+
+
+def _default_chapter_plan(state: DebateState) -> list[dict]:
+    return [
+        {
+            "scene_number": 1,
+            "title": "Scène unique",
+            "objective": (state.get("final_brief") or state["scene_idea"])[:200],
+            "emotional_beat": state["tone"],
+            "estimated_words": 800,
+            "pacing": "medium",
+            "style_directive": "prose narrative",
+            "ends_on": "resolution",
+        }
+    ]
+
+
+def _detect_rhythm_issues(plan: list[dict]) -> list[str]:
+    """Return a list of rhythm problems found in the chapter plan."""
+    issues: list[str] = []
+    # 3 consecutive scenes with same pacing
+    for i in range(len(plan) - 2):
+        if (
+            plan[i].get("pacing") == plan[i + 1].get("pacing") == plan[i + 2].get("pacing")
+        ):
+            issues.append(f"3 scènes consécutives de pacing '{plan[i].get('pacing')}'")
+            break
+    # No short scene < 300 words
+    if len(plan) > 1 and not any(s.get("estimated_words", 999) < 300 for s in plan):
+        issues.append("aucune scène courte (< 300 mots)")
+    # No variation in ends_on
+    ends = [s.get("ends_on") for s in plan]
+    if len(plan) > 1 and len(set(ends)) < 2:
+        issues.append("pas de variation dans ends_on")
+    return issues
 
 
 def _generate(agent_name: str, state: DebateState, prompt: str) -> str:

@@ -8,11 +8,15 @@ from langgraph.graph import END, START, StateGraph
 
 from src.agents.debate_nodes import (
     architect_node,
+    chapter_architect_node,
+    chapter_assembler_node,
     continuity_node,
     contract_parser_node,
     devil_node,
     editor_node,
     emotion_node,
+    rhythm_guardian_node,
+    scene_challenge_node,
     stylist_node,
     visionary_node,
 )
@@ -28,8 +32,17 @@ def should_revise(state: DebateState) -> Literal["revise", "end"]:
     return "end"
 
 
+def should_continue_scenes(state: DebateState) -> Literal["next_scene", "assemble"]:
+    """After each scene: continue scene loop or proceed to assembly."""
+    plan: list[dict] = state.get("chapter_plan") or []
+    idx: int = state.get("current_scene_index", 0)
+    if idx < len(plan) - 1:
+        return "next_scene"
+    return "assemble"
+
+
 def build_debate_graph() -> StateGraph:
-    """Build the LangGraph debate topology."""
+    """Build the LangGraph debate topology with multi-scene chapter pipeline."""
     graph = StateGraph(DebateState)
 
     graph.add_node("contract_parser", contract_parser_node)
@@ -40,7 +53,12 @@ def build_debate_graph() -> StateGraph:
     graph.add_node("emotion", emotion_node)
     graph.add_node("architect_arbitrate", _architect_arbitrate_node)
     graph.add_node("architect_revise", _architect_revise_node)
+    graph.add_node("chapter_architect", chapter_architect_node)
+    graph.add_node("rhythm_guardian", rhythm_guardian_node)
     graph.add_node("stylist", stylist_node)
+    graph.add_node("_increment_scene", _increment_scene_index_node)
+    graph.add_node("scene_challenge", scene_challenge_node)
+    graph.add_node("chapter_assembler", chapter_assembler_node)
     graph.add_node("editor", editor_node)
 
     graph.add_edge(START, "contract_parser")
@@ -50,8 +68,20 @@ def build_debate_graph() -> StateGraph:
     graph.add_edge("devil", "visionary")
     graph.add_edge("visionary", "emotion")
     graph.add_edge("emotion", "architect_arbitrate")
-    graph.add_edge("architect_arbitrate", "stylist")
-    graph.add_edge("stylist", "editor")
+    graph.add_edge("architect_arbitrate", "chapter_architect")
+    graph.add_edge("chapter_architect", "rhythm_guardian")
+    graph.add_edge("rhythm_guardian", "stylist")
+    graph.add_conditional_edges(
+        "stylist",
+        should_continue_scenes,
+        {
+            "next_scene": "_increment_scene",
+            "assemble": "chapter_assembler",
+        },
+    )
+    graph.add_edge("_increment_scene", "scene_challenge")
+    graph.add_edge("scene_challenge", "stylist")
+    graph.add_edge("chapter_assembler", "editor")
     graph.add_conditional_edges(
         "editor",
         should_revise,
@@ -105,6 +135,10 @@ def run_debate(
         "quality_feedback": "",
         "revision_round": 0,
         "warnings": [],
+        "chapter_plan": [],
+        "current_scene_index": 0,
+        "scenes_drafted": [],
+        "chapter_assembled": "",
     }
     compiled_graph = build_debate_graph().compile()
     return cast(DebateState, compiled_graph.invoke(initial_state))
@@ -120,6 +154,10 @@ def _architect_arbitrate_node(state: DebateState) -> dict[str, Any]:
 
 def _architect_revise_node(state: DebateState) -> dict[str, Any]:
     return architect_node(_with_architect_mode(state, "revise"))
+
+
+def _increment_scene_index_node(state: DebateState) -> dict[str, Any]:
+    return {"current_scene_index": state.get("current_scene_index", 0) + 1}
 
 
 def _with_architect_mode(state: DebateState, mode: str) -> DebateState:

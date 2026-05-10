@@ -38,3 +38,20 @@ class DebateState(TypedDict):
     revision_round: int
 
     warnings: Annotated[list[str], operator.add]
+
+    # Multi-scene chapter pipeline
+    chapter_plan: list[dict]
+    # Plan produit par chapter_architect_node. Chaque dict :
+    # {"scene_number": int, "title": str, "objective": str,
+    #  "emotional_beat": str, "estimated_words": int,
+    #  "pacing": "slow"|"medium"|"fast"|"cut",
+    #  "style_directive": str, "ends_on": "hook"|"ambiguous"|"resolution"|"cut"}
+
+    current_scene_index: int  # indice de la scène en cours de génération
+
+    scenes_drafted: Annotated[list[dict], operator.add]
+    # Scènes générées, accumulées :
+    # {"scene_number": int, "prose": str, "word_count": int,
+    #  "last_words": str}  # 150 derniers mots pour transitions
+
+    chapter_assembled: str  # chapitre complet assemblé
