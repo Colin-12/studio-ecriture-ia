@@ -230,7 +230,10 @@ def devil_node(state: DebateState) -> dict[str, Any]:
         parts += [constraint_block, _CREATIVE_CHALLENGE]
     parts += [
         "Critique this scene brief as a devil's advocate.",
-        "Find narrative contradictions, weak stakes, and missing consequences.",
+        "Respond with EXACTLY 3 bullet points maximum.",
+        "Each bullet: one problem, one sentence, under 20 words.",
+        "Format: • [problem]: [one-sentence explanation]",
+        "No preamble, no conclusion, no elaboration.",
         f"Scene brief: {_current_brief(state)}",
         f"Continuity report: {_compact_json(state.get('continuity_report', {}))}",
     ]
@@ -244,8 +247,10 @@ def visionary_node(state: DebateState) -> dict[str, Any]:
     if constraint_block:
         parts += [constraint_block, _CREATIVE_CHALLENGE]
     parts += [
-        "Propose exactly two vivid alternatives for this scene brief.",
-        "Keep continuity intact while increasing surprise and imagery.",
+        "Propose exactly two alternatives for this scene brief.",
+        "Each alternative: one paragraph, maximum 60 words.",
+        "Label them Alternative 1 and Alternative 2.",
+        "No preamble, no conclusion, no explanation of your choices.",
         f"Scene brief: {_current_brief(state)}",
         f"Genre: {state['genre']}",
         f"Tone: {state['tone']}",
@@ -262,6 +267,10 @@ def emotion_node(state: DebateState) -> dict[str, Any]:
     parts += [
         "Check the emotional logic of this scene brief.",
         "Focus on character motivation, desire, fear, and emotional payoff.",
+        "Respond with EXACTLY 2 bullet points maximum.",
+        "Each bullet: one emotional observation, under 15 words.",
+        "Format: • [character]: [emotional observation]",
+        "No preamble, no analysis, no elaboration.",
         f"Scene brief: {_current_brief(state)}",
         f"Continuity report: {_compact_json(state.get('continuity_report', {}))}",
     ]
@@ -295,8 +304,8 @@ def editor_node(state: DebateState) -> dict[str, Any]:
         parts.append(constraint_block)
     parts += [
         "Evaluate this draft on originality, tension, emotion, coherence, and style.",
-        "Return a score from 1 to 5 and concise feedback.",
-        "Format: Score: <1-5>\nFeedback: <feedback>",
+        'Respond with a JSON object only: {"score": <int 1-5>, "feedback": "<one sentence under 20 words>"}',
+        "No other text.",
         f"Draft: {state.get('draft', '')}",
         f"Final brief: {state.get('final_brief', '')}",
     ]
@@ -358,6 +367,9 @@ def _arbitration_architect_prompt(state: DebateState) -> str:
         f"Critiques: {_compact_json(state.get('critiques', []))}",
         f"Alternatives: {_compact_json(state.get('alternatives', []))}",
         f"Emotion notes: {_compact_json(state.get('emotion_notes', []))}",
+        "Produce the final brief in maximum 150 words.",
+        "Include: objective, conflict, setting, character intent.",
+        "No bullet points — flowing prose only.",
     ]
     return "\n".join(parts)
 
