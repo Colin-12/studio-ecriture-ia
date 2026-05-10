@@ -461,6 +461,14 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
         "Chaque scène doit avoir des estimated_words différents.",
         "Varie le pacing : ne jamais mettre le même pacing deux fois de suite.",
         "Réponds UNIQUEMENT avec le JSON, rien d'autre.",
+        "",
+        "CONTRAINTES DE FORMAT :",
+        "- objective : maximum 20 mots",
+        "- emotional_beat : maximum 8 mots",
+        "- style_directive : maximum 10 mots",
+        "- ends_on : un seul mot parmi : hook, ambiguous, resolution, cut, cliffhanger",
+        "- Génère entre 3 et 5 scènes",
+        "- JSON uniquement, aucun texte avant ou après",
     ])
     llm = get_llm_for_agent("chapter_architect", profile=state.get("llm_profile", "default"))
     raw = ""
