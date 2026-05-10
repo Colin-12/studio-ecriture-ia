@@ -46,4 +46,5 @@ outputs/
 logs/
 examples/trisha_revenge_story/continuations/
 results/
-manuscript/novels/
+manuscript/
+.claude/
