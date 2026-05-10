@@ -353,6 +353,19 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
 
     prose = _generate("stylist", state, "\n".join(parts))
     words = prose.split()
+    estimated_words: int = scene["estimated_words"]
+    min_words = int(estimated_words * 0.85)
+
+    # Single auto-expand pass when prose is critically short
+    if len(words) < int(min_words * 0.7):
+        expand_prompt = "\n".join(parts + [
+            f"La prose précédente était trop courte ({len(words)} mots).",
+            f"Reprends-la et développe jusqu'à atteindre {estimated_words} mots.",
+            f"Voici la prose à développer : {prose}",
+        ])
+        prose = _generate("stylist", state, expand_prompt)
+        words = prose.split()
+
     return {
         "scenes_drafted": [
             {
@@ -541,9 +554,11 @@ def scene_challenge_node(state: DebateState) -> dict[str, Any]:
 
     arb_prompt = "\n".join([
         f"Plan : {scene['title']} — {scene['objective']}",
+        f"Longueur cible : {scene['estimated_words']} mots.",
         f"Critique : {devil_critique}",
         f"Alternative : {visionary_alt}",
         "Produce a micro-brief for this scene in MAXIMUM 30 words.",
+        f"Include the word target ({scene['estimated_words']} mots) as an explicit constraint.",
         "Flowing prose, no bullet points.",
     ])
     micro_brief = _generate("scene_architect", state, arb_prompt)
