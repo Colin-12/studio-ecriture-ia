@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,8 @@ from src.agents.continuity_agent import run_continuity_check
 from src.agents.debate_state import DebateState
 from src.llm.base import LLMResponse
 from src.llm.router import get_llm_for_agent
+
+logger = logging.getLogger(__name__)
 
 _CONTRACT_SYSTEM = (
     "Tu es un parseur de brief narratif expert. Depuis un brief utilisateur libre, "
@@ -417,7 +420,7 @@ _CHAPTER_PLAN_FIELDS = {
 
 
 def chapter_architect_node(state: DebateState) -> dict[str, Any]:
-    """Plan the full chapter as 2-6 scenes before any generation."""
+    """Plan the full chapter as 3-5 scenes before any generation."""
     brief = state.get("final_brief") or state.get("scene_brief") or state["scene_idea"]
     user_prompt = "\n".join([
         f"Brief du chapitre : {brief}",
@@ -432,8 +435,14 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
         "Un chapitre contemplatif → 2-3 scènes longues.",
         "",
         f"Format JSON attendu :\n{_CHAPTER_PLAN_FORMAT}",
+        "",
+        "IMPORTANT : Génère EXACTEMENT entre 3 et 5 scènes.",
+        "Chaque scène doit avoir des estimated_words différents.",
+        "Varie le pacing : ne jamais mettre le même pacing deux fois de suite.",
+        "Réponds UNIQUEMENT avec le JSON, rien d'autre.",
     ])
     llm = get_llm_for_agent("chapter_architect", profile=state.get("llm_profile", "default"))
+    raw = ""
     try:
         response = llm.generate(
             prompt=user_prompt,
@@ -441,6 +450,7 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
             response_format="json",
         )
         raw = response.text if isinstance(response, LLMResponse) else str(response)
+        logger.debug("chapter_architect raw response: %s", raw[:500])
         parsed = json.loads(raw)
         scenes: list[dict] = parsed.get("scenes", [])
         if not scenes or not isinstance(scenes, list):
@@ -448,9 +458,13 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
         for s in scenes:
             if not _CHAPTER_PLAN_FIELDS.issubset(s.keys()):
                 raise ValueError("missing fields")
-    except Exception:
-        scenes = _default_chapter_plan(state)
-    return {"chapter_plan": scenes, "current_scene_index": 0}
+        return {"chapter_plan": scenes, "current_scene_index": 0}
+    except (json.JSONDecodeError, Exception) as e:
+        logger.warning(
+            "chapter_architect JSON parse failed: %s | raw[:200]: %s",
+            e, raw[:200],
+        )
+        return {"chapter_plan": _default_chapter_plan(state), "current_scene_index": 0}
 
 
 def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
