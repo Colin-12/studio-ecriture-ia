@@ -525,6 +525,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     quality_feedback: str = (debate.get("quality_feedback") or "").strip()
     prose_default: str = (
         st.session_state.get("writing_prose_edited")
+        or debate.get("chapter_assembled")
         or debate.get("draft")
         or ""
     )
@@ -829,6 +830,10 @@ def _build_base_state(
         "quality_feedback": "",
         "revision_round": 0,
         "warnings": [],
+        "chapter_plan": [],
+        "current_scene_index": 0,
+        "scenes_drafted": [],
+        "chapter_assembled": "",
     }
 
 
