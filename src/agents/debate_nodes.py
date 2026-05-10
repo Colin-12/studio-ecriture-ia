@@ -351,6 +351,9 @@ def _initial_architect_prompt(state: DebateState) -> str:
         f"POV: {state['pov']}",
         f"Language: {state['language']}",
         f"Continuity report: {_compact_json(state.get('continuity_report', {}))}",
+        "Produce the brief in maximum 120 words.",
+        "Flowing prose only — no bullet points, no headers.",
+        "Cover: objective, conflict, setting, character intent.",
     ]
     return "\n".join(parts)
 
