@@ -333,6 +333,14 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         f"Style de cette scène : {scene['style_directive']}",
         f"Longueur cible : {scene['estimated_words']} mots (± 20%)",
         f"Cette scène doit se terminer sur : {scene['ends_on']}",
+        (
+            f"CONTRAINTE DE LONGUEUR ABSOLUE :\n"
+            f"Cette scène doit faire entre {int(scene['estimated_words'] * 0.85)}"
+            f" et {int(scene['estimated_words'] * 1.15)} mots.\n"
+            f"Compte tes mots pendant que tu écris.\n"
+            f"Ne t'arrête pas avant d'avoir atteint {scene['estimated_words']} mots.\n"
+            f"Ne dépasse pas {int(scene['estimated_words'] * 1.15)} mots."
+        ),
     ]
     if state.get("scene_brief"):
         parts.append(f"Micro-brief de scène : {state['scene_brief']}")
