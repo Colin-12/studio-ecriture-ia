@@ -7,6 +7,7 @@ Lancement :
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import streamlit as st
 
@@ -72,10 +73,17 @@ with st.sidebar:
     st.session_state[us.MODE_KEY] = story_mode
 
     # Profil LLM
+    _profiles_dir = Path("configs/llm_profiles")
+    _available_profiles = sorted(
+        [p.stem for p in _profiles_dir.glob("*.yaml")]
+    ) if _profiles_dir.exists() else ["mixed_budget"]
+    _current_profile = us.get_llm_profile()
     llm_profile = st.selectbox(
         "Profil LLM",
-        ["mixed_budget", "free_only", "local_only", "custom"],
-        index=["mixed_budget", "free_only", "local_only", "custom"].index(us.get_llm_profile()),
+        _available_profiles,
+        index=_available_profiles.index(_current_profile)
+        if _current_profile in _available_profiles
+        else 0,
         key="sidebar_llm_profile",
     )
     st.session_state[us.LLM_PROFILE_KEY] = llm_profile
