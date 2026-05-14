@@ -61,7 +61,17 @@ _CONTRACT_FORMAT = """\
 
 
 def contract_parser_node(state: DebateState) -> dict[str, Any]:
-    """Extract hard_constraints and creative_directives from the user brief."""
+    """Extract hard_constraints and creative_directives from the user brief.
+
+    If hard_constraints is already populated (blueprint path where the user
+    validated constraints in the UI), skip the LLM call and return as-is.
+    """
+    if state.get("hard_constraints"):
+        return {
+            "hard_constraints": state["hard_constraints"],
+            "creative_directives": state.get("creative_directives") or _default_creative_directives(state),
+        }
+
     user_prompt = "\n".join(
         [
             f"Brief : {state['scene_idea']}",

@@ -750,47 +750,32 @@ def _run_full_debate(
 
 
 def _run_debate_nodes_with_status(state: dict[str, Any]) -> None:
-    """Call debate nodes sequentially, writing progress messages for st.status."""
-    from src.agents.debate_nodes import (
-        architect_node,
-        continuity_node,
-        devil_node,
-        editor_node,
-        emotion_node,
-        stylist_node,
-        visionary_node,
+    """Run the full debate graph (multi-scene pipeline) and update state in-place.
+
+    Passes pre-validated hard_constraints from the blueprint path so that
+    contract_parser_node skips re-extraction and honours the user's edits.
+    """
+    from src.agents.debate_graph import run_debate
+
+    st.write("🎭 Writer's room multi-scènes en cours (débat + planification + prose)…")
+    result = dict(
+        run_debate(
+            scene_idea=state["scene_idea"],
+            genre=state.get("genre", "roman"),
+            tone=state.get("tone", "neutre"),
+            pov=state.get("pov", "third_person"),
+            language=state.get("language", "fr"),
+            chapter_number=state.get("chapter_number", 1),
+            novel_id=state.get("novel_id", 1),
+            llm_profile=state.get("llm_profile", "default"),
+            db_path=state.get("db_path", "db/novel_memory.sqlite"),
+            chroma_dir=state.get("chroma_dir", "data/chroma"),
+            collection_name=state.get("collection_name", ""),
+            initial_hard_constraints=state.get("hard_constraints") or None,
+            initial_creative_directives=state.get("creative_directives") or None,
+        )
     )
-
-    st.write("📚 Continuiste consulte la mémoire narrative…")
-    cont = continuity_node(_as_debate_state(state))
-    state["continuity_report"] = cont.get("continuity_report", {})
-    state["warnings"] = state.get("warnings", []) + cont.get("warnings", [])
-
-    st.write("⚔️ Avocat du Diable teste les failles…")
-    devil = devil_node(_as_debate_state(state))
-    state["critiques"] = state.get("critiques", []) + devil.get("critiques", [])
-
-    st.write("🔭 Visionnaire propose des angles alternatifs…")
-    vis = visionary_node(_as_debate_state(state))
-    state["alternatives"] = state.get("alternatives", []) + vis.get("alternatives", [])
-
-    st.write("❤️ Gardien de l'Émotion vérifie la tension…")
-    emo = emotion_node(_as_debate_state(state))
-    state["emotion_notes"] = state.get("emotion_notes", []) + emo.get("emotion_notes", [])
-
-    st.write("🏛️ Architecte arbitre et synthétise…")
-    arb_state: dict[str, Any] = dict(state)
-    arb_state["_architect_mode"] = "arbitrate"
-    arb = architect_node(_as_debate_state(arb_state))
-    state.update(arb)
-
-    st.write("✍️ Styliste rédige la prose…")
-    sty = stylist_node(_as_debate_state(state))
-    state.update(sty)
-
-    st.write("🔎 Éditeur évalue le brouillon…")
-    ed = editor_node(_as_debate_state(state))
-    state.update(ed)
+    state.update(result)
 
 
 # ---------------------------------------------------------------------------

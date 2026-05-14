@@ -107,8 +107,14 @@ def run_debate(
     db_path: str = "db/novel_memory.sqlite",
     chroma_dir: str = "data/chroma",
     collection_name: str = "",
+    initial_hard_constraints: dict | None = None,
+    initial_creative_directives: dict | None = None,
 ) -> DebateState:
-    """Run the debate graph and return the final state."""
+    """Run the debate graph and return the final state.
+
+    Pass initial_hard_constraints to skip contract_parser re-extraction
+    (e.g. when the user has already validated constraints in the UI).
+    """
     effective_collection = collection_name or f"novel_{novel_id}"
     initial_state: DebateState = {
         "scene_idea": scene_idea,
@@ -122,8 +128,8 @@ def run_debate(
         "db_path": db_path,
         "chroma_dir": chroma_dir,
         "collection_name": effective_collection,
-        "hard_constraints": {},
-        "creative_directives": {},
+        "hard_constraints": initial_hard_constraints or {},
+        "creative_directives": initial_creative_directives or {},
         "continuity_report": {},
         "scene_brief": "",
         "critiques": [],
