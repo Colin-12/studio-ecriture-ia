@@ -319,6 +319,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         if last_words:
             last_words_ctx = f"Fin de la scène précédente (contexte de transition) :\n{last_words}"
 
+    estimated_words: int = scene["estimated_words"]
+
     parts += [
         "Write the scene prose now. Do not explain the task.",
         f"Brief du chapitre : {state.get('final_brief') or _current_brief(state)}",
@@ -331,9 +333,13 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         f"Language: {state['language']}",
         f"Directive de rythme : {scene['pacing']}",
         f"Style de cette scène : {scene['style_directive']}",
-        f"Longueur cible : {scene['estimated_words']} mots (± 20%)",
+        f"Longueur cible : {estimated_words} mots (± 20%)",
         f"Cette scène doit se terminer sur : {scene['ends_on']}",
-        *_length_constraint_parts(scene["estimated_words"]),
+        (
+            f"Commence à écrire cette scène. Objectif : {estimated_words} mots.\n"
+            f"Tu peux t'arrêter avant si la scène est naturellement terminée,\n"
+            f"mais vise {estimated_words} mots."
+        ),
     ]
     if state.get("scene_brief"):
         parts.append(f"Micro-brief de scène : {state['scene_brief']}")
@@ -345,20 +351,28 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     ]
 
     prose = _generate("stylist", state, "\n".join(parts))
+
+    # Continuation loop for long scenes (≤ 500 words: no continuation)
+    if estimated_words > 500:
+        target_min = int(estimated_words * 0.85)
+        for _ in range(2):
+            words = prose.split()
+            if len(words) >= target_min:
+                break
+            mots_restants = estimated_words - len(words)
+            last_150 = " ".join(words[-150:])
+            continuation_prompt = "\n".join([
+                "Continue cette scène depuis exactement où tu t'es arrêté.",
+                "Ne répète pas ce qui précède.",
+                "Voici la fin de ce qui a été écrit :",
+                f"[...] {last_150}",
+                "",
+                "Continue directement, même registre, même voix.",
+                f"Objectif : encore {mots_restants} mots environ.",
+            ])
+            prose = prose + "\n" + _generate("stylist", state, continuation_prompt)
+
     words = prose.split()
-    estimated_words: int = scene["estimated_words"]
-    min_words = int(estimated_words * 0.85)
-
-    # Single auto-expand pass when prose is critically short
-    if len(words) < int(min_words * 0.7):
-        expand_prompt = "\n".join(parts + [
-            f"La prose précédente était trop courte ({len(words)} mots).",
-            f"Reprends-la et développe jusqu'à atteindre {estimated_words} mots.",
-            f"Voici la prose à développer : {prose}",
-        ])
-        prose = _generate("stylist", state, expand_prompt)
-        words = prose.split()
-
     return {
         "scenes_drafted": [
             {
@@ -592,31 +606,6 @@ def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
     assembled = "\n".join(parts)
     return {"chapter_assembled": assembled, "draft": assembled}
 
-
-def _length_constraint_parts(estimated_words: int) -> list[str]:
-    """Build word-count constraint prompt lines for stylist_node."""
-    min_w = int(estimated_words * 0.85)
-    max_w = int(estimated_words * 1.15)
-    base = (
-        f"CONTRAINTE DE LONGUEUR ABSOLUE :\n"
-        f"Cette scène doit faire entre {min_w} et {max_w} mots.\n"
-        f"Compte tes mots pendant que tu écris.\n"
-        f"Ne t'arrête pas avant d'avoir atteint {estimated_words} mots.\n"
-        f"Ne dépasse pas {max_w} mots."
-    )
-    if estimated_words <= 500:
-        return [base]
-    n_passages = max(2, estimated_words // 400)
-    words_per_passage = estimated_words // n_passages
-    multi = (
-        f"Cette scène doit faire {estimated_words} mots.\n"
-        f"Structure-la en {n_passages} passages narratifs distincts,\n"
-        f"séparés chacun par une ligne vide.\n"
-        f"Chaque passage doit faire environ {words_per_passage} mots.\n"
-        f"Développe pleinement chaque passage avant de passer au suivant.\n"
-        f"Ne résume pas — montre, décris, dialogue, approfondis."
-    )
-    return [base, multi]
 
 
 def _default_chapter_plan(state: DebateState) -> list[dict]:
