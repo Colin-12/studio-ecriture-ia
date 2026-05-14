@@ -201,6 +201,7 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
                 "Écrire le prochain chapitre du roman en respectant le canon narratif établi."
             )
             _save_step0_inputs(effective_brief, pov_label, tone)
+            st.session_state.pop("writing_prose_edited", None)
             with st.spinner("Génération complète en cours…"):
                 try:
                     state = _run_full_debate(
@@ -408,6 +409,7 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
         base["creative_directives"] = st.session_state.get("writing_creative_directives") or {}
         base["scene_brief"] = st.session_state.get("writing_scene_brief") or ""
 
+        st.session_state.pop("writing_prose_edited", None)
         error_msg: str | None = None
         try:
             with st.status("La writer's room travaille…", expanded=True) as status:
