@@ -534,6 +534,12 @@ def _render_editor_score(score: int, feedback: str, generated: bool) -> None:
             st.markdown(f"*{phrase}*")
 
 
+def _render_revision_history(history: list[dict]) -> None:
+    if len(history) > 1:
+        scores = " puis ".join(str(entry.get("score", 0)) for entry in history)
+        st.caption(f"Révision automatique : note {scores}, meilleure version conservée")
+
+
 def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     st.subheader(f"Chapitre {chapter_number} — Brouillon")
 
@@ -552,6 +558,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
         quality_score, quality_feedback,
         generated=bool(prose_default or debate.get("scenes_drafted")),
     )
+    _render_revision_history(debate.get("revision_history") or [])
 
     prose: str = st.text_area(
         "Prose (éditable)",

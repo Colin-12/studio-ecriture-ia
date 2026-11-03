@@ -231,12 +231,12 @@ def continuity_node(state: DebateState) -> dict[str, Any]:
 def architect_node(state: DebateState) -> dict[str, Any]:
     """Create the initial brief, then arbitrate or revise it after debate."""
     mode = _architect_mode(state)
-    if mode == "initial" or not state.get("scene_brief"):
+    if mode == "initial" or (not mode and not state.get("scene_brief")):
         prompt = _initial_architect_prompt(state)
         text = _generate("scene_architect", state, prompt)
         return {"scene_brief": text}
 
-    if mode == "revise" or (state.get("draft") and state.get("quality_feedback")):
+    if mode == "revise" or (not mode and state.get("draft") and state.get("quality_feedback")):
         prompt = _revision_architect_prompt(state)
         text = _generate("scene_architect", state, prompt)
         return {

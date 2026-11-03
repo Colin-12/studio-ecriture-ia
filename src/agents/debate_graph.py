@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import os
+from copy import deepcopy
 from typing import Any, Literal, cast
 
 from langgraph.graph import END, START, StateGraph
@@ -21,14 +24,28 @@ from src.agents.debate_nodes import (
     visionary_node,
 )
 from src.agents.debate_state import DebateState
+from src.agents.plan_validation import MAX_SCENES
 
-MAX_REVISION_ROUNDS = 2
+MAX_REVISION_ROUNDS = 1
+logger = logging.getLogger(__name__)
+
+
+def _max_revision_rounds() -> int:
+    raw = os.getenv("REVISION_MAX_ROUNDS", str(MAX_REVISION_ROUNDS))
+    try:
+        value = int(raw)
+        if value < 0:
+            raise ValueError
+        return value
+    except ValueError:
+        logger.warning("Invalid REVISION_MAX_ROUNDS=%r; using %s.", raw, MAX_REVISION_ROUNDS)
+        return MAX_REVISION_ROUNDS
 
 
 def should_revise(state: DebateState) -> Literal["revise", "end"]:
     """Route low-scoring drafts through another debate round."""
     # 0 means not evaluated: an unavailable score must not trigger a revision.
-    if 0 < state["quality_score"] < 3 and state["revision_round"] < MAX_REVISION_ROUNDS:
+    if 0 < state["quality_score"] < 3 and state["revision_round"] < _max_revision_rounds():
         return "revise"
     return "end"
 
@@ -61,6 +78,9 @@ def build_debate_graph() -> StateGraph:
     graph.add_node("scene_challenge", scene_challenge_node)
     graph.add_node("chapter_assembler", chapter_assembler_node)
     graph.add_node("editor", editor_node)
+    graph.add_node("reset_chapter_pass", _reset_chapter_pass_node)
+    graph.add_node("record_revision", _record_revision_node)
+    graph.add_node("select_best_revision", _select_best_revision_node)
 
     graph.add_edge(START, "contract_parser")
     graph.add_edge("contract_parser", "continuity")
@@ -69,7 +89,8 @@ def build_debate_graph() -> StateGraph:
     graph.add_edge("devil", "visionary")
     graph.add_edge("visionary", "emotion")
     graph.add_edge("emotion", "architect_arbitrate")
-    graph.add_edge("architect_arbitrate", "chapter_architect")
+    graph.add_edge("architect_arbitrate", "reset_chapter_pass")
+    graph.add_edge("reset_chapter_pass", "chapter_architect")
     graph.add_edge("chapter_architect", "rhythm_guardian")
     graph.add_edge("rhythm_guardian", "stylist")
     graph.add_conditional_edges(
@@ -83,15 +104,17 @@ def build_debate_graph() -> StateGraph:
     graph.add_edge("_increment_scene", "scene_challenge")
     graph.add_edge("scene_challenge", "stylist")
     graph.add_edge("chapter_assembler", "editor")
+    graph.add_edge("editor", "record_revision")
     graph.add_conditional_edges(
-        "editor",
+        "record_revision",
         should_revise,
         {
             "revise": "architect_revise",
-            "end": END,
+            "end": "select_best_revision",
         },
     )
     graph.add_edge("architect_revise", "devil")
+    graph.add_edge("select_best_revision", END)
 
     return graph
 
@@ -141,6 +164,8 @@ def run_debate(
         "quality_score": 0,
         "quality_feedback": "",
         "revision_round": 0,
+        "revision_history": [],
+        "best_revision": {},
         "warnings": [],
         "chapter_plan": [],
         "current_scene_index": 0,
@@ -148,7 +173,60 @@ def run_debate(
         "chapter_assembled": "",
     }
     compiled_graph = build_debate_graph().compile()
-    return cast(DebateState, compiled_graph.invoke(initial_state))
+    # Allow every scene in every configured pass to complete within LangGraph's
+    # step budget; this does not change the revision or scene limits themselves.
+    steps = (_max_revision_rounds() + 1) * (MAX_SCENES * 3 + 20) + 5
+    return cast(DebateState, compiled_graph.invoke(initial_state, {"recursion_limit": steps}))
+
+
+def _reset_chapter_pass_node(state: DebateState) -> dict[str, Any]:
+    return {
+        "scenes_drafted": {"reset": True, "scenes": []},
+        "current_scene_index": 0,
+        "chapter_plan": [],
+        "chapter_assembled": "",
+        "draft": "",
+    }
+
+
+def _record_revision_node(state: DebateState) -> dict[str, Any]:
+    chapter = state.get("chapter_assembled") or state.get("draft") or ""
+    entry = {
+        "round": state.get("revision_round", 0),
+        "score": state.get("quality_score", 0),
+        "feedback": state.get("quality_feedback", ""),
+        "words": len(chapter.split()),
+        "chapter": chapter,
+    }
+    history = state.get("revision_history") or []
+    if history:
+        previous = history[-1]
+        logger.warning(
+            "Automatic revision round=%s: score before=%s after=%s; words before=%s after=%s.",
+            entry["round"], previous["score"], entry["score"], previous["words"], entry["words"],
+        )
+    best = state.get("best_revision") or {}
+    # Strict comparison retains the oldest on ties; an unassessed 0 cannot beat
+    # any assessed score. Keep its matching plan and scenes with the chapter.
+    if not best or entry["score"] > best["quality_score"]:
+        best = deepcopy({
+            "chapter_assembled": chapter, "draft": chapter,
+            "quality_score": entry["score"], "quality_feedback": entry["feedback"],
+            "chapter_plan": state.get("chapter_plan") or [],
+            "scenes_drafted": state.get("scenes_drafted") or [],
+            "current_scene_index": state.get("current_scene_index", 0),
+            "scene_brief": state.get("scene_brief", ""),
+            "final_brief": state.get("final_brief", ""),
+        })
+    return {"revision_history": [*history, entry], "best_revision": best}
+
+
+def _select_best_revision_node(state: DebateState) -> dict[str, Any]:
+    best = deepcopy(state.get("best_revision") or {})
+    if not best:
+        return {}
+    best["scenes_drafted"] = {"reset": True, "scenes": best["scenes_drafted"]}
+    return best
 
 
 def _architect_initial_node(state: DebateState) -> dict[str, Any]:

@@ -3,7 +3,20 @@
 from __future__ import annotations
 
 import operator
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, TypedDict
+
+
+def accumulate_scenes(current: list[dict], update: list[dict] | dict) -> list[dict]:
+    """Append scene batches, or explicitly replace them with a reset update.
+
+    {"reset": True, "scenes": [...]} replaces the batch, including an empty one.
+    The stored state always remains a list of scenes.
+    """
+    if isinstance(update, dict) and update.get("reset") is True:
+        return list(update.get("scenes", []))
+    if isinstance(update, list):
+        return current + update
+    raise ValueError("Scene update must be a list or an explicit reset mapping.")
 
 
 class DebateState(TypedDict):
@@ -36,6 +49,8 @@ class DebateState(TypedDict):
     quality_score: int
     quality_feedback: str
     revision_round: int
+    revision_history: NotRequired[list[dict]]
+    best_revision: NotRequired[dict]
 
     warnings: Annotated[list[str], operator.add]
 
@@ -49,7 +64,7 @@ class DebateState(TypedDict):
 
     current_scene_index: int  # indice de la scène en cours de génération
 
-    scenes_drafted: Annotated[list[dict], operator.add]
+    scenes_drafted: Annotated[list[dict], accumulate_scenes]
     # Scènes générées, accumulées :
     # {"scene_number": int, "prose": str, "word_count": int,
     #  "last_words": str}  # 150 derniers mots pour transitions
