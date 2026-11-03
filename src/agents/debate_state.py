@@ -37,6 +37,7 @@ class DebateState(TypedDict):
     continuity_report: dict
 
     scene_brief: str
+    scene_micro_brief: NotRequired[dict]
     critiques: Annotated[list[str], operator.add]
     alternatives: Annotated[list[str], operator.add]
     emotion_notes: Annotated[list[str], operator.add]

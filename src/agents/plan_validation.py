@@ -10,7 +10,15 @@ MAX_SCENES = 6
 MIN_WORDS = 3500
 MAX_WORDS = 5000
 PACING = {"slow", "medium", "fast", "cut"}
-ENDINGS = {"hook", "ambiguous", "resolution", "cut", "cliffhanger"}
+# Plan enums are metadata. Only these French instructions reach the prose prompt.
+ENDING_DIRECTIVES = {
+    "hook": "termine sur une image ou une question qui donne envie de lire la suite",
+    "ambiguous": "termine sur une note ambiguë, sans conclusion nette",
+    "resolution": "termine sur un apaisement, une résolution du moment",
+    "cut": "termine abruptement, sur une coupure nette",
+    "cliffhanger": "termine sur un suspense non résolu",
+}
+ENDINGS = set(ENDING_DIRECTIVES)
 REQUIRED_FIELDS = {
     "scene_number", "title", "objective", "emotional_beat", "estimated_words",
     "pacing", "style_directive", "ends_on",

@@ -13,7 +13,11 @@ Chaque chapitre passe par un graphe de débat LangGraph :
 5. **Gardien de l'Émotion** vérifie la cohérence émotionnelle.
 6. **Architecte** arbitre et produit le brief final.
 7. **Styliste** (Gemini 3.6 Flash) rédige la prose.
-8. **Éditeur** note et déclenche une révision si le score < 3/5.
+8. **Éditeur** note et fournit un feedback en français. La révision automatique est désactivée par défaut.
+
+`REVISION_MAX_ROUNDS=1` réactive au maximum une révision pour une note de 1 ou 2 sur 5.
+`REVISION_MAX_ROUNDS=0` la désactive ; une note de 0 signifie « non évalué » et ne déclenche jamais de révision.
+L'historique conserve toutes les passes, et la meilleure version est retenue (la plus ancienne en cas d'égalité).
 
 Les `hard_constraints` extraites à l'étape 1 sont injectées dans tous les prompts : les agents créatifs peuvent enrichir la zone libre, jamais modifier le contrat narratif.
 
@@ -26,7 +30,7 @@ Roman
       contract_parser -> continuity -> architect_initial
       -> [devil_advocate | visionary | emotion_guardian]
       -> architect_arbitrate -> stylist -> editor
-      -> (révision si score < 3, max 2 tours)
+      -> (révision optionnelle si 0 < score < 3 ; REVISION_MAX_ROUNDS, défaut 0)
 
 Mémoire composite
   ChromaDB  — recherche sémantique par roman (collection novel_{id})

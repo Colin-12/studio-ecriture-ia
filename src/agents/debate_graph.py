@@ -26,7 +26,7 @@ from src.agents.debate_nodes import (
 from src.agents.debate_state import DebateState
 from src.agents.plan_validation import MAX_SCENES
 
-MAX_REVISION_ROUNDS = 1
+MAX_REVISION_ROUNDS = 0
 logger = logging.getLogger(__name__)
 
 
@@ -184,6 +184,7 @@ def _reset_chapter_pass_node(state: DebateState) -> dict[str, Any]:
         "scenes_drafted": {"reset": True, "scenes": []},
         "current_scene_index": 0,
         "chapter_plan": [],
+        "scene_micro_brief": {},
         "chapter_assembled": "",
         "draft": "",
     }

@@ -52,7 +52,8 @@ def test_nested_braces_and_feedback_cleaning():
 
 
 @pytest.mark.parametrize("score,expected", [(0, "end"), (1, "revise"), (2, "revise"), (3, "end"), (5, "end")])
-def test_revision_routing(score, expected):
+def test_revision_routing(monkeypatch, score, expected):
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     assert should_revise(cast(DebateState, {"quality_score": score, "revision_round": 0})) == expected
     assert should_revise(cast(DebateState, {"quality_score": score, "revision_round": 2})) == "end"
 

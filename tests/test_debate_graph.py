@@ -32,13 +32,15 @@ def test_debate_graph_executes_without_error(monkeypatch) -> None:
     assert state["emotion_notes"] == ["Emotion note"]
 
 
-def test_should_revise_routes_by_score_and_max_rounds() -> None:
+def test_should_revise_routes_by_score_and_max_rounds(monkeypatch) -> None:
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     assert should_revise(_state_for_routing(quality_score=2, revision_round=0)) == "revise"
     assert should_revise(_state_for_routing(quality_score=4, revision_round=0)) == "end"
     assert should_revise(_state_for_routing(quality_score=2, revision_round=2)) == "end"
 
 
 def test_revision_round_increments_correctly(monkeypatch) -> None:
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     editor_calls = {"count": 0}
 
     def editor_node(state: DebateState) -> dict[str, Any]:
@@ -57,6 +59,7 @@ def test_revision_round_increments_correctly(monkeypatch) -> None:
 
 
 def test_debate_lists_accumulate_between_rounds(monkeypatch) -> None:
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     editor_calls = {"count": 0}
 
     def editor_node(state: DebateState) -> dict[str, Any]:

@@ -71,6 +71,7 @@ def _run(monkeypatch, scores):
 
 
 def test_improved_revision_contains_only_second_pass(monkeypatch, caplog):
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     with caplog.at_level(logging.WARNING):
         state, counts, prompts = _run(monkeypatch, [2, 4])
     assert state["revision_round"] == 1
@@ -93,6 +94,7 @@ def test_improved_revision_contains_only_second_pass(monkeypatch, caplog):
 
 @pytest.mark.parametrize("scores", [[2, 2], [2, 1], [2, 0]])
 def test_tie_or_worse_revision_restores_first_plan_and_scenes(monkeypatch, scores):
+    monkeypatch.setenv("REVISION_MAX_ROUNDS", "1")
     state, counts, _ = _run(monkeypatch, scores)
     assert state["revision_round"] == 1
     assert len(state["revision_history"]) == 2
@@ -139,7 +141,7 @@ def test_zero_environment_disables_revision(monkeypatch):
 def test_bad_revision_limit_uses_default(monkeypatch, value, caplog):
     monkeypatch.setenv("REVISION_MAX_ROUNDS", value)
     with caplog.at_level(logging.WARNING):
-        assert debate_graph._max_revision_rounds() == 1
+        assert debate_graph._max_revision_rounds() == 0
     assert "Invalid REVISION_MAX_ROUNDS" in caplog.text
 
 

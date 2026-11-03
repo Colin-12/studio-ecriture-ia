@@ -12,6 +12,8 @@ from typing import Any
 from src.agents.continuity_agent import run_continuity_check
 from src.agents.debate_state import DebateState
 from src.agents.plan_validation import (
+    ENDING_DIRECTIVES,
+    ENDINGS,
     normalize_chapter_plan,
     repair_chapter_plan,
     validate_chapter_plan,
@@ -208,8 +210,9 @@ _CREATIVE_CHALLENGE = (
 
 _STYLIST_CONSTRAINT = (
     "Respecte chaque élément du contrat narratif à la lettre. "
-    "Le protagoniste, l'événement central et toutes les contraintes de forme "
-    "sont non négociables dans ta prose."
+    "Le protagoniste, l'événement central et les contraintes de forme sont non négociables "
+    "à l'échelle du chapitre. Dans cette scène, ne réalise que son objectif : "
+    "ne déclenche pas les événements réservés aux scènes suivantes."
 )
 
 
@@ -370,6 +373,57 @@ def _generate_stylist(
     return text
 
 
+def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[str]:
+    """Separate current, past and future scene objectives without an LLM call."""
+    scene = plan[idx]
+    local = state.get("scene_micro_brief") or {}
+    micro_brief = local.get("text") if local.get("scene_number") == scene["scene_number"] else None
+    if not micro_brief:
+        micro_brief = " ".join(f"{scene['objective']} Émotion : {scene['emotional_beat']}".split()[:40])
+    blocks = ["\n".join([
+        "À écrire dans cette scène — prioritaire",
+        f"Scène {scene['scene_number']} : {scene['title']}",
+        f"Objectif : {scene['objective']}",
+        f"Registre émotionnel : {scene['emotional_beat']}",
+        f"Micro-brief de scène : {micro_brief}",
+        "Décris uniquement ce qui se passe dans cette scène. L'objectif et l'émotion ci-dessus "
+        "priment sur les suggestions du micro-brief ; ne raconte pas le chapitre entier.",
+    ])]
+    if idx:
+        previous = ["Déjà raconté (ne pas le raconter à nouveau)"]
+        for earlier in plan[:idx]:
+            previous.append(
+                f"Scène {earlier['scene_number']} — {earlier['title']} | Objectif : {earlier['objective']} "
+                f"| Registre émotionnel : {earlier['emotional_beat']}"
+            )
+        drafted = state.get("scenes_drafted") or []
+        if drafted and drafted[-1].get("last_words"):
+            previous.append("Fin de la scène précédente (contexte de transition) :\n" + drafted[-1]["last_words"])
+        previous.append(
+            "Ne reprends pas la même conclusion émotionnelle (par exemple une réflexion sur la solitude) "
+            "à la fin de ta scène, sauf si l'objectif de la scène l'exige. Termine selon la consigne de fin de scène."
+        )
+        blocks.append("\n".join(previous))
+    if idx < len(plan) - 1:
+        future = ["Réservé aux scènes suivantes (ne pas l'anticiper)"]
+        future.extend(f"Scène {later['scene_number']} — {later['title']} | Objectif : {later['objective']}" for later in plan[idx + 1:])
+        blocks.append("\n".join(future))
+    return blocks
+
+
+def _check_scene_prose(prose: str, scene_number: int) -> str:
+    """Remove leaked ending enums and flag English words without another call."""
+    ending_words = "|".join(re.escape(word) for word in sorted(ENDINGS))
+    pattern = rf'''(?:^|\s)[`*_"«]*({ending_words})[`*_"»]*[\s.!?…:;]*\Z'''
+    while match := re.search(pattern, prose, flags=re.IGNORECASE):
+        logger.warning("stylist scene=%s removed trailing instruction word=%s.", scene_number, match.group(1))
+        prose = prose[:match.start()].rstrip()
+    for match in re.finditer(r"\b(the|and|with|against|into|from|his|her|suddenly)\b", prose, flags=re.IGNORECASE):
+        context = prose[max(0, match.start() - 45):match.end() + 45]
+        logger.warning("stylist scene=%s possible isolated English word=%s | context=%r", scene_number, match.group(), context)
+    return prose
+
+
 def stylist_node(state: DebateState) -> dict[str, Any]:
     """Draft prose scene by scene (multi-scene) or as a single block (legacy)."""
     chapter_plan: list[dict] = state.get("chapter_plan") or []
@@ -381,62 +435,48 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         if constraint_block:
             parts += [constraint_block, _STYLIST_CONSTRAINT]
         parts += [
-            "Write the scene prose now. Do not explain the task.",
-            f"Final brief: {state.get('final_brief') or _current_brief(state)}",
+            "Rédige maintenant la prose de la scène, sans expliquer la tâche.",
+            f"Brief final : {state.get('final_brief') or _current_brief(state)}",
             f"Genre: {state['genre']}",
-            f"Tone: {state['tone']}",
-            f"POV: {state['pov']}",
-            f"Language: {state['language']}",
-            "Respect this continuity report:",
+            f"Ton : {state['tone']}",
+            f"Point de vue : {state['pov']}",
+            f"Langue : {state['language']}",
+            "Respecte les faits acquis de ce rapport de continuité :",
             _compact_json(state.get("continuity_report", {})),
         ]
-        return {"draft": _generate_stylist(state, "\n".join(parts), 1)}
+        return {"draft": _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)}
 
     # Multi-scene path
     idx = state.get("current_scene_index", 0)
     scene = chapter_plan[idx]
 
     constraint_block = _format_hard_constraints(state.get("hard_constraints") or {})
-    parts = []
+    scope = _scene_scope_blocks(state, chapter_plan, idx)
+    parts = list(scope)
     if constraint_block:
         parts += [constraint_block, _STYLIST_CONSTRAINT]
-
-    # Transition context from previous scene
-    scenes_drafted: list[dict] = state.get("scenes_drafted") or []
-    last_words_ctx = ""
-    if scenes_drafted:
-        last_words = scenes_drafted[-1].get("last_words", "")
-        if last_words:
-            last_words_ctx = f"Fin de la scène précédente (contexte de transition) :\n{last_words}"
 
     estimated_words: int = scene["estimated_words"]
 
     parts += [
-        "Write the scene prose now. Do not explain the task.",
-        f"Brief du chapitre : {state.get('final_brief') or _current_brief(state)}",
-        f"Scène {scene['scene_number']} : {scene['title']}",
-        f"Objectif : {scene['objective']}",
-        f"Registre émotionnel : {scene['emotional_beat']}",
+        "Rédige maintenant la prose de la scène, sans expliquer la tâche.",
         f"Genre: {state['genre']}",
         f"Ton: {state['tone']}",
-        f"POV: {state['pov']}",
-        f"Language: {state['language']}",
-        f"Directive de rythme : {scene['pacing']}",
+        f"Point de vue : {state['pov']}",
+        f"Langue : {state['language']}",
+        "Directive de rythme : " + {"slow": "lent", "medium": "modéré", "fast": "rapide", "cut": "saccadé, avec des coupures nettes"}.get(scene["pacing"], "modéré"),
         f"Style de cette scène : {scene['style_directive']}",
         f"Longueur cible : {estimated_words} mots (± 20%)",
-        f"Cette scène doit se terminer sur : {scene['ends_on']}",
+        "Consigne de fin de scène : " + ENDING_DIRECTIVES.get(scene["ends_on"], ENDING_DIRECTIVES["hook"]) + ".",
+        "Les directives ne sont pas des mots à inclure dans la prose.",
         (
             f"Commence à écrire cette scène. Objectif : {estimated_words} mots.\n"
             f"Tu peux t'arrêter avant si la scène est naturellement terminée,\n"
             f"mais vise {estimated_words} mots."
         ),
     ]
-    if state.get("scene_brief"):
-        parts.append(f"Micro-brief de scène : {state['scene_brief']}")
-    if last_words_ctx:
-        parts.append(last_words_ctx)
     parts += [
-        "Respect this continuity report:",
+        "Respecte les faits acquis de ce rapport de continuité, sans les raconter à nouveau :",
         _compact_json(state.get("continuity_report", {})),
     ]
 
@@ -452,7 +492,10 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 break
             mots_restants = estimated_words - len(words)
             last_150 = " ".join(words[-150:])
-            continuation_prompt = "\n".join([
+            continuation_prompt = "\n".join([*scope,
+                "Consigne de fin de scène : " + ENDING_DIRECTIVES.get(scene["ends_on"], ENDING_DIRECTIVES["hook"]) + ".",
+                f"Contrat narratif : {constraint_block}",
+                f"Style : {scene['style_directive']} | Langue : {state['language']}",
                 "Continue cette scène depuis exactement où tu t'es arrêté.",
                 "Ne répète pas ce qui précède.",
                 "Voici la fin de ce qui a été écrit :",
@@ -467,6 +510,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 break
             prose = (prose + "\n" + continuation).strip()
 
+    prose = _check_scene_prose(prose, scene["scene_number"])
     words = prose.split()
     return {
         "scenes_drafted": [
@@ -491,6 +535,7 @@ def editor_node(state: DebateState) -> dict[str, Any]:
         parts.append(constraint_block)
     parts += [
         "Evaluate this draft on originality, tension, emotion, coherence, and style.",
+        "Écris le feedback en français, en une phrase de moins de 20 mots. Garde le format JSON demandé.",
         'Respond with a JSON object only: {"score": <int 1-5>, "feedback": "<one sentence under 20 words>"}',
         "No other text.",
         f"Draft: {state.get('draft', '')}",
@@ -544,7 +589,7 @@ _CHAPTER_PLAN_FORMAT = """\
       "estimated_words": 600,
       "pacing": "slow|medium|fast|cut",
       "style_directive": "string — ex: dialogue dense, flux de conscience",
-      "ends_on": "hook|ambiguous|resolution|cut"
+      "ends_on": "hook|ambiguous|resolution|cut|cliffhanger"
     }
   ]
 }"""
@@ -591,6 +636,8 @@ def chapter_architect_node(
         "",
         "CONTRAINTES DE FORMAT :",
         "- objective : maximum 20 mots",
+        "- Chaque objectif couvre uniquement les événements de cette scène ; ne répète pas un événement dans plusieurs scènes.",
+        "- Les scènes suivent l'ordre du récit : un événement ne doit pas être annoncé comme accompli avant la scène qui le montre.",
         "- emotional_beat : maximum 8 mots",
         "- style_directive : maximum 10 mots",
         "- ends_on : un seul mot parmi : hook, ambiguous, resolution, cut, cliffhanger",
@@ -669,44 +716,49 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
 
 
 def scene_challenge_node(state: DebateState) -> dict[str, Any]:
-    """Mini-debate for scenes 2+ (devil 2 bullets, visionary 50 words, architect 30-word brief)."""
+    """Scope the existing mini-debate and its 40-word brief to the current scene."""
     plan: list[dict] = state.get("chapter_plan") or []
     idx = state.get("current_scene_index", 0)
     if idx >= len(plan):
         return {}
 
     scene = plan[idx]
-    chapter_brief = (state.get("final_brief") or _current_brief(state))[:300]
-
-    devil_prompt = "\n".join([
+    local_context = "\n".join([
         f"Scène {scene['scene_number']} : {scene['title']}",
         f"Objectif : {scene['objective']}",
-        f"Contexte chapitre : {chapter_brief}",
-        "Give EXACTLY 2 bullet points on weaknesses of this scene plan.",
-        "Each bullet: under 15 words.",
-        "Format: • [problem]: [explanation]",
-        "No preamble.",
+        f"Registre émotionnel : {scene['emotional_beat']}",
+        f"Longueur cible : {scene['estimated_words']} mots.",
+        "Contrat narratif (à respecter à l'échelle du chapitre) :",
+        _format_hard_constraints(state.get("hard_constraints") or {}),
+        "Décris uniquement ce qui se passe dans cette scène. Ne développe pas le chapitre entier, "
+        "ne modifie pas son objectif et n'anticipe pas les autres scènes.",
+    ])
+
+    devil_prompt = "\n".join([
+        local_context,
+        "Donne exactement deux points faibles de cette scène, sous forme de puces de moins de 15 mots.",
+        "Sans préambule.",
     ])
     devil_critique = _generate("devil_advocate", state, devil_prompt)
 
     visionary_prompt = "\n".join([
-        f"Scène {scene['scene_number']} : {scene['title']} — {scene['objective']}",
-        "Propose ONE alternative approach for this scene, maximum 50 words.",
-        "No preamble.",
+        local_context,
+        "Propose une approche pour cette seule scène, sans changer son objectif, en 50 mots maximum.",
+        "Sans préambule.",
     ])
     visionary_alt = _generate("visionary", state, visionary_prompt)
 
     arb_prompt = "\n".join([
-        f"Plan : {scene['title']} — {scene['objective']}",
-        f"Longueur cible : {scene['estimated_words']} mots.",
+        local_context,
         f"Critique : {devil_critique}",
         f"Alternative : {visionary_alt}",
-        "Produce a micro-brief for this scene in MAXIMUM 30 words.",
-        f"Include the word target ({scene['estimated_words']} mots) as an explicit constraint.",
-        "Flowing prose, no bullet points.",
+        "Produis un micro-brief de 40 mots maximum, uniquement sur ce qui se passe dans cette scène.",
+        "Ne retiens des suggestions que ce qui respecte son objectif et son émotion.",
+        f"Inclus la cible de {scene['estimated_words']} mots comme contrainte explicite.",
+        "Texte suivi, sans puces.",
     ])
-    micro_brief = _generate("scene_architect", state, arb_prompt)
-    return {"scene_brief": micro_brief}
+    micro_brief = " ".join(_generate("scene_architect", state, arb_prompt).split()[:40])
+    return {"scene_brief": micro_brief, "scene_micro_brief": {"scene_number": scene["scene_number"], "text": micro_brief}}
 
 
 def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
