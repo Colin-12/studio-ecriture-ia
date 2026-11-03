@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib import error, parse, request
+from urllib import error, request
 
 # Support `python scripts/check_models.py` from any working directory.
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,8 +14,11 @@ sys.path.insert(0, str(ROOT))
 import yaml  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 
+from src.llm.gemini_models import fetch_gemini_models  # noqa: E402
 from src.llm.model_registry import load_model_registry, resolve_model_config  # noqa: E402
 from src.llm.router import resolve_agent_config  # noqa: E402
+
+_gemini_limits: dict[str, int] = {}
 
 
 def configured_models() -> set[tuple[str, str]]:
@@ -58,21 +61,14 @@ def available_models(provider: str) -> set[str] | None:
         data = _get("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {key}"})
         return {item["id"] for item in data["data"]}
     if provider == "gemini":
+        _gemini_limits.clear()
         key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not key:
             return None
-        models: set[str] = set()
-        page = ""
-        while True:
-            url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
-            if page:
-                url += "&pageToken=" + parse.quote(page, safe="")
-            data = _get(url, {"x-goog-api-key": key})
-            models.update(item["name"].removeprefix("models/") for item in data.get("models", [])
-                          if "generateContent" in item.get("supportedGenerationMethods", []))
-            page = data.get("nextPageToken", "")
-            if not page:
-                return models
+        catalog = fetch_gemini_models(key, get_json=_get)
+        _gemini_limits.update({name: model["outputTokenLimit"] for name, model in catalog.items()
+                               if type(model.get("outputTokenLimit")) is int})
+        return set(catalog)
     if provider == "ollama":
         host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
         data = _get(host + "/api/tags", {})
@@ -95,7 +91,8 @@ def main() -> int:
             if available is not None:
                 status = "OK" if model in available else "MANQUANT"
                 missing |= model not in available
-            print(f"{status} : {provider} / {model}")
+            detail = f" | outputTokenLimit={_gemini_limits.get(model, 'inconnu')}" if provider == "gemini" else ""
+            print(f"{status} : {provider} / {model}{detail}")
     return 1 if missing else 0
 
 

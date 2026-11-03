@@ -88,10 +88,8 @@ def test_router_uses_fallback_on_rate_limit() -> None:
     assert fallback.calls == ["hello"]
 
 
-def test_usage_logger_writes_jsonl() -> None:
-    log_path = Path("logs/test_llm_usage.jsonl")
-    if log_path.exists():
-        log_path.unlink()
+def test_usage_logger_writes_jsonl(tmp_path) -> None:
+    log_path = tmp_path / "test_llm_usage.jsonl"
 
     log_llm_call(
         agent="stylist",

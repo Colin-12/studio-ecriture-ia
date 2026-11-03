@@ -19,7 +19,7 @@ TEXT_FIELDS = {"title", "objective", "emotional_beat", "style_directive"}
 
 
 def normalize_chapter_plan(plan: object) -> list[Any]:
-    """Copy a plan, renumber scenes, convert integer strings and alias quick."""
+    """Normalize enums; unknown pacing follows length, unknown ending becomes hook."""
     if not isinstance(plan, list):
         return []
     normalized: list[Any] = []
@@ -39,8 +39,19 @@ def normalize_chapter_plan(plan: object) -> list[Any]:
             value = scene.get(field)
             if isinstance(value, str):
                 scene[field] = value.strip().lower()
-        if scene.get("pacing") == "quick":
-            scene["pacing"] = "fast"
+        pacing = scene.get("pacing")
+        synonyms = {"quick": "fast", "flash": "fast", "rapid": "fast", "rapide": "fast", "lent": "slow", "moderate": "medium"}
+        if isinstance(pacing, str):
+            pacing = synonyms.get(pacing, pacing)
+        if not isinstance(pacing, str) or pacing not in PACING:
+            words = scene.get("estimated_words")
+            pacing = "fast" if type(words) is int and words <= 300 else "medium" if type(words) is not int or words <= 700 else "slow"
+        scene["pacing"] = pacing
+        ending = scene.get("ends_on")
+        endings = {"cliff-hanger": "cliffhanger", "cliff_hanger": "cliffhanger", "resolved": "resolution", "open": "ambiguous"}
+        if isinstance(ending, str):
+            ending = endings.get(ending, ending)
+        scene["ends_on"] = ending if isinstance(ending, str) and ending in ENDINGS else "hook"
         normalized.append(scene)
     return normalized
 

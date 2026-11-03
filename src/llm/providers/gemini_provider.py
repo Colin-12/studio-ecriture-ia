@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import InvalidProviderResponseError
+from src.llm.gemini_models import output_token_limit
 from src.llm.providers._http import post_json
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ _temperature_warned: set[str] = set()
 class GeminiProvider(LLMProvider):
     provider_name = "gemini"
 
-    def __init__(self, model: str, thinking_level: str = "medium") -> None:
+    def __init__(self, model: str, thinking_level: str = "medium", thinking_reserve: int = 0) -> None:
         load_dotenv()
         if not model or not model.strip():
             raise ValueError("A model must be supplied by the registry or configuration.")
@@ -28,7 +29,15 @@ class GeminiProvider(LLMProvider):
         if thinking_level not in {"minimal", "low", "medium", "high"}:
             raise ValueError(f"Invalid Gemini thinking_level: {thinking_level}")
         self.thinking_level = thinking_level
+        if thinking_reserve < 0:
+            raise ValueError("thinking_reserve must be non-negative.")
+        self.thinking_reserve = thinking_reserve
         self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+    def completion_token_limit(self, max_tokens: int) -> int:
+        if self.model.startswith("gemini-3"):
+            return min(max_tokens + self.thinking_reserve, output_token_limit(self.model, self.api_key or ""))
+        return max_tokens
 
     def generate(
         self,
@@ -43,7 +52,7 @@ class GeminiProvider(LLMProvider):
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": temperature,
-                "maxOutputTokens": max_tokens,
+                "maxOutputTokens": self.completion_token_limit(max_tokens),
             },
         }
         if self.model.startswith("gemini-3"):
@@ -65,7 +74,16 @@ class GeminiProvider(LLMProvider):
         if not isinstance(data, dict):
             raise InvalidProviderResponseError("Gemini response must be a JSON object.")
         text, input_tokens, output_tokens = _parse_response(data)
-        return LLMResponse(text, self.provider_name, self.model, input_tokens, output_tokens, latency_ms, data)
+        candidate = data["candidates"][0]
+        raw_usage = data.get("usageMetadata")
+        usage = raw_usage if isinstance(raw_usage, dict) else {}
+        finish_reason = candidate.get("finishReason")
+        reasoning_tokens = usage.get("thoughtsTokenCount")
+        return LLMResponse(
+            text, self.provider_name, self.model, input_tokens, output_tokens, latency_ms, data,
+            finish_reason=finish_reason if isinstance(finish_reason, str) else None,
+            reasoning_tokens=reasoning_tokens if isinstance(reasoning_tokens, int) else None,
+        )
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -73,9 +91,10 @@ class GeminiProvider(LLMProvider):
 
 def _parse_response(data: dict[str, Any]) -> tuple[str, int | None, int | None]:
     try:
-        parts = data["candidates"][0]["content"]["parts"]
+        candidate = data["candidates"][0]
+        parts = candidate.get("content", {}).get("parts", [])
         text = "".join(part["text"] for part in parts if not part.get("thought") and isinstance(part.get("text"), str))
-        if not text:
+        if not text and candidate.get("finishReason") != "MAX_TOKENS":
             raise InvalidProviderResponseError("Gemini response is missing final text.")
     except (KeyError, IndexError, TypeError) as exc:
         raise InvalidProviderResponseError("Gemini response is missing text.") from exc

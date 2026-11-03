@@ -16,7 +16,7 @@ from src.agents.plan_validation import (
     validate_chapter_plan,
 )
 from src.llm.base import LLMProvider, LLMResponse
-from src.llm.router import get_llm_for_agent
+from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +304,55 @@ def emotion_node(state: DebateState) -> dict[str, Any]:
     return {"emotion_notes": [_generate("emotion_guardian", state, "\n".join(parts))]}
 
 
+def _complete_sentences(text: str) -> str:
+    """Discard the unfinished tail, retaining trailing dialogue quotes."""
+    endings = list(re.finditer(r'''[.!?…]+(?:[ \t]*[»”’"')\]])*(?=\s|$)''', text))
+    return text[:endings[-1].end()].strip() if endings else ""
+
+
+def _without_overlap(previous: str, continuation: str) -> str:
+    """Remove the longest repeated suffix/prefix of at least six words."""
+    old = previous.split()
+    spans = list(re.finditer(r"\S+", continuation))
+    def clean(word: str) -> str:
+        return word.strip('.,;:!?…«»“”"()[]').casefold()
+    old_words = [clean(word) for word in old]
+    new_words = [clean(match.group()) for match in spans]
+    for count in range(min(len(old_words), len(new_words)), 5, -1):
+        if old_words[-count:] == new_words[:count]:
+            return continuation[spans[count - 1].end():].lstrip()
+    return continuation.strip()
+
+
+def _generate_stylist(state: DebateState, prompt: str, scene_number: int) -> str:
+    """Retry truncated prose once with twice the total completion budget."""
+    llm = get_llm_for_agent("stylist", profile=state.get("llm_profile", "default"))
+    response = llm.generate(prompt=prompt)
+    if not isinstance(response, LLMResponse):
+        return str(response).strip()
+    if response.finish_reason != "MAX_TOKENS":
+        return response.text.strip()
+    if isinstance(llm, ConfiguredLLMProvider):
+        budget = int(llm.config.get("max_tokens", 1000))
+        primary = llm.primary
+    else:
+        budget = 6000
+        primary = llm
+    reserve = getattr(primary, "thinking_reserve", 0)
+    reserve = reserve if isinstance(reserve, int) else 0
+    limit_fn = getattr(primary, "completion_token_limit", None)
+    total = limit_fn(budget) if callable(limit_fn) else budget + reserve
+    total = total if isinstance(total, int) else budget + reserve
+    retry_budget = max(1, total * 2 - reserve)
+    logger.warning("stylist scene=%s MAX_TOKENS; retrying once with doubled completion budget.", scene_number)
+    response = llm.generate(prompt=prompt, max_tokens=retry_budget)
+    text = response.text.strip() if isinstance(response, LLMResponse) else str(response).strip()
+    if isinstance(response, LLMResponse) and response.finish_reason == "MAX_TOKENS":
+        text = _complete_sentences(text)
+        logger.warning("stylist scene=%s still MAX_TOKENS; trimmed to complete sentences, words_retained=%s.", scene_number, len(text.split()))
+    return text
+
+
 def stylist_node(state: DebateState) -> dict[str, Any]:
     """Draft prose scene by scene (multi-scene) or as a single block (legacy)."""
     chapter_plan: list[dict] = state.get("chapter_plan") or []
@@ -324,7 +373,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             "Respect this continuity report:",
             _compact_json(state.get("continuity_report", {})),
         ]
-        return {"draft": _generate("stylist", state, "\n".join(parts))}
+        return {"draft": _generate_stylist(state, "\n".join(parts), 1)}
 
     # Multi-scene path
     idx = state.get("current_scene_index", 0)
@@ -374,7 +423,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         _compact_json(state.get("continuity_report", {})),
     ]
 
-    prose = _generate("stylist", state, "\n".join(parts))
+    prose = _generate_stylist(state, "\n".join(parts), scene["scene_number"])
 
     # Continuation loop for long scenes (≤ 500 words: no continuation)
     if estimated_words > 500:
@@ -394,7 +443,11 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "Continue directement, même registre, même voix.",
                 f"Objectif : encore {mots_restants} mots environ.",
             ])
-            prose = prose + "\n" + _generate("stylist", state, continuation_prompt)
+            continuation = _generate_stylist(state, continuation_prompt, scene["scene_number"])
+            continuation = _without_overlap(prose, continuation)
+            if not continuation:
+                break
+            prose = (prose + "\n" + continuation).strip()
 
     words = prose.split()
     return {

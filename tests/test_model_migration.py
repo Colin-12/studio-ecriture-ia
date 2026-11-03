@@ -66,6 +66,7 @@ def test_unknown_role_is_clear():
 
 
 def test_gemini3_payload_and_final_text(monkeypatch, caplog):
+    monkeypatch.setattr("src.llm.providers.gemini_provider.output_token_limit", lambda *args: 65536)
     payloads = []
     def post(url, payload, **kwargs):
         payloads.append(payload)

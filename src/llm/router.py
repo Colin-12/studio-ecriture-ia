@@ -45,13 +45,13 @@ class ConfiguredLLMProvider(LLMProvider):
         self,
         prompt: str,
         system: str | None = None,
-        max_tokens: int = 1000,
+        max_tokens: int | None = None,
         temperature: float = 0.7,
         response_format: str | None = None,
         timeout: int = 120,
     ) -> LLMResponse:
         primary_config = {
-            "max_tokens": int(self.config.get("max_tokens", max_tokens)),
+            "max_tokens": max_tokens if max_tokens is not None else int(self.config.get("max_tokens", 1000)),
             "temperature": float(self.config.get("temperature", temperature)),
             "response_format": self.config.get("response_format", response_format),
             "timeout": int(self.config.get("timeout", timeout)),
@@ -69,7 +69,7 @@ class ConfiguredLLMProvider(LLMProvider):
             fallback_config = {
                 "max_tokens": _as_int(
                     self.fallback_config.get("max_tokens"),
-                    _as_int(primary_config["max_tokens"], max_tokens),
+                    _as_int(primary_config["max_tokens"], 1000),
                 ),
                 "temperature": _as_float(
                     self.fallback_config.get("temperature"),
@@ -133,6 +133,8 @@ class ConfiguredLLMProvider(LLMProvider):
             model=response.model,
             input_tokens=response.input_tokens,
             output_tokens=response.output_tokens,
+            finish_reason=response.finish_reason,
+            reasoning_tokens=response.reasoning_tokens,
             latency_ms=response.latency_ms,
             success=True,
             error=None,
@@ -140,7 +142,8 @@ class ConfiguredLLMProvider(LLMProvider):
         limiter.record_usage(
             provider_name,
             (response.input_tokens or (len(prompt) + len(system or "")) // 3)
-            + (response.output_tokens or config["max_tokens"]),
+            + (response.output_tokens if response.output_tokens is not None else config["max_tokens"])
+            + (response.reasoning_tokens or 0),
             model=model,
         )
         return response
@@ -168,7 +171,7 @@ def get_llm_for_agent(
     if overrides:
         overrides = {key: value for key, value in overrides.items() if value is not None}
         if overrides.get("role"):
-            agent_config = {key: value for key, value in agent_config.items() if key not in {"role", "provider", "model", "thinking_level", "reasoning_effort", "min_completion_tokens"}}
+            agent_config = {key: value for key, value in agent_config.items() if key not in {"role", "provider", "model", "thinking_level", "thinking_reserve", "reasoning_effort", "min_completion_tokens"}}
             agent_config = resolve_model_config({**agent_config, **overrides})
         agent_config = {**agent_config, **{key: value for key, value in overrides.items() if value is not None}}
         if isinstance(agent_config.get("fallback"), dict):
@@ -227,7 +230,7 @@ def resolve_agent_config(config: dict[str, Any], agent_name: str) -> dict[str, A
     if not isinstance(selected, dict):
         raise ValueError(f"Invalid LLM config for agent: {agent_name}")
     if "role" in selected:
-        default_config = {key: value for key, value in default_config.items() if key not in {"role", "provider", "model", "thinking_level", "reasoning_effort", "min_completion_tokens"}}
+        default_config = {key: value for key, value in default_config.items() if key not in {"role", "provider", "model", "thinking_level", "thinking_reserve", "reasoning_effort", "min_completion_tokens"}}
     elif "provider" in selected or "model" in selected:
         default_config = resolve_model_config(default_config) if "role" in default_config else dict(default_config)
         default_config.pop("role", None)
@@ -237,8 +240,8 @@ def resolve_agent_config(config: dict[str, Any], agent_name: str) -> dict[str, A
 def _provider_kwargs(provider_name: str, config: dict[str, Any]) -> dict[str, object]:
     if provider_name == "groq":
         return {key: config[key] for key in ("reasoning_effort", "min_completion_tokens") if config.get(key) is not None}
-    if provider_name == "gemini" and config.get("thinking_level"):
-        return {"thinking_level": config["thinking_level"]}
+    if provider_name == "gemini":
+        return {key: config[key] for key in ("thinking_level", "thinking_reserve") if config.get(key) is not None}
     if provider_name == "ollama":
         kwargs: dict[str, object] = {}
         if config.get("base_url"):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,10 +19,12 @@ def log_llm_call(
     latency_ms: int,
     success: bool,
     error: str | None = None,
-    log_path: str | Path = DEFAULT_USAGE_LOG_PATH,
+    log_path: str | Path | None = None,
+    finish_reason: str | None = None,
+    reasoning_tokens: int | None = None,
 ) -> None:
     """Append one structured provider-call record to the usage log."""
-    path = Path(log_path)
+    path = Path(log_path if log_path is not None else os.getenv("LLM_USAGE_LOG", str(DEFAULT_USAGE_LOG_PATH)))
     path.parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "timestamp": datetime.now(UTC).replace(microsecond=0).isoformat().replace(
@@ -33,6 +36,8 @@ def log_llm_call(
         "model": model,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
+        "finish_reason": finish_reason,
+        "reasoning_tokens": reasoning_tokens,
         "latency_ms": latency_ms,
         "success": success,
         "error": error,
