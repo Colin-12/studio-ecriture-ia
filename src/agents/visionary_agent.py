@@ -6,6 +6,7 @@ import json
 
 from src.agents.base import BaseAgent
 from src.llm.base import LLMResponse
+from src.llm.model_registry import resolve_model_config
 from src.llm.router import get_llm_for_agent
 
 
@@ -31,7 +32,7 @@ class VisionaryAgent(BaseAgent):
             provider_override = None
         model_override = llm_model
         if provider_override == "ollama" and model_override is None:
-            model_override = "qwen2.5:3b"
+            model_override = resolve_model_config({"role": "local_json"})["model"]
         elif provider_override == "mock" and model_override is None:
             model_override = "mock"
         self.llm_client = get_llm_for_agent(

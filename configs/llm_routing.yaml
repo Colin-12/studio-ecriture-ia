@@ -1,141 +1,93 @@
-# Routing validé par benchmark stylist — 3 briefs, 2 lecteurs indépendants
-# Gemini 2.5 Flash : score moyen 4.6/5
-# Groq Llama 3.3 70B : score moyen 2.9/5
-# Groq Llama 3.1 8B : score moyen 2.3/5
-# Ollama qwen2.5:3b : score moyen 1.2/5 — prose exclue, JSON uniquement
-
 default:
-  provider: groq
-  model: llama-3.3-70b-versatile
   temperature: 0.7
   max_tokens: 1000
-
+  role: structured
 agents:
   contract_parser:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.1
     max_tokens: 600
     response_format: json
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: structured
   stylist:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.8
     max_tokens: 6000
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: prose
   scene_architect:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.6
     max_tokens: 1500
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: planner
   story_architect:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.6
     max_tokens: 2000
-
+    role: planner
   emotion_guardian:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.5
     max_tokens: 800
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: prose
   editor:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.4
     max_tokens: 1500
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: prose
   devil_advocate:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.6
     max_tokens: 800
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: fast_critique
   visionary:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.9
     max_tokens: 800
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: fast_critique
   continuity:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.2
     max_tokens: 1000
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: fast_critique
   quality_evaluator:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.2
     max_tokens: 600
     response_format: json
-
+    role: structured
   beta_reader:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.5
     max_tokens: 600
     response_format: json
-
+    role: light_json
   event_extractor:
-    provider: ollama
-    model: qwen2.5:3b
     temperature: 0.1
     max_tokens: 800
     response_format: json
     fallback:
-      provider: groq
-      model: llama-3.1-8b-instant
-
+      role: light_json
+    role: local_json
   chapter_architect:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.7
     max_tokens: 3000
     response_format: json
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: planner
   rhythm_guardian:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.3
     max_tokens: 800
     response_format: json
     fallback:
-      provider: groq
-      model: llama-3.3-70b-versatile
-
+      role: structured
+    role: structured
   scene_challenger:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.6
     max_tokens: 300
+    role: fast_critique

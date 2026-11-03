@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import ProviderUnavailableError, RateLimitError
+from src.llm.model_registry import resolve_model_config
 from src.llm.rate_limiter import get_rate_limiter
 from src.llm.registry import create_provider
 from src.llm.usage_logger import log_llm_call
@@ -103,7 +104,8 @@ class ConfiguredLLMProvider(LLMProvider):
                 raise ProviderUnavailableError(
                     f"{provider_name} provider is not configured or available.",
                 )
-            limiter.wait_if_needed(provider_name, config["max_tokens"])
+            estimated_tokens = (len(prompt) + len(system or "")) // 3 + config["max_tokens"]
+            limiter.wait_if_needed(provider_name, estimated_tokens, model=model)
             response = provider.generate(
                 prompt=prompt,
                 system=system,
@@ -134,7 +136,12 @@ class ConfiguredLLMProvider(LLMProvider):
             success=True,
             error=None,
         )
-        limiter.record_usage(provider_name, response.output_tokens or config["max_tokens"])
+        limiter.record_usage(
+            provider_name,
+            (response.input_tokens or (len(prompt) + len(system or "")) // 3)
+            + (response.output_tokens or config["max_tokens"]),
+            model=model,
+        )
         return response
 
     def is_available(self) -> bool:
@@ -158,7 +165,13 @@ def get_llm_for_agent(
     config = load_llm_config(profile)
     agent_config = resolve_agent_config(config, agent_name)
     if overrides:
+        overrides = {key: value for key, value in overrides.items() if value is not None}
+        if overrides.get("role"):
+            agent_config = {key: value for key, value in agent_config.items() if key not in {"role", "provider", "model", "thinking_level"}}
+            agent_config = resolve_model_config({**agent_config, **overrides})
         agent_config = {**agent_config, **{key: value for key, value in overrides.items() if value is not None}}
+        if isinstance(agent_config.get("fallback"), dict):
+            agent_config["fallback"] = resolve_model_config(agent_config["fallback"])
 
     provider_name = str(agent_config["provider"])
     model = str(agent_config["model"])
@@ -212,13 +225,17 @@ def resolve_agent_config(config: dict[str, Any], agent_name: str) -> dict[str, A
     selected = agent_configs.get(config_key) or agent_configs.get(agent_name) or {}
     if not isinstance(selected, dict):
         raise ValueError(f"Invalid LLM config for agent: {agent_name}")
-    merged = {**default_config, **selected}
-    if "provider" not in merged or "model" not in merged:
-        raise ValueError(f"LLM config for {agent_name} must define provider and model.")
-    return merged
+    if "role" in selected:
+        default_config = {key: value for key, value in default_config.items() if key not in {"role", "provider", "model", "thinking_level"}}
+    elif "provider" in selected or "model" in selected:
+        default_config = resolve_model_config(default_config) if "role" in default_config else dict(default_config)
+        default_config.pop("role", None)
+    return resolve_model_config({**default_config, **selected})
 
 
 def _provider_kwargs(provider_name: str, config: dict[str, Any]) -> dict[str, object]:
+    if provider_name == "gemini" and config.get("thinking_level"):
+        return {"thinking_level": config["thinking_level"]}
     if provider_name == "ollama":
         kwargs: dict[str, object] = {}
         if config.get("base_url"):

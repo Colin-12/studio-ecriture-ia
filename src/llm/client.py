@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.llm.base import LLMProvider
 from src.llm.exceptions import ProviderUnavailableError
+from src.llm.model_registry import resolve_model_config
 from src.llm.providers._http import request as request
 from src.llm.providers.mock_provider import MockProvider
 from src.llm.providers.ollama_provider import OllamaProvider
@@ -25,7 +26,11 @@ class LLMClient:
         profile: str = "default",
     ) -> None:
         self.mode = mode
-        self.model = model or ("mock" if mode == "mock" else "qwen2.5:3b")
+        self.model = model or ""
+        if not self.model and mode == "mock":
+            self.model = "mock"
+        elif not self.model and mode == "ollama":
+            self.model = resolve_model_config({"role": "local_json"})["model"]
         self.num_predict = num_predict
         self.keep_alive = keep_alive
         self.timeout = timeout
@@ -47,7 +52,7 @@ class LLMClient:
         return get_llm_for_agent(
             self.agent_name,
             profile=self.profile,
-            overrides={"provider": self.mode, "model": self.model},
+            overrides={"provider": self.mode, "model": self.model or None},
         )
 
     def generate(self, prompt: str) -> str:

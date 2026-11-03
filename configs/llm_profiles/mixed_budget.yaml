@@ -1,24 +1,89 @@
 default:
-  provider: groq
-  model: llama-3.3-70b-versatile
   temperature: 0.7
   max_tokens: 1000
-
+  role: structured
 agents:
   stylist:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.8
     max_tokens: 2000
-
+    role: prose
   story_architect:
-    provider: gemini
-    model: gemini-2.5-flash
     temperature: 0.6
     max_tokens: 2000
-
+    role: planner
   visionary:
-    provider: groq
-    model: llama-3.3-70b-versatile
     temperature: 0.9
     max_tokens: 800
+    role: fast_critique
+  contract_parser:
+    temperature: 0.1
+    max_tokens: 600
+    response_format: json
+    fallback:
+      role: structured
+    role: structured
+  scene_architect:
+    temperature: 0.6
+    max_tokens: 1500
+    fallback:
+      role: structured
+    role: planner
+  emotion_guardian:
+    temperature: 0.5
+    max_tokens: 800
+    fallback:
+      role: structured
+    role: prose
+  editor:
+    temperature: 0.4
+    max_tokens: 1500
+    fallback:
+      role: structured
+    role: prose
+  devil_advocate:
+    temperature: 0.6
+    max_tokens: 800
+    fallback:
+      role: structured
+    role: fast_critique
+  continuity:
+    temperature: 0.2
+    max_tokens: 1000
+    fallback:
+      role: structured
+    role: fast_critique
+  quality_evaluator:
+    temperature: 0.2
+    max_tokens: 600
+    response_format: json
+    role: structured
+  beta_reader:
+    temperature: 0.5
+    max_tokens: 600
+    response_format: json
+    role: light_json
+  event_extractor:
+    temperature: 0.1
+    max_tokens: 800
+    response_format: json
+    fallback:
+      role: light_json
+    role: local_json
+  chapter_architect:
+    temperature: 0.7
+    max_tokens: 3000
+    response_format: json
+    fallback:
+      role: structured
+    role: planner
+  rhythm_guardian:
+    temperature: 0.3
+    max_tokens: 800
+    response_format: json
+    fallback:
+      role: structured
+    role: structured
+  scene_challenger:
+    temperature: 0.6
+    max_tokens: 300
+    role: fast_critique

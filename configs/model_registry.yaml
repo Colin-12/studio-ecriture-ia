@@ -1,0 +1,51 @@
+roles:
+  prose:
+    provider: gemini
+    model: gemini-3.6-flash
+    thinking_level: medium
+  planner:
+    provider: gemini
+    model: gemini-3.6-flash
+    thinking_level: medium
+  structured:
+    provider: groq
+    model: openai/gpt-oss-120b
+  fast_critique:
+    provider: groq
+    model: openai/gpt-oss-120b
+  light_json:
+    provider: groq
+    model: openai/gpt-oss-20b
+  local_json:
+    provider: ollama
+    model: qwen2.5:3b
+  gemini_fast:
+    provider: gemini
+    model: gemini-3.6-flash
+    thinking_level: low
+quota_defaults:
+  tokens_per_minute: 5000
+  tokens_per_day: 100000
+models:
+  groq:
+    openai/gpt-oss-120b:
+      tokens_per_minute: 8000
+      tokens_per_day: 100000
+    openai/gpt-oss-20b:
+      tokens_per_minute: 8000
+      tokens_per_day: 100000
+  gemini:
+    gemini-3.6-flash:
+      tokens_per_minute: 100000
+      tokens_per_day: 500000
+  ollama:
+    qwen2.5:3b:
+      tokens_per_minute: null
+      tokens_per_day: null
+provider_defaults:
+  mock:
+    tokens_per_minute: null
+    tokens_per_day: null
+  ollama:
+    tokens_per_minute: null
+    tokens_per_day: null

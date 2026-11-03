@@ -79,10 +79,10 @@ BRIEFS: list[Brief] = [BRIEF_1, BRIEF_2, BRIEF_3]
 
 # (provider, model, skip_if_unavailable)
 PROVIDERS: list[tuple[str, str, bool]] = [
-    ("gemini", "gemini-2.5-flash", False),
-    ("groq", "llama-3.3-70b-versatile", False),
-    ("groq", "llama-3.1-8b-instant", False),
-    ("ollama", "qwen2.5:3b", True),
+    ("gemini", "gemini-3.6-flash", False),
+    ("groq", "openai/gpt-oss-120b", False),
+    ("groq", "openai/gpt-oss-20b", False),
+    ("groq", "qwen/qwen3.6-27b", False),
 ]
 
 

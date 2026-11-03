@@ -1,57 +1,42 @@
-# Project Status
+# État du projet
 
-## Etat actuel
+## Fonctionnalités livrées
 
-Deux chantiers complétés sur la branche phase-1-completion :
-- ruff + mypy configurés (pyproject.toml), 119 tests passent
-- Abstraction LLM provider-agnostique opérationnelle
+- Phases 1 à 3 terminées : mémoire narrative composite (ChromaDB, SQLite,
+  NetworkX), extraction automatique d'événements, connaissances des personnages
+  avec filtrage temporel, suivi setup/payoff, agents de continuité et de style,
+  débat multi-agents LangGraph.
+- Interface Streamlit : tableau de bord, écriture guidée, mémoire/canon et récit court.
+- Contraintes rigides extraites du brief et transmises aux agents du pipeline.
+- Pipeline multi-scènes avec planification, continuité, rédaction, évaluation
+  et sauvegarde du récit ; mémoire sémantique isolée par roman.
+- Abstraction LLM multi-provider, profils YAML, fallbacks et journalisation des usages.
 
-## Décision actuelle
+## Migration des modèles
 
-- Prototype agentique taggeré v0.3-agents-prototype
-- Expansion agentique gelée temporairement
-- Branche phase-1-completion active
-- Priorité : compléter les trois tests mémoire Phase 1
+Branche de travail : `chore/model-migration` (sans fusion).
 
-## Diagnostic Phase 1
+- Registre `configs/model_registry.yaml` : rôles, providers, modèles et quotas.
+- Prose et planification : `gemini-3.6-flash` ; sorties structurées et critiques :
+  `openai/gpt-oss-120b` ; JSON léger : `openai/gpt-oss-20b` ; extraction locale : `qwen2.5:3b`.
+- Routage et profils convertis aux rôles ; configurations explicites toujours acceptées.
+- Gemini 3.x : `thinking_level` configurable, paramètres d'échantillonnage exclus.
+- GPT-OSS : contenu final séparé du raisonnement et mode JSON object conservé.
+- Quotas par modèle et par minute/jour UTC, avertissement à 80 % ; compteurs en mémoire
+  du processus (non persistés et non partagés entre processus).
+- `scripts/check_models.py` contrôle les catalogues Groq, Gemini et Ollama.
+  Une clé absente ou un catalogue inaccessible donne `NON VÉRIFIÉ`.
+- Benchmark stylist mis à jour ; les notes historiques ne valident pas ces nouveaux modèles.
 
-- Retrieval sémantique Frankenstein : fonctionnel
-- Mémoire structurée : existe mais seedée manuellement
-- Trois capacités critiques non validées :
-  a. extraction automatique d'événements depuis la prose
-  b. état épistémique des personnages (CharacterKnowledge)
-  c. setup/payoff seedé et testé
+## Validation et suites
 
-## Refonte LLM  complétée
+Validation de la migration le 3 novembre 2026 : ruff et mypy passent,
+179 tests passent (hors `tests/test_cli.py`). Les quatre modèles du registre
+sont confirmés disponibles par leurs catalogues Groq, Gemini et Ollama.
 
-- src/llm/ : interface LLMProvider abstraite + 5 providers + 2 stubs
-- configs/llm_routing.yaml : routing par agent
-- configs/llm_profiles/ : free_only, local_only, mixed_budget
-- Fallback automatique sur RateLimitError
-- logs/llm_usage.jsonl : observabilité par session
-- Flag CLI --llm-profile opérationnel
-- Compatibilité descendante --llm-mode préservée
+Exécuter ruff sur src/tests/scripts, mypy sur src, pytest hors test_cli,
+puis `python scripts/check_models.py`. Les tests unitaires utilisent des réponses simulées ;
+la disponibilité réelle dépend du catalogue et des accès du compte.
 
-## Tests Phase 1 à construire
-
-### Test 1  Extraction automatique d'événements
-Objectif : lire un chapitre Markdown et produire des événements structurés sans saisie manuelle.
-Référence : frankenstein_events_reference.json (15-20 événements, établie par lecture humaine).
-Critères : precision >= 0.60, recall >= 0.50, <= 2 hallucinations par chapitre.
-Code attendu : src/memory/event_extractor.py, tests/test_event_extractor.py
-
-### Test 2  État épistémique des personnages
-Objectif : répondre à "que sait un personnage à un chapitre donné ?".
-Table : CharacterKnowledge(id, character_id, fact, learned_at_chapter, source_event_id, belief_status, confidence).
-belief_status : true / false / suspected / hidden (obligatoire  couvre mensonge, secret, ambiguïté).
-Critères : 0% de fuite temporelle (faits appris après N exclus), 4 valeurs de belief_status couvertes.
-Code attendu : src/memory/knowledge.py, tests/test_character_knowledge.py
-
-### Test 3  Setup / Payoff fonctionnel
-Objectif : suivre ce qui est planté, payé, partiellement payé.
-Enrichissement : champ progress (planted / partially_paid / fully_paid) + payoff_chapters (JSON list).
-Critères : 5 setups seedés, 3 requêtes testées à chapitres différents, au moins 1 partially_paid correct.
-Code attendu : src/memory/setup_payoff.py, tests/test_setup_payoff.py
-
-### Gate de sortie Phase 1
-Les trois tests ci-dessus doivent passer leurs critères chiffrés avant toute nouvelle feature agentique.
+À poursuivre : benchmark réel des nouveaux modèles, roman complet de bout en bout,
+déploiement Streamlit Cloud, historique des versions et export PDF.

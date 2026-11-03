@@ -9,7 +9,9 @@ from src.llm.exceptions import ProviderUnavailableError
 class OpenAIProvider(LLMProvider):
     provider_name = "openai"
 
-    def __init__(self, model: str = "gpt-4o-mini") -> None:
+    def __init__(self, model: str) -> None:
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
 
     def generate(

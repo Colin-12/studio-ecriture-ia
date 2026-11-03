@@ -29,7 +29,7 @@ def test_groq_provider_rate_limit(monkeypatch) -> None:
     patch_http_error(monkeypatch, 429)
 
     with pytest.raises(RateLimitError):
-        GroqProvider().generate("hello")
+        GroqProvider(model="test-model").generate("hello")
 
 
 def test_groq_provider_auth_error(monkeypatch) -> None:
@@ -37,7 +37,7 @@ def test_groq_provider_auth_error(monkeypatch) -> None:
     patch_http_error(monkeypatch, 401)
 
     with pytest.raises(AuthError):
-        GroqProvider().generate("hello")
+        GroqProvider(model="test-model").generate("hello")
 
 
 def test_groq_provider_retries_cloudflare_1010(monkeypatch, caplog) -> None:
@@ -76,4 +76,4 @@ def test_groq_provider_timeout(monkeypatch) -> None:
     patch_timeout(monkeypatch)
 
     with pytest.raises(ProviderTimeoutError):
-        GroqProvider().generate("hello")
+        GroqProvider(model="test-model").generate("hello")

@@ -6,6 +6,7 @@ import yaml
 
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import RateLimitError
+from src.llm.model_registry import resolve_model_config
 from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 from src.llm.usage_logger import log_llm_call
 
@@ -47,14 +48,11 @@ class FakeProvider(LLMProvider):
 def test_llm_routing_yaml_has_valid_agent_configs() -> None:
     config = yaml.safe_load(Path("configs/llm_routing.yaml").read_text(encoding="utf-8"))
 
-    assert config["default"]["provider"]
-    assert config["default"]["model"]
+    assert resolve_model_config(config["default"])["model"]
     for agent_config in config["agents"].values():
-        assert agent_config["provider"]
-        assert agent_config["model"]
+        assert resolve_model_config(agent_config)["model"]
         if "fallback" in agent_config:
-            assert agent_config["fallback"]["provider"]
-            assert agent_config["fallback"]["model"]
+            assert resolve_model_config(agent_config["fallback"])["model"]
 
 
 def test_router_instantiates_configured_provider(monkeypatch) -> None:
@@ -69,7 +67,7 @@ def test_router_instantiates_configured_provider(monkeypatch) -> None:
     provider = get_llm_for_agent("stylist")
 
     assert isinstance(provider, ConfiguredLLMProvider)
-    assert created[0] == ("gemini", "gemini-2.5-flash")
+    assert created[0] == ("gemini", "gemini-3.6-flash")
 
 
 def test_router_uses_fallback_on_rate_limit() -> None:
@@ -98,7 +96,7 @@ def test_usage_logger_writes_jsonl() -> None:
     log_llm_call(
         agent="stylist",
         provider="gemini",
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         input_tokens=12,
         output_tokens=8,
         latency_ms=2300,

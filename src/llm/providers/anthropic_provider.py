@@ -9,7 +9,9 @@ from src.llm.exceptions import ProviderUnavailableError
 class AnthropicProvider(LLMProvider):
     provider_name = "anthropic"
 
-    def __init__(self, model: str = "claude-3-5-haiku-latest") -> None:
+    def __init__(self, model: str) -> None:
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
 
     def generate(

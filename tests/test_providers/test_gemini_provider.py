@@ -29,7 +29,7 @@ def test_gemini_provider_rate_limit(monkeypatch) -> None:
     patch_http_error(monkeypatch, 429)
 
     with pytest.raises(RateLimitError):
-        GeminiProvider().generate("hello")
+        GeminiProvider(model="test-model").generate("hello")
 
 
 def test_gemini_provider_auth_error(monkeypatch) -> None:
@@ -37,7 +37,7 @@ def test_gemini_provider_auth_error(monkeypatch) -> None:
     patch_http_error(monkeypatch, 401)
 
     with pytest.raises(AuthError):
-        GeminiProvider().generate("hello")
+        GeminiProvider(model="test-model").generate("hello")
 
 
 def test_gemini_provider_timeout(monkeypatch) -> None:
@@ -45,4 +45,4 @@ def test_gemini_provider_timeout(monkeypatch) -> None:
     patch_timeout(monkeypatch)
 
     with pytest.raises(ProviderTimeoutError):
-        GeminiProvider().generate("hello")
+        GeminiProvider(model="test-model").generate("hello")

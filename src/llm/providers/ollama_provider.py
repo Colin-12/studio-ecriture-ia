@@ -17,12 +17,14 @@ class OllamaProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "qwen2.5:3b",
+        model: str,
         base_url: str | None = None,
         num_predict: int | None = None,
         keep_alive: str | None = None,
     ) -> None:
         load_dotenv()
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
         self.base_url = (base_url or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
         self.num_predict = num_predict

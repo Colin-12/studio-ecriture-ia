@@ -12,7 +12,7 @@ Chaque chapitre passe par un graphe de débat LangGraph :
 4. **Avocat du Diable** et **Visionnaire** challengent le brief en parallèle.
 5. **Gardien de l'Émotion** vérifie la cohérence émotionnelle.
 6. **Architecte** arbitre et produit le brief final.
-7. **Styliste** (Gemini 2.5 Flash) rédige la prose.
+7. **Styliste** (Gemini 3.6 Flash) rédige la prose.
 8. **Éditeur** note et déclenche une révision si le score < 3/5.
 
 Les `hard_constraints` extraites à l'étape 1 sont injectées dans tous les prompts : les agents créatifs peuvent enrichir la zone libre, jamais modifier le contrat narratif.
@@ -34,13 +34,52 @@ Mémoire composite
   NetworkX  — graphe de cohérence narratif
 ```
 
-**Routing LLM validé par benchmark** (3 briefs, 2 lecteurs indépendants) :
+## Routing LLM
 
-| Modèle | Score | Usage |
-|--------|-------|-------|
-| Gemini 2.5 Flash | 4.6/5 | Prose (stylist, editor, architect) |
-| Groq Llama 3.3 70B | 2.9/5 | Challenge (devil, visionary, continuity) |
-| Ollama qwen2.5:3b | 1.2/5 | JSON uniquement (event_extractor) |
+`configs/model_registry.yaml` centralise les modèles, les niveaux de réflexion Gemini
+et les quotas par modèle (tokens par minute et par jour). Les agents et leurs fallbacks
+dans `configs/llm_routing.yaml` et `configs/llm_profiles/*.yaml` utilisent des rôles :
+
+| Rôle | Provider | Modèle | Usage |
+|------|----------|--------|-------|
+| prose | Gemini | gemini-3.6-flash | Styliste, émotion, édition |
+| planner | Gemini | gemini-3.6-flash | Architectes de scène, chapitre et récit |
+| structured | Groq | openai/gpt-oss-120b | Contrats, rythme, évaluation |
+| fast_critique | Groq | openai/gpt-oss-120b | Challenge et continuité |
+| light_json | Groq | openai/gpt-oss-20b | Beta reader et fallback extraction |
+| local_json | Ollama | qwen2.5:3b | Extraction locale |
+| gemini_fast | Gemini | gemini-3.6-flash | Analyse rapide dans gemini_only |
+
+```yaml
+agents:
+  stylist:
+    role: prose
+    max_tokens: 6000
+    fallback:
+      role: structured
+```
+
+Les blocs explicites `provider` + `model` restent compatibles, ainsi que les overrides CLI.
+Les profils `free_only` et `mixed_budget` utilisent Gemini/Groq avec extraction locale ;
+`local_only` utilise exclusivement Ollama ; `gemini_only` conserve l'extraction locale
+avec fallback Gemini. Ces noms de profils ne garantissent pas la gratuité des comptes.
+
+Gemini 3.x utilise `thinking_level` du registre (`medium`, `low` pour `gemini_fast`).
+La température YAML reste acceptée et est ignorée avec un avertissement unique par modèle.
+GPT-OSS fournit uniquement son contenu final au pipeline ; le mode JSON object est conservé.
+Les quotas sont modifiables dans le registre ; `null` signifie illimité. Le compteur journalier
+se réinitialise à minuit UTC et prévient à 80 %. Les compteurs vivent dans le processus
+et repartent à zéro au redémarrage ; ils ne remplacent pas le suivi du compte fournisseur.
+
+Vérifier les catalogues sans générer de texte :
+
+```bash
+python scripts/check_models.py
+```
+
+Le contrôle affiche `OK`, `MANQUANT` ou `NON VÉRIFIÉ` (clé absente / catalogue inaccessible).
+Il retourne un code non nul si un modèle est confirmé manquant. Les anciens scores de benchmark
+ne constituent pas une validation des nouveaux modèles ; relancer `scripts/benchmark_stylist.py`.
 
 ## Interface
 
@@ -91,16 +130,16 @@ Chaque appel LLM est journalisé dans `logs/llm_usage.jsonl`.
 | Composant | Rôle |
 |-----------|------|
 | LangGraph >= 0.2 | Orchestration du graphe de débat avec état |
-| Gemini 2.5 Flash | Prose et arbitrage (Google AI Studio) |
-| Groq Llama 3.3 70B | Agents de challenge (vitesse, coût nul) |
+| Gemini 3.6 Flash | Prose et arbitrage (Google AI Studio) |
+| Groq GPT-OSS 120B | Agents de challenge (vitesse, coût nul) |
 | ChromaDB | Recherche sémantique par roman |
 | SQLite + SQLAlchemy | Mémoire structurée (romans, chapitres, events) |
 | NetworkX | Graphe de cohérence narrative |
 | Streamlit | Interface utilisateur |
 | YAML routing | Configuration par agent et par profil LLM |
 
-Profils LLM disponibles : `mixed_budget`, `free_only`, `local_only`.  
-Rate limiting token-bucket intégré (Groq : 5 500 TPM).
+Profils LLM disponibles : `mixed_budget`, `free_only`, `local_only`, `gemini_only`.
+Limites par modèle configurées dans le registre, par minute et par jour.
 
 ## Tests
 
@@ -108,14 +147,14 @@ Rate limiting token-bucket intégré (Groq : 5 500 TPM).
 pytest -q --ignore=tests/test_cli.py
 ```
 
-151 tests — ruff + mypy clean sur 75 fichiers sources.
+Vérifications : `ruff check src/ tests/ scripts/`, `mypy src/` et la suite pytest ci-dessus.
 
 ## Roadmap
 
 **Fait**
 
 - Mémoire narrative composite : ChromaDB + SQLite + NetworkX
-- Continuiste enrichi et Styliste Gemini 2.5 Flash
+- Continuiste enrichi et Styliste Gemini 3.6 Flash
 - Graphe de débat LangGraph validé avec vrais appels API
 - Benchmark Styliste documenté (3 briefs, blind review)
 - Interface Streamlit wizard 4 étapes

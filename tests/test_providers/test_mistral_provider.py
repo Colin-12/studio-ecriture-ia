@@ -29,7 +29,7 @@ def test_mistral_provider_rate_limit(monkeypatch) -> None:
     patch_http_error(monkeypatch, 429)
 
     with pytest.raises(RateLimitError):
-        MistralProvider().generate("hello")
+        MistralProvider(model="test-model").generate("hello")
 
 
 def test_mistral_provider_auth_error(monkeypatch) -> None:
@@ -37,7 +37,7 @@ def test_mistral_provider_auth_error(monkeypatch) -> None:
     patch_http_error(monkeypatch, 403)
 
     with pytest.raises(AuthError):
-        MistralProvider().generate("hello")
+        MistralProvider(model="test-model").generate("hello")
 
 
 def test_mistral_provider_timeout(monkeypatch) -> None:
@@ -45,4 +45,4 @@ def test_mistral_provider_timeout(monkeypatch) -> None:
     patch_timeout(monkeypatch)
 
     with pytest.raises(ProviderTimeoutError):
-        MistralProvider().generate("hello")
+        MistralProvider(model="test-model").generate("hello")

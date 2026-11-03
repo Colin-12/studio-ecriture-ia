@@ -21,7 +21,7 @@ def test_huggingface_provider_rate_limit(monkeypatch) -> None:
     patch_http_error(monkeypatch, 429)
 
     with pytest.raises(RateLimitError):
-        HuggingFaceProvider().generate("hello")
+        HuggingFaceProvider(model="test-model").generate("hello")
 
 
 def test_huggingface_provider_auth_error(monkeypatch) -> None:
@@ -29,7 +29,7 @@ def test_huggingface_provider_auth_error(monkeypatch) -> None:
     patch_http_error(monkeypatch, 401)
 
     with pytest.raises(AuthError):
-        HuggingFaceProvider().generate("hello")
+        HuggingFaceProvider(model="test-model").generate("hello")
 
 
 def test_huggingface_provider_timeout(monkeypatch) -> None:
@@ -37,4 +37,4 @@ def test_huggingface_provider_timeout(monkeypatch) -> None:
     patch_timeout(monkeypatch)
 
     with pytest.raises(ProviderTimeoutError):
-        HuggingFaceProvider().generate("hello")
+        HuggingFaceProvider(model="test-model").generate("hello")

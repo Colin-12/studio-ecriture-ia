@@ -16,8 +16,10 @@ class MistralProvider(LLMProvider):
     provider_name = "mistral"
     api_url = "https://api.mistral.ai/v1/chat/completions"
 
-    def __init__(self, model: str = "mistral-small-latest") -> None:
+    def __init__(self, model: str) -> None:
         load_dotenv()
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
         self.api_key = os.getenv("MISTRAL_API_KEY")
 

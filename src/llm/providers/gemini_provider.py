@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 from urllib.parse import quote
@@ -12,14 +13,22 @@ from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import InvalidProviderResponseError
 from src.llm.providers._http import post_json
 
+logger = logging.getLogger(__name__)
+_temperature_warned: set[str] = set()
+
 
 class GeminiProvider(LLMProvider):
     provider_name = "gemini"
 
-    def __init__(self, model: str = "gemini-2.5-flash") -> None:
+    def __init__(self, model: str, thinking_level: str = "medium") -> None:
         load_dotenv()
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
-        self.api_key = os.getenv("GOOGLE_API_KEY")
+        if thinking_level not in {"minimal", "low", "medium", "high"}:
+            raise ValueError(f"Invalid Gemini thinking_level: {thinking_level}")
+        self.thinking_level = thinking_level
+        self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
     def generate(
         self,
@@ -37,6 +46,12 @@ class GeminiProvider(LLMProvider):
                 "maxOutputTokens": max_tokens,
             },
         }
+        if self.model.startswith("gemini-3"):
+            payload["generationConfig"].pop("temperature")
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingLevel": self.thinking_level}
+            if self.model not in _temperature_warned:
+                logger.warning("Temperature ignored for %s; using thinking_level=%s.", self.model, self.thinking_level)
+                _temperature_warned.add(self.model)
         if system:
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         if response_format == "json":
@@ -58,7 +73,10 @@ class GeminiProvider(LLMProvider):
 
 def _parse_response(data: dict[str, Any]) -> tuple[str, int | None, int | None]:
     try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        parts = data["candidates"][0]["content"]["parts"]
+        text = "".join(part["text"] for part in parts if not part.get("thought") and isinstance(part.get("text"), str))
+        if not text:
+            raise InvalidProviderResponseError("Gemini response is missing final text.")
     except (KeyError, IndexError, TypeError) as exc:
         raise InvalidProviderResponseError("Gemini response is missing text.") from exc
     raw_usage = data.get("usageMetadata")

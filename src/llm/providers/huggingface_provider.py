@@ -16,8 +16,10 @@ from src.llm.providers._http import post_json
 class HuggingFaceProvider(LLMProvider):
     provider_name = "huggingface"
 
-    def __init__(self, model: str = "mistralai/Mistral-7B-Instruct-v0.3") -> None:
+    def __init__(self, model: str) -> None:
         load_dotenv()
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
         self.api_key = os.getenv("HF_API_KEY")
 

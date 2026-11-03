@@ -8,7 +8,9 @@ from src.llm.base import LLMProvider, LLMResponse
 class MockProvider(LLMProvider):
     provider_name = "mock"
 
-    def __init__(self, model: str = "mock") -> None:
+    def __init__(self, model: str) -> None:
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
 
     def generate(

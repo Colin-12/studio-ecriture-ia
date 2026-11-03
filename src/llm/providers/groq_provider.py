@@ -22,8 +22,10 @@ class GroqProvider(LLMProvider):
     provider_name = "groq"
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    def __init__(self, model: str = "llama-3.3-70b-versatile") -> None:
+    def __init__(self, model: str) -> None:
         load_dotenv()
+        if not model or not model.strip():
+            raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
         self.api_key = os.getenv("GROQ_API_KEY")
 
@@ -103,6 +105,7 @@ class GroqProvider(LLMProvider):
 
 
 def _parse_openai_compatible(data: dict[str, Any]) -> tuple[str, int | None, int | None]:
+    """Read final content only; GPT-OSS message.reasoning is never prose or JSON."""
     try:
         text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
