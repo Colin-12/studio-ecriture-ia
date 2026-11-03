@@ -25,3 +25,15 @@ class ProviderTimeoutError(ProviderUnavailableError):
 
 class InvalidProviderResponseError(LLMError):
     """Raised when a provider returns an unexpected response payload."""
+
+    def __init__(
+        self, message: str, *, failure_reason: str | None = None,
+        finish_reason: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.failure_reason = failure_reason
+        self.finish_reason = finish_reason
+
+
+class EmptyProviderResponseError(InvalidProviderResponseError):
+    """Raised when a provider returns no usable candidate, including blocked text."""

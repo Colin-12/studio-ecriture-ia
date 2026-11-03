@@ -18,6 +18,7 @@ class LLMResponse:
     raw: dict[str, Any] | None
     finish_reason: str | None = None
     reasoning_tokens: int | None = None
+    fallback_used: bool = False
 
 
 class LLMProvider(ABC):

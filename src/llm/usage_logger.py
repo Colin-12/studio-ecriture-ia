@@ -22,6 +22,7 @@ def log_llm_call(
     log_path: str | Path | None = None,
     finish_reason: str | None = None,
     reasoning_tokens: int | None = None,
+    failure_reason: str | None = None,
 ) -> None:
     """Append one structured provider-call record to the usage log."""
     path = Path(log_path if log_path is not None else os.getenv("LLM_USAGE_LOG", str(DEFAULT_USAGE_LOG_PATH)))
@@ -38,6 +39,7 @@ def log_llm_call(
         "output_tokens": output_tokens,
         "finish_reason": finish_reason,
         "reasoning_tokens": reasoning_tokens,
+        "failure_reason": failure_reason,
         "latency_ms": latency_ms,
         "success": success,
         "error": error,

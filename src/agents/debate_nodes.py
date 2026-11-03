@@ -325,10 +325,25 @@ def _without_overlap(previous: str, continuation: str) -> str:
     return continuation.strip()
 
 
-def _generate_stylist(state: DebateState, prompt: str, scene_number: int) -> str:
+def _generate_stylist(
+    state: DebateState, prompt: str, scene_number: int,
+    *, scene_usage: list[LLMResponse] | None = None,
+) -> str:
     """Retry truncated prose once with twice the total completion budget."""
     llm = get_llm_for_agent("stylist", profile=state.get("llm_profile", "default"))
+
+    def record_source(result: object) -> None:
+        if isinstance(result, LLMResponse):
+            if scene_usage is not None:
+                scene_usage.append(result)
+            if result.fallback_used:
+                logger.warning(
+                    "stylist scene=%s fallback_used provider=%s model=%s; fallback prose has not been compared with the primary model's prose.",
+                    scene_number, result.provider, result.model,
+                )
+
     response = llm.generate(prompt=prompt)
+    record_source(response)
     if not isinstance(response, LLMResponse):
         return str(response).strip()
     if response.finish_reason != "MAX_TOKENS":
@@ -347,6 +362,7 @@ def _generate_stylist(state: DebateState, prompt: str, scene_number: int) -> str
     retry_budget = max(1, total * 2 - reserve)
     logger.warning("stylist scene=%s MAX_TOKENS; retrying once with doubled completion budget.", scene_number)
     response = llm.generate(prompt=prompt, max_tokens=retry_budget)
+    record_source(response)
     text = response.text.strip() if isinstance(response, LLMResponse) else str(response).strip()
     if isinstance(response, LLMResponse) and response.finish_reason == "MAX_TOKENS":
         text = _complete_sentences(text)
@@ -424,7 +440,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         _compact_json(state.get("continuity_report", {})),
     ]
 
-    prose = _generate_stylist(state, "\n".join(parts), scene["scene_number"])
+    scene_usage: list[LLMResponse] = []
+    prose = _generate_stylist(state, "\n".join(parts), scene["scene_number"], scene_usage=scene_usage)
 
     # Continuation loop for long scenes (≤ 500 words: no continuation)
     if estimated_words > 500:
@@ -444,7 +461,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "Continue directement, même registre, même voix.",
                 f"Objectif : encore {mots_restants} mots environ.",
             ])
-            continuation = _generate_stylist(state, continuation_prompt, scene["scene_number"])
+            continuation = _generate_stylist(state, continuation_prompt, scene["scene_number"], scene_usage=scene_usage)
             continuation = _without_overlap(prose, continuation)
             if not continuation:
                 break
@@ -458,6 +475,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "prose": prose,
                 "word_count": len(words),
                 "last_words": " ".join(words[-150:]),
+                "fallback_used": any(response.fallback_used for response in scene_usage),
+                "model": scene_usage[-1].model if scene_usage else "",
+                "fallback_models": list(dict.fromkeys(response.model for response in scene_usage if response.fallback_used)),
             }
         ]
     }

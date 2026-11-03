@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,11 @@ import yaml
 from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
-from src.llm.exceptions import ProviderUnavailableError, RateLimitError
+from src.llm.exceptions import (
+    InvalidProviderResponseError,
+    ProviderUnavailableError,
+    RateLimitError,
+)
 from src.llm.model_registry import resolve_model_config
 from src.llm.rate_limiter import get_rate_limiter
 from src.llm.registry import create_provider
@@ -18,6 +23,7 @@ from src.llm.usage_logger import log_llm_call
 
 DEFAULT_ROUTING_PATH = Path("configs/llm_routing.yaml")
 PROFILE_DIR = Path("configs/llm_profiles")
+logger = logging.getLogger(__name__)
 
 
 class ConfiguredLLMProvider(LLMProvider):
@@ -57,15 +63,25 @@ class ConfiguredLLMProvider(LLMProvider):
             "timeout": int(self.config.get("timeout", timeout)),
         }
         try:
-            return self._generate_and_log(
-                self.primary,
-                prompt,
-                system,
-                primary_config,
-            )
-        except (RateLimitError, ProviderUnavailableError):
+            try:
+                return self._generate_and_log(self.primary, prompt, system, primary_config)
+            except InvalidProviderResponseError as exc:
+                logger.warning(
+                    "%s provider=%s invalid response; retrying once after 2 seconds: %s",
+                    self.agent_name, getattr(self.primary, "provider_name", type(self.primary).__name__), exc,
+                )
+                time.sleep(2)
+                return self._generate_and_log(self.primary, prompt, system, primary_config)
+        except (RateLimitError, ProviderUnavailableError, InvalidProviderResponseError) as exc:
             if self.fallback is None:
+                logger.warning("%s provider=%s failed; no fallback configured: %s", self.agent_name,
+                               getattr(self.primary, "provider_name", type(self.primary).__name__), exc)
                 raise
+            logger.warning(
+                "%s provider=%s failed; using fallback provider=%s model=%s: %s",
+                self.agent_name, getattr(self.primary, "provider_name", type(self.primary).__name__),
+                getattr(self.fallback, "provider_name", type(self.fallback).__name__), self.fallback.model, exc,
+            )
             fallback_config = {
                 "max_tokens": _as_int(
                     self.fallback_config.get("max_tokens"),
@@ -81,12 +97,14 @@ class ConfiguredLLMProvider(LLMProvider):
                     _as_int(primary_config["timeout"], timeout),
                 ),
             }
-            return self._generate_and_log(
+            response = self._generate_and_log(
                 self.fallback,
                 prompt,
                 system,
                 fallback_config,
             )
+            response.fallback_used = True
+            return response
 
     def _generate_and_log(
         self,
@@ -125,6 +143,8 @@ class ConfiguredLLMProvider(LLMProvider):
                 latency_ms=int((time.perf_counter() - started_at) * 1000),
                 success=False,
                 error=str(exc),
+                failure_reason=getattr(exc, "failure_reason", None),
+                finish_reason=getattr(exc, "finish_reason", None),
             )
             raise
         log_llm_call(
