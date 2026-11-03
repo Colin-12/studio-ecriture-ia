@@ -15,6 +15,13 @@ from src.llm.router import get_llm_for_agent
 
 logger = logging.getLogger(__name__)
 
+
+def _warn_json_fallback(agent: str, raw: str, error: Exception) -> None:
+    logger.warning(
+        "%s JSON response failed; using fallback | response_length=%d | response[:200]=%r | error=%s",
+        agent, len(raw), raw[:200], error,
+    )
+
 _CONTRACT_SYSTEM = (
     "Tu es un parseur de brief narratif expert. Depuis un brief utilisateur libre, "
     "tu extrais deux catégories :\n"
@@ -84,6 +91,7 @@ def contract_parser_node(state: DebateState) -> dict[str, Any]:
         ]
     )
     llm = get_llm_for_agent("contract_parser", profile=state.get("llm_profile", "default"))
+    raw = ""
     try:
         response = llm.generate(prompt=user_prompt, system=_CONTRACT_SYSTEM, response_format="json")
         raw = response.text if isinstance(response, LLMResponse) else str(response)
@@ -94,7 +102,8 @@ def contract_parser_node(state: DebateState) -> dict[str, Any]:
             hard = {}
         if not isinstance(creative, dict):
             creative = {}
-    except (json.JSONDecodeError, Exception):
+    except Exception as exc:
+        _warn_json_fallback("contract_parser", raw, exc)
         hard = _default_hard_constraints(state)
         creative = _default_creative_directives(state)
 
@@ -507,11 +516,8 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
             if not _CHAPTER_PLAN_FIELDS.issubset(s.keys()):
                 raise ValueError("missing fields")
         return {"chapter_plan": scenes, "current_scene_index": 0}
-    except (json.JSONDecodeError, Exception) as e:
-        logger.warning(
-            "chapter_architect JSON parse failed: %s | raw[:200]: %s",
-            e, raw[:200],
-        )
+    except Exception as exc:
+        _warn_json_fallback("chapter_architect", raw, exc)
         return {"chapter_plan": _default_chapter_plan(state), "current_scene_index": 0}
 
 
@@ -535,6 +541,7 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
         '{"scenes": [...]}',
     ])
     llm = get_llm_for_agent("rhythm_guardian", profile=state.get("llm_profile", "default"))
+    raw = ""
     try:
         response = llm.generate(
             prompt=user_prompt,
@@ -546,8 +553,9 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
         scenes = parsed.get("scenes", [])
         if scenes and isinstance(scenes, list):
             return {"chapter_plan": scenes}
-    except Exception:
-        pass
+        raise ValueError("missing or invalid scenes")
+    except Exception as exc:
+        _warn_json_fallback("rhythm_guardian", raw, exc)
     return {}
 
 

@@ -10,7 +10,11 @@ from typing import Any
 from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
-from src.llm.exceptions import AuthError, InvalidProviderResponseError
+from src.llm.exceptions import (
+    AuthError,
+    InvalidProviderResponseError,
+    ProviderUnavailableError,
+)
 from src.llm.providers._http import post_json
 
 logger = logging.getLogger(__name__)
@@ -22,12 +26,29 @@ class GroqProvider(LLMProvider):
     provider_name = "groq"
     api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    def __init__(self, model: str) -> None:
+    def __init__(
+        self,
+        model: str,
+        reasoning_effort: str | None = None,
+        min_completion_tokens: int = 0,
+    ) -> None:
         load_dotenv()
         if not model or not model.strip():
             raise ValueError("A model must be supplied by the registry or configuration.")
         self.model = model
+        if reasoning_effort not in {None, "low", "medium", "high"}:
+            raise ValueError(f"Invalid Groq reasoning_effort: {reasoning_effort}")
+        if min_completion_tokens < 0:
+            raise ValueError("min_completion_tokens must be non-negative.")
+        self.reasoning_effort = reasoning_effort
+        self.min_completion_tokens = min_completion_tokens
         self.api_key = os.getenv("GROQ_API_KEY")
+
+    def completion_token_limit(self, max_tokens: int) -> int:
+        """Include the configured reasoning budget for GPT-OSS roles."""
+        if self.model.startswith("openai/gpt-oss-"):
+            return max(max_tokens, self.min_completion_tokens)
+        return max_tokens
 
     def generate(
         self,
@@ -45,12 +66,29 @@ class GroqProvider(LLMProvider):
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": self.completion_token_limit(max_tokens),
             "temperature": temperature,
         }
         if response_format == "json":
             payload["response_format"] = {"type": "json_object"}
-        data, latency_ms = self._post_json_with_cloudflare_retry(payload, timeout)
+        is_reasoning_model = self.model.startswith("openai/gpt-oss-")
+        if is_reasoning_model and self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
+        started_at = time.perf_counter()
+        try:
+            data, latency_ms = self._post_json_with_cloudflare_retry(payload, timeout)
+        except ProviderUnavailableError as exc:
+            message = str(exc).lower()
+            if not (is_reasoning_model and response_format == "json"
+                    and "json_validate_failed" in message and "max completion tokens" in message):
+                raise
+            retry_payload = {**payload, "max_completion_tokens": payload["max_completion_tokens"] * 2}
+            logger.warning(
+                "Groq %s JSON validation exhausted completion tokens; retrying once with max_completion_tokens=%s (was %s).",
+                self.model, retry_payload["max_completion_tokens"], payload["max_completion_tokens"],
+            )
+            data, latency_ms = self._post_json_with_cloudflare_retry(retry_payload, timeout)
+            latency_ms = int((time.perf_counter() - started_at) * 1000)
         if not isinstance(data, dict):
             raise InvalidProviderResponseError("Groq response must be a JSON object.")
         text, input_tokens, output_tokens = _parse_openai_compatible(data)

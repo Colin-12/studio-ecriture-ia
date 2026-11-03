@@ -10,12 +10,18 @@ roles:
   structured:
     provider: groq
     model: openai/gpt-oss-120b
+    reasoning_effort: low
+    min_completion_tokens: 2500
   fast_critique:
     provider: groq
     model: openai/gpt-oss-120b
+    reasoning_effort: low
+    min_completion_tokens: 1500
   light_json:
     provider: groq
     model: openai/gpt-oss-20b
+    reasoning_effort: low
+    min_completion_tokens: 1500
   local_json:
     provider: ollama
     model: qwen2.5:3b
