@@ -36,6 +36,9 @@ def normalize_chapter_plan(plan: object) -> list[Any]:
             normalized.append(original)
             continue
         scene = dict(original)
+        for field in ("lieu", "moment"):
+            value = scene.get(field)
+            scene[field] = " ".join(value.split()[:8]) if isinstance(value, str) else ""
         scene["scene_number"] = index
         words = scene.get("estimated_words")
         if isinstance(words, str):

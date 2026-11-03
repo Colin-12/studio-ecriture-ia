@@ -71,3 +71,8 @@ agents:
     temperature: 0.6
     max_tokens: 300
     role: local_json
+  scene_state:
+    role: local_json
+    max_tokens: 400
+    temperature: 0.1
+    response_format: json

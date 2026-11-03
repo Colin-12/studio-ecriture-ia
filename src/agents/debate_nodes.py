@@ -18,6 +18,7 @@ from src.agents.plan_validation import (
     repair_chapter_plan,
     validate_chapter_plan,
 )
+from src.agents.scene_state import extract_scene_state
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 
@@ -389,26 +390,52 @@ def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[
         "Décris uniquement ce qui se passe dans cette scène. L'objectif et l'émotion ci-dessus "
         "priment sur les suggestions du micro-brief ; ne raconte pas le chapitre entier.",
     ])]
+    blocks.append("\n".join([
+        "Lieu et moment prévus pour cette scène",
+        f"Lieu : {scene.get('lieu') or 'non précisé, conserver le lieu précédent'}",
+        f"Moment : {scene.get('moment') or 'non précisé, poursuivre la chronologie précédente'}",
+    ]))
     if idx:
+        drafted = state.get("scenes_drafted") or []
+        end_state = (drafted[-1].get("end_state") or {}) if drafted else {}
+        blocks.append("\n".join([
+            "État à la fin de la scène précédente (à respecter)",
+            json.dumps(end_state, ensure_ascii=False),
+            "Si le lieu ou le moment prévu diffère de cet état, signale la transition dans les deux premières phrases "
+            "(aucune téléportation). Un objet garde son état et ne change pas de nom ni de nature d'une scène à l'autre. "
+            "Ne raconte pas à nouveau ce qui figure dans revele ni dans Déjà raconté.",
+        ]))
         previous = ["Déjà raconté (ne pas le raconter à nouveau)"]
         for earlier in plan[:idx]:
+            earlier_draft = next((entry for entry in drafted if entry.get("scene_number") == earlier["scene_number"]), {})
+            ending = _last_sentence(earlier_draft.get("prose") or earlier_draft.get("last_words") or "")
             previous.append(
                 f"Scène {earlier['scene_number']} — {earlier['title']} | Objectif : {earlier['objective']} "
-                f"| Registre émotionnel : {earlier['emotional_beat']}"
+                f"| Registre émotionnel : {earlier['emotional_beat']} | Dernière phrase : {ending}"
             )
-        drafted = state.get("scenes_drafted") or []
         if drafted and drafted[-1].get("last_words"):
             previous.append("Fin de la scène précédente (contexte de transition) :\n" + drafted[-1]["last_words"])
         previous.append(
             "Ne reprends pas la même conclusion émotionnelle (par exemple une réflexion sur la solitude) "
             "à la fin de ta scène, sauf si l'objectif de la scène l'exige. Termine selon la consigne de fin de scène."
         )
+        previous.append("Ne termine pas ta scène sur la même idée ni la même image que ces fins.")
         blocks.append("\n".join(previous))
     if idx < len(plan) - 1:
         future = ["Réservé aux scènes suivantes (ne pas l'anticiper)"]
         future.extend(f"Scène {later['scene_number']} — {later['title']} | Objectif : {later['objective']}" for later in plan[idx + 1:])
         blocks.append("\n".join(future))
     return blocks
+
+
+def _last_sentence(prose: str) -> str:
+    """Return the final sentence, including its closing dialogue punctuation."""
+    text = prose.strip()
+    endings = list(re.finditer(r'''[.!?…]+(?:[ \t]*[»”’"')\]])*(?=\s|$)''', text))
+    if not endings:
+        return text
+    tail = text[endings[-1].end():].strip()
+    return tail or text[endings[-2].end() if len(endings) > 1 else 0:].strip()
 
 
 def _check_scene_prose(prose: str, scene_number: int) -> str:
@@ -512,6 +539,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
 
     prose = _check_scene_prose(prose, scene["scene_number"])
     words = prose.split()
+    previous_scenes = state.get("scenes_drafted") or []
+    previous_end_state = (previous_scenes[-1].get("end_state") or {}) if previous_scenes else {}
+    end_state = extract_scene_state(prose, previous_end_state, profile=state.get("llm_profile", "default"))
     return {
         "scenes_drafted": [
             {
@@ -519,6 +549,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "prose": prose,
                 "word_count": len(words),
                 "last_words": " ".join(words[-150:]),
+                "end_state": end_state,
                 "fallback_used": any(response.fallback_used for response in scene_usage),
                 "model": scene_usage[-1].model if scene_usage else "",
                 "fallback_models": list(dict.fromkeys(response.model for response in scene_usage if response.fallback_used)),
@@ -586,6 +617,8 @@ _CHAPTER_PLAN_FORMAT = """\
       "title": "string",
       "objective": "string — ce que cette scène accomplit",
       "emotional_beat": "string — état émotionnel dominant",
+      "lieu": "string — 8 mots maximum, facultatif",
+      "moment": "string — 8 mots maximum, facultatif",
       "estimated_words": 600,
       "pacing": "slow|medium|fast|cut",
       "style_directive": "string — ex: dialogue dense, flux de conscience",
@@ -639,6 +672,8 @@ def chapter_architect_node(
         "- Chaque objectif couvre uniquement les événements de cette scène ; ne répète pas un événement dans plusieurs scènes.",
         "- Les scènes suivent l'ordre du récit : un événement ne doit pas être annoncé comme accompli avant la scène qui le montre.",
         "- emotional_beat : maximum 8 mots",
+        "- lieu et moment : facultatifs, 8 mots maximum chacun.",
+        "- Chaque scène commence là où la précédente s'est terminée, sauf changement de lieu ou de moment indiqué dans ces deux champs.",
         "- style_directive : maximum 10 mots",
         "- ends_on : un seul mot parmi : hook, ambiguous, resolution, cut, cliffhanger",
         "- Varie le pacing : ne jamais mettre le même pacing deux fois de suite.",
@@ -801,6 +836,8 @@ def _default_chapter_plan(state: DebateState) -> list[dict]:
             "title": title,
             "objective": f"{objective} : {brief}",
             "emotional_beat": state.get("tone") or "tension",
+            "lieu": "",
+            "moment": "",
             "estimated_words": words,
             "pacing": pacing,
             "style_directive": "prose narrative",

@@ -91,3 +91,10 @@ agents:
     temperature: 0.6
     max_tokens: 300
     role: fast_critique
+  scene_state:
+    role: fast_critique
+    max_tokens: 400
+    temperature: 0.1
+    response_format: json
+    fallback:
+      role: gemini_fast

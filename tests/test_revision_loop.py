@@ -20,6 +20,7 @@ def revision_environment(monkeypatch):
 
 
 def _run(monkeypatch, scores):
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
     counts = {"planner": 0, "editor": 0, "stylist": 0, "revise": 0, "arbitrate": 0}
     plans = []
     prompts = []

@@ -3,6 +3,13 @@ default:
   max_tokens: 1000
   role: structured
 agents:
+  scene_state:
+    role: fast_critique
+    max_tokens: 400
+    temperature: 0.1
+    response_format: json
+    fallback:
+      role: gemini_fast
   contract_parser:
     temperature: 0.1
     max_tokens: 600

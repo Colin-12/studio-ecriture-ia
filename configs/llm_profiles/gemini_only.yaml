@@ -73,3 +73,8 @@ agents:
     max_tokens: 600
     response_format: json
     role: gemini_fast
+  scene_state:
+    role: gemini_fast
+    max_tokens: 400
+    temperature: 0.1
+    response_format: json

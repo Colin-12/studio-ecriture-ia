@@ -14,6 +14,7 @@ from src.agents.debate_nodes import (
     stylist_node,
 )
 from src.agents.debate_state import DebateState
+from src.agents.plan_validation import normalize_chapter_plan
 from src.llm.base import LLMResponse
 
 
@@ -424,7 +425,7 @@ def test_rhythm_guardian_detects_and_corrects_monotone_pacing(monkeypatch) -> No
     result = rhythm_guardian_node(state)
 
     assert "chapter_plan" in result
-    assert result["chapter_plan"] == corrected_plan
+    assert result["chapter_plan"] == normalize_chapter_plan(corrected_plan)
 
 
 def test_should_continue_scenes_routing() -> None:
@@ -462,6 +463,7 @@ def test_chapter_assembler_cut_separator_and_draft_equality() -> None:
 def test_stylist_node_includes_last_words_in_prompt(monkeypatch) -> None:
     """stylist_node passes last_words from previous scene into the LLM prompt."""
     import src.agents.debate_nodes as nodes_module
+    monkeypatch.setattr(nodes_module, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
 
     captured_prompt: list[str] = []
 

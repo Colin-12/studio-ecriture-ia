@@ -68,6 +68,6 @@ class DebateState(TypedDict):
     scenes_drafted: Annotated[list[dict], accumulate_scenes]
     # Scènes générées, accumulées :
     # {"scene_number": int, "prose": str, "word_count": int,
-    #  "last_words": str}  # 150 derniers mots pour transitions
+    #  "last_words": str, "end_state": dict}  # État physique/narratif hors prose.
 
     chapter_assembled: str  # chapitre complet assemblé

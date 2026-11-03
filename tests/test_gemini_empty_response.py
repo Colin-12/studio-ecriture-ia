@@ -148,6 +148,7 @@ def test_exhausted_retry_without_fallback_raises_original(monkeypatch):
 
 
 def test_scene_records_fallback_model_and_comparison_warning(monkeypatch, caplog):
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
     llm, _ = _router(monkeypatch, [EmptyProviderResponseError("empty"), EmptyProviderResponseError("empty")])
     monkeypatch.setattr(debate_nodes, "get_llm_for_agent", lambda *a, **kw: llm)
     state = cast(DebateState, {

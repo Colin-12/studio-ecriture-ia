@@ -40,6 +40,7 @@ def _state(index=1):
 
 
 def _capture(monkeypatch, state, text="La porte se referma doucement."):
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
     llm = MagicMock()
     llm.generate.return_value = LLMResponse(text, "mock", "mock", None, None, 0, None)
     monkeypatch.setattr(debate_nodes, "get_llm_for_agent", lambda *a, **kw: llm)
@@ -84,7 +85,9 @@ def test_scene_three_contains_both_previous_emotions_and_rule(monkeypatch):
     assert "Registre émotionnel : émerveillement fragile" in previous
     assert EMOTIONAL_RULE in previous
     assert "DERNIERS_MOTS_SCENE_2" in previous
-    assert "DERNIERS_MOTS_SCENE_1" not in previous
+    assert "Dernière phrase : DERNIERS_MOTS_SCENE_1" in previous
+    transition = previous.split("Fin de la scène précédente (contexte de transition) :", 1)[1]
+    assert "DERNIERS_MOTS_SCENE_1" not in transition
 
 
 def test_last_scene_has_no_future_block(monkeypatch):

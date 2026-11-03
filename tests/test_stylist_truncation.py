@@ -19,6 +19,11 @@ from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 from src.llm.usage_logger import log_llm_call
 
 
+@pytest.fixture(autouse=True)
+def mock_scene_state_extraction(monkeypatch):
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
+
+
 def _payload(text="Une phrase complète.", reason="STOP", thinking=5100):
     return {
         "candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": reason}],
