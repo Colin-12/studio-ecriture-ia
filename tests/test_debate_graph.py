@@ -349,7 +349,7 @@ _SAMPLE_PLAN_3 = [
 
 
 def test_chapter_architect_node_produces_valid_plan(monkeypatch) -> None:
-    """chapter_architect_node → 3-scene plan with all required fields."""
+    """chapter_architect_node accepts a valid four-scene plan without retry."""
     import src.agents.debate_nodes as nodes_module
 
     payload = {"scenes": [
@@ -358,12 +358,12 @@ def test_chapter_architect_node_produces_valid_plan(monkeypatch) -> None:
             "title": f"Scène {i}",
             "objective": f"Objectif {i}",
             "emotional_beat": "tension",
-            "estimated_words": 500,
+            "estimated_words": 1000,
             "pacing": "medium",
             "style_directive": "prose narrative",
             "ends_on": "hook",
         }
-        for i in range(1, 4)
+        for i in range(1, 5)
     ]}
     mock_llm = MagicMock()
     mock_llm.generate.return_value = LLMResponse(
@@ -382,7 +382,9 @@ def test_chapter_architect_node_produces_valid_plan(monkeypatch) -> None:
     result = chapter_architect_node(state)
 
     plan = result["chapter_plan"]
-    assert 2 <= len(plan) <= 6
+    assert len(plan) == 4
+    assert sum(scene["estimated_words"] for scene in plan) == 4000
+    assert mock_llm.generate.call_count == 1
     for scene in plan:
         assert _REQUIRED_SCENE_FIELDS.issubset(scene.keys()), f"Missing fields: {_REQUIRED_SCENE_FIELDS - scene.keys()}"
     assert result["current_scene_index"] == 0

@@ -10,7 +10,12 @@ from typing import Any
 
 from src.agents.continuity_agent import run_continuity_check
 from src.agents.debate_state import DebateState
-from src.llm.base import LLMResponse
+from src.agents.plan_validation import (
+    normalize_chapter_plan,
+    repair_chapter_plan,
+    validate_chapter_plan,
+)
+from src.llm.base import LLMProvider, LLMResponse
 from src.llm.router import get_llm_for_agent
 
 logger = logging.getLogger(__name__)
@@ -460,14 +465,16 @@ _RHYTHM_GUARDIAN_SYSTEM = (
     "surprend. Réponds uniquement en JSON valide."
 )
 
-_CHAPTER_PLAN_FIELDS = {
-    "scene_number", "title", "objective", "emotional_beat",
-    "estimated_words", "pacing", "style_directive", "ends_on",
-}
+def chapter_architect_node(
+    state: DebateState,
+    *,
+    retry_invalid: bool = True,
+    provider: LLMProvider | None = None,
+) -> dict[str, Any]:
+    """Validate 4-6 scenes, retry once, then repair without further LLM calls.
 
-
-def chapter_architect_node(state: DebateState) -> dict[str, Any]:
-    """Plan the full chapter as 3-5 scenes before any generation."""
+    Diagnostics can inject a provider and disable the retry to enforce a call budget.
+    """
     brief = state.get("final_brief") or state.get("scene_brief") or state["scene_idea"]
     user_prompt = "\n".join([
         f"Brief du chapitre : {brief}",
@@ -498,38 +505,48 @@ def chapter_architect_node(state: DebateState) -> dict[str, Any]:
         "- Varie le pacing : ne jamais mettre le même pacing deux fois de suite.",
         "- JSON uniquement, aucun texte avant ou après",
     ])
-    llm = get_llm_for_agent("chapter_architect", profile=state.get("llm_profile", "default"))
-    raw = ""
-    try:
-        response = llm.generate(
-            prompt=user_prompt,
-            system=_CHAPTER_ARCHITECT_SYSTEM,
-            response_format="json",
-        )
-        raw = response.text if isinstance(response, LLMResponse) else str(response)
-        logger.debug("chapter_architect raw response: %s", raw[:500])
-        parsed = json.loads(raw)
-        scenes: list[dict] = parsed.get("scenes", [])
-        if not scenes or not isinstance(scenes, list):
-            raise ValueError("empty scenes")
-        for s in scenes:
-            if not _CHAPTER_PLAN_FIELDS.issubset(s.keys()):
-                raise ValueError("missing fields")
-        return {"chapter_plan": scenes, "current_scene_index": 0}
-    except Exception as exc:
-        _warn_json_fallback("chapter_architect", raw, exc)
-        return {"chapter_plan": _default_chapter_plan(state), "current_scene_index": 0}
+    scenes: list[Any] = []
+    prompt = user_prompt
+    for attempt in range(2 if retry_invalid else 1):
+        raw = ""
+        try:
+            llm = provider or get_llm_for_agent("chapter_architect", profile=state.get("llm_profile", "default"))
+            response = llm.generate(
+                prompt=prompt,
+                system=_CHAPTER_ARCHITECT_SYSTEM,
+                response_format="json",
+            )
+            raw = response.text if isinstance(response, LLMResponse) else str(response)
+            parsed = json.loads(raw)
+            candidate = normalize_chapter_plan(parsed.get("scenes") if isinstance(parsed, dict) else parsed)
+            violations = validate_chapter_plan(candidate)
+            if candidate:
+                scenes = candidate
+            if not violations:
+                return {"chapter_plan": candidate, "current_scene_index": 0}
+        except Exception as exc:
+            _warn_json_fallback("chapter_architect", raw, exc)
+            violations = [f"response must be valid chapter-plan JSON: {exc}"]
+        logger.warning("chapter_architect invalid plan (attempt %d): %s", attempt + 1, violations)
+        prompt = user_prompt + "\n\nVIOLATIONS EXACTES À CORRIGER :\n" + "\n".join(
+            f"- {violation}" for violation in violations
+        ) + "\nIMPÉRATIF : retourne 4 à 6 scènes, avec une somme des estimated_words entre 3500 et 5000. JSON uniquement."
+    repaired = repair_chapter_plan(scenes, _default_chapter_plan(state))
+    remaining = validate_chapter_plan(repaired)
+    if remaining:
+        logger.warning("chapter_architect retaining repaired plan with violations: %s", remaining)
+    return {"chapter_plan": repaired, "current_scene_index": 0}
 
 
 def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
     """Check chapter plan rhythm variety; correct if monotone."""
-    plan: list[dict] = state.get("chapter_plan") or []
+    plan: list[dict] = normalize_chapter_plan(state.get("chapter_plan") or [])
     if not plan:
         return {}
 
     issues = _detect_rhythm_issues(plan)
     if not issues:
-        return {}
+        return {"chapter_plan": plan}
 
     user_prompt = "\n".join([
         f"Plan de chapitre : {_compact_json(plan)}",
@@ -550,13 +567,13 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
         )
         raw = response.text if isinstance(response, LLMResponse) else str(response)
         parsed = json.loads(raw)
-        scenes = parsed.get("scenes", [])
-        if scenes and isinstance(scenes, list):
+        scenes = normalize_chapter_plan(parsed.get("scenes", []))
+        if scenes and all(isinstance(scene, dict) for scene in scenes):
             return {"chapter_plan": scenes}
         raise ValueError("missing or invalid scenes")
     except Exception as exc:
         _warn_json_fallback("rhythm_guardian", raw, exc)
-    return {}
+    return {"chapter_plan": plan}
 
 
 def scene_challenge_node(state: DebateState) -> dict[str, Any]:
@@ -627,17 +644,25 @@ def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
 
 
 def _default_chapter_plan(state: DebateState) -> list[dict]:
+    beats = [
+        ("Mise en place", "Installer la situation et l'enjeu", 900, "slow", "hook"),
+        ("Complication", "Introduire un obstacle au but des personnages", 1100, "medium", "ambiguous"),
+        ("Confrontation", "Confronter les personnages à un choix décisif", 1200, "fast", "cliffhanger"),
+        ("Conséquences", "Montrer les conséquences du choix", 800, "slow", "resolution"),
+    ]
+    brief = (state.get("final_brief") or state.get("scene_idea") or "Développer le chapitre")[:200]
     return [
         {
-            "scene_number": 1,
-            "title": "Scène unique",
-            "objective": (state.get("final_brief") or state["scene_idea"])[:200],
-            "emotional_beat": state["tone"],
-            "estimated_words": 800,
-            "pacing": "medium",
+            "scene_number": index,
+            "title": title,
+            "objective": f"{objective} : {brief}",
+            "emotional_beat": state.get("tone") or "tension",
+            "estimated_words": words,
+            "pacing": pacing,
             "style_directive": "prose narrative",
-            "ends_on": "resolution",
+            "ends_on": ending,
         }
+        for index, (title, objective, words, pacing, ending) in enumerate(beats, 1)
     ]
 
 

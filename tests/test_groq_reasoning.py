@@ -134,11 +134,13 @@ def test_json_fallback_warning_includes_agent_length_and_preview(monkeypatch, ca
     with caplog.at_level(logging.WARNING):
         result = getattr(debate_nodes, f"{agent}_node")(state)
     assert result is not None
-    [warning] = [record.message for record in caplog.records if "JSON response failed" in record.message]
-    assert agent in warning
-    assert f"response_length={len(raw)}" in warning
-    assert repr(raw[:200]) in warning
-    assert "PRIVATE_TAIL" not in warning
+    warnings = [record.message for record in caplog.records if "JSON response failed" in record.message]
+    assert len(warnings) == (2 if agent == "chapter_architect" else 1)
+    for warning in warnings:
+        assert agent in warning
+        assert f"response_length={len(raw)}" in warning
+        assert repr(raw[:200]) in warning
+        assert "PRIVATE_TAIL" not in warning
 
 
 def test_switching_roles_drops_previous_reasoning_budget():
