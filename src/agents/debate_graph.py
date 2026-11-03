@@ -27,7 +27,8 @@ MAX_REVISION_ROUNDS = 2
 
 def should_revise(state: DebateState) -> Literal["revise", "end"]:
     """Route low-scoring drafts through another debate round."""
-    if state["quality_score"] < 3 and state["revision_round"] < MAX_REVISION_ROUNDS:
+    # 0 means not evaluated: an unavailable score must not trigger a revision.
+    if 0 < state["quality_score"] < 3 and state["revision_round"] < MAX_REVISION_ROUNDS:
         return "revise"
     return "end"
 

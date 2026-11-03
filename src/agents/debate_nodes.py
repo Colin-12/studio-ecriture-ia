@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -475,10 +476,28 @@ def editor_node(state: DebateState) -> dict[str, Any]:
         f"Draft: {state.get('draft', '')}",
         f"Final brief: {state.get('final_brief', '')}",
     ]
-    response = _generate("editor", state, "\n".join(parts))
+    prompt = "\n".join(parts)
+    response = ""
+    score, feedback = 0, ""
+    for attempt in range(2):
+        try:
+            response = _generate("editor", state, prompt)
+        except Exception as exc:
+            logger.warning("editor request failed: %s", exc)
+            response = ""
+        score, feedback = parse_editor_response(response)
+        if score:
+            break
+        if attempt == 0:
+            prompt += '\nRéponds uniquement par {"score": <1-5>, "feedback": "<phrase>"}'
+    if score == 0:
+        logger.warning(
+            "editor score unavailable after one retry | response_length=%d | response[:200]=%r",
+            len(response), response[:200],
+        )
     return {
-        "quality_score": _parse_quality_score(response),
-        "quality_feedback": response,
+        "quality_score": score,
+        "quality_feedback": feedback,
     }
 
 
@@ -821,10 +840,48 @@ def _compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)[:3000]
 
 
-def _parse_quality_score(text: str) -> int:
-    match = re.search(r"(?:score|note)\s*:\s*([1-5])", text, flags=re.IGNORECASE)
-    if not match:
-        match = re.search(r"\b([1-5])\s*/\s*5\b", text)
-    if not match:
-        return 3
-    return max(1, min(5, int(match.group(1))))
+def _numeric_editor_score(value: object) -> int:
+    """Round decimal scores half up (4.5 -> 5), then clamp to 1..5."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return 0
+    try:
+        number = Decimal(str(value).strip())
+        if not number.is_finite():
+            return 0
+        number = min(Decimal(5), max(Decimal(1), number))
+        return int(number.to_integral_value(rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError, OverflowError):
+        return 0
+
+
+def parse_editor_response(text: str) -> tuple[int, str]:
+    """Parse JSON or a free-text score; return 0 when not evaluated.
+
+    Decimal scores use ROUND_HALF_UP: 4.4 becomes 4, 4.5 becomes 5.
+    JSON objects embedded in prose are decoded with balanced braces, including
+    braces inside the feedback string. No LLM call is made here.
+    """
+    if not isinstance(text, str):
+        return 0, ""
+    cleaned = re.sub(r"```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
+    parsed: Any = None
+    try:
+        parsed = json.loads(cleaned)
+    except (ValueError, RecursionError):
+        pass
+    if not isinstance(parsed, dict):
+        start = cleaned.find("{")
+        if start >= 0:
+            try:
+                parsed, _ = json.JSONDecoder().raw_decode(cleaned[start:])
+            except (ValueError, RecursionError):
+                pass
+    data = parsed if isinstance(parsed, dict) else {}
+    feedback = data.get("feedback")
+    feedback = " ".join(feedback.split()) if isinstance(feedback, str) and feedback.strip() else " ".join(cleaned.split())[:300]
+    score = _numeric_editor_score(data.get("score"))
+    if score == 0:
+        match = re.search(r'''\bscore["']?\s*[:=]\s*([1-5])(?!\d|\.\d)''', cleaned, flags=re.IGNORECASE)
+        if match:
+            score = int(match.group(1))
+    return score, feedback

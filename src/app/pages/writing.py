@@ -11,6 +11,7 @@ import streamlit as st
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from src.agents.debate_nodes import parse_editor_response
 from src.app import novel_manager as nm
 from src.app import ui_state as us
 from src.memory.models import Base, Chapter, Event, Novel
@@ -27,8 +28,8 @@ _POV_KEYS: dict[str, str] = {
 }
 _STEP_NAMES = ["Point de départ", "Contrat narratif", "Débat", "Prose", "Mémoire"]
 _SCORE_LABEL: dict[int, str] = {
-    1: "🔴 Faible",
-    2: "🔴 Faible",
+    1: "🔴 Très insuffisant",
+    2: "🟠 À retravailler",
     3: "🟠 Correct",
     4: "🟢 Bon",
     5: "✨ Excellent",
@@ -519,6 +520,20 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _render_editor_score(score: int, feedback: str, generated: bool) -> None:
+    """Show all five scores, or an explicit unavailable state after generation."""
+    if score == 0:
+        if generated:
+            st.info("Note non disponible")
+    else:
+        st.markdown(f"**{score}/5 · {_SCORE_LABEL.get(score, '')}**")
+    if (score or generated) and feedback:
+        # Also clean JSON feedback saved by older versions of the pipeline.
+        _, phrase = parse_editor_response(feedback)
+        if phrase:
+            st.markdown(f"*{phrase}*")
+
+
 def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     st.subheader(f"Chapitre {chapter_number} — Brouillon")
 
@@ -533,13 +548,10 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     )
 
     # Score display
-    if quality_score:
-        score_label = _SCORE_LABEL.get(quality_score, "")
-        top_left, top_right = st.columns([4, 1])
-        with top_right:
-            st.markdown(f"**{score_label}**")
-        if quality_feedback:
-            st.markdown(f"*{quality_feedback[:200]}*")
+    _render_editor_score(
+        quality_score, quality_feedback,
+        generated=bool(prose_default or debate.get("scenes_drafted")),
+    )
 
     prose: str = st.text_area(
         "Prose (éditable)",
