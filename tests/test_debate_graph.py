@@ -463,7 +463,7 @@ def test_chapter_assembler_cut_separator_and_draft_equality() -> None:
 def test_stylist_node_includes_last_words_in_prompt(monkeypatch) -> None:
     """stylist_node passes last_words from previous scene into the LLM prompt."""
     import src.agents.debate_nodes as nodes_module
-    monkeypatch.setattr(nodes_module, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
+    monkeypatch.setattr(nodes_module, "extract_scene_state", lambda prose, personnages, **kw: {})
 
     captured_prompt: list[str] = []
 

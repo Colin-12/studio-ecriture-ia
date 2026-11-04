@@ -40,7 +40,7 @@ def _state(index=1):
 
 
 def _capture(monkeypatch, state, text="La porte se referma doucement."):
-    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, personnages, **kw: {})
     llm = MagicMock()
     llm.generate.return_value = LLMResponse(text, "mock", "mock", None, None, 0, None)
     monkeypatch.setattr(debate_nodes, "get_llm_for_agent", lambda *a, **kw: llm)

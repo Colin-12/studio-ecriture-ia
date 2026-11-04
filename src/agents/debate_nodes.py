@@ -18,7 +18,12 @@ from src.agents.plan_validation import (
     repair_chapter_plan,
     validate_chapter_plan,
 )
-from src.agents.scene_state import extract_scene_state
+from src.agents.scene_state import (
+    contract_character_names,
+    extract_scene_state,
+    update_object_registry,
+    warn_state_stagnation,
+)
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 
@@ -405,6 +410,13 @@ def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[
             "(aucune téléportation). Un objet garde son état et ne change pas de nom ni de nature d'une scène à l'autre. "
             "Ne raconte pas à nouveau ce qui figure dans revele ni dans Déjà raconté.",
         ]))
+        attributes = (drafted[-1].get("object_registry") or {}) if drafted else {}
+        if attributes:
+            blocks.append("\n".join([
+                "Attributs établis (à respecter)",
+                json.dumps(attributes, ensure_ascii=False),
+                "Ces attributs physiques sont prioritaires : ne les modifie pas, même si une description récente les contredit.",
+            ]))
         previous = ["Déjà raconté (ne pas le raconter à nouveau)"]
         for earlier in plan[:idx]:
             earlier_draft = next((entry for entry in drafted if entry.get("scene_number") == earlier["scene_number"]), {})
@@ -540,8 +552,15 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     prose = _check_scene_prose(prose, scene["scene_number"])
     words = prose.split()
     previous_scenes = state.get("scenes_drafted") or []
-    previous_end_state = (previous_scenes[-1].get("end_state") or {}) if previous_scenes else {}
-    end_state = extract_scene_state(prose, previous_end_state, profile=state.get("llm_profile", "default"))
+    previous_scene = previous_scenes[-1] if previous_scenes else {}
+    previous_end_state = previous_scene.get("end_state") or {}
+    contract = state.get("hard_constraints") or {}
+    extracted = extract_scene_state(prose, contract_character_names(contract), profile=state.get("llm_profile", "default"))
+    # An unreadable response is an unknown end state, not fresh evidence that
+    # the scene ended at the previous location. Only object facts are carried.
+    end_state = extracted
+    registry, observations, mentions = update_object_registry(previous_scene, extracted.get("attributs_objets") or {}, prose, contract)
+    warn_state_stagnation(scene["scene_number"], extracted, previous_end_state, scene)
     return {
         "scenes_drafted": [
             {
@@ -550,6 +569,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "word_count": len(words),
                 "last_words": " ".join(words[-150:]),
                 "end_state": end_state,
+                "object_registry": registry,
+                "object_observations": observations,
+                "object_mentions": mentions,
                 "fallback_used": any(response.fallback_used for response in scene_usage),
                 "model": scene_usage[-1].model if scene_usage else "",
                 "fallback_models": list(dict.fromkeys(response.model for response in scene_usage if response.fallback_used)),

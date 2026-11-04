@@ -16,7 +16,7 @@ from tests.test_scene_isolation import _state
 
 END_STATE = {"lieu": "sur le quai", "moment": "à l'aube", "objets_tenus": ["Léa : montre arrêtée"],
              "etat_objet_central": "montre arrêtée, boîtier fermé", "personnages_presents": ["Léa"],
-             "revele": ["Léa a trouvé la montre dans une boîte"]}
+             "revele": ["Léa a trouvé la montre dans une boîte"], "attributs_objets": {}}
 
 
 def _response(text):
@@ -29,30 +29,28 @@ def test_extract_parses_json_fences_and_surrounding_text(monkeypatch, wrapper):
     llm.generate.return_value = _response(wrapper.format(json.dumps(END_STATE, ensure_ascii=False)))
     factory = MagicMock(return_value=llm)
     monkeypatch.setattr(extractor, "get_llm_for_agent", factory)
-    assert extractor.extract_scene_state("La scène.", {}) == END_STATE
+    assert extractor.extract_scene_state("La scène.", ["Léa"]) == END_STATE
     factory.assert_called_once_with("scene_state", profile="default")
     assert llm.generate.call_count == 1
     assert llm.generate.call_args.kwargs["max_tokens"] == 400
 
 
 @pytest.mark.parametrize("text", ["not JSON", "null", "[]", '{}', '{"lieu": 42}'])
-def test_unreadable_state_keeps_previous_and_warns(monkeypatch, caplog, text):
+def test_unreadable_state_returns_no_observation_and_warns(monkeypatch, caplog, text):
     llm = MagicMock()
     llm.generate.return_value = _response(text)
     monkeypatch.setattr(extractor, "get_llm_for_agent", lambda *a, **kw: llm)
-    previous = deepcopy(END_STATE)
     with caplog.at_level(logging.WARNING):
-        result = extractor.extract_scene_state("La scène.", previous)
-    assert result == previous == END_STATE
-    assert result is not previous
+        result = extractor.extract_scene_state("La scène.", ["Léa"])
+    assert result == {}
     assert "scene_state extraction failed" in caplog.text
     assert f"response_length={len(text)}" in caplog.text
     assert repr(text[:200]) in caplog.text
 
 
-def test_extraction_exception_keeps_previous(monkeypatch):
+def test_extraction_exception_returns_no_observation(monkeypatch):
     monkeypatch.setattr(extractor, "get_llm_for_agent", MagicMock(side_effect=RuntimeError("offline")))
-    assert extractor.extract_scene_state("La scène.", END_STATE) == END_STATE
+    assert extractor.extract_scene_state("La scène.", ["Léa"]) == {}
 
 
 def test_state_word_limit_is_enforced(monkeypatch):
@@ -60,7 +58,7 @@ def test_state_word_limit_is_enforced(monkeypatch):
     llm = MagicMock()
     llm.generate.return_value = _response(json.dumps(value))
     monkeypatch.setattr(extractor, "get_llm_for_agent", lambda *a, **kw: llm)
-    result = extractor.extract_scene_state("La scène.", {})
+    result = extractor.extract_scene_state("La scène.", ["Léa"])
     assert len(json.dumps(result, ensure_ascii=False).split()) <= 120
     assert set(result) == set(END_STATE)
 
@@ -74,7 +72,7 @@ def test_scene_one_extracts_and_stores_end_state(monkeypatch):
     monkeypatch.setattr(debate_nodes, "extract_scene_state", extract)
     [scene] = debate_nodes.stylist_node(state)["scenes_drafted"]
     assert scene["end_state"] == END_STATE
-    extract.assert_called_once_with(scene["prose"], {}, profile="default")
+    extract.assert_called_once_with(scene["prose"], [], profile="default")
     prompt = llm.generate.call_args.kwargs["prompt"]
     assert "État à la fin de la scène précédente" not in prompt
     assert "Lieu et moment prévus pour cette scène" in prompt
@@ -104,7 +102,7 @@ def test_scene_two_gets_state_transition_and_previous_endings(monkeypatch):
     already = prompt.split("Déjà raconté (ne pas le raconter à nouveau)")[1]
     assert "Dernière phrase : La montre resta arrêtée." in already
     assert "Ne termine pas ta scène sur la même idée ni la même image que ces fins." in already
-    assert extract.call_args.args[1] == END_STATE
+    assert extract.call_args.args[1] == []
 
 
 def test_all_previous_last_sentences_are_present(monkeypatch):

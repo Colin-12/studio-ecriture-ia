@@ -68,6 +68,9 @@ class DebateState(TypedDict):
     scenes_drafted: Annotated[list[dict], accumulate_scenes]
     # Scènes générées, accumulées :
     # {"scene_number": int, "prose": str, "word_count": int,
-    #  "last_words": str, "end_state": dict}  # État physique/narratif hors prose.
+    #  "last_words": str, "end_state": dict,
+    #  "object_registry": dict, "object_observations": dict, "object_mentions": dict}
+    # Registry snapshots live with their pass's scenes, so reset/best-version
+    # selection automatically preserves the matching physical attributes.
 
     chapter_assembled: str  # chapitre complet assemblé

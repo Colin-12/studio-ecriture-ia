@@ -21,7 +21,7 @@ from src.llm.usage_logger import log_llm_call
 
 @pytest.fixture(autouse=True)
 def mock_scene_state_extraction(monkeypatch):
-    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, previous, **kw: dict(previous or {}))
+    monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, personnages, **kw: {})
 
 
 def _payload(text="Une phrase complète.", reason="STOP", thinking=5100):
