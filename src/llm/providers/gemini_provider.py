@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
+import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -13,12 +16,43 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
-from src.llm.exceptions import EmptyProviderResponseError, InvalidProviderResponseError
+from src.llm.exceptions import (
+    EmptyProviderResponseError,
+    InvalidProviderResponseError,
+    RateLimitError,
+    SpendCapExceededError,
+)
 from src.llm.gemini_models import output_token_limit
 from src.llm.providers._http import post_json
 
 logger = logging.getLogger(__name__)
 _temperature_warned: set[str] = set()
+_spend_cap_until = 0.0
+_spend_cap_message = ""
+_spend_cap_warned = False
+_spend_cap_lock = threading.Lock()
+
+
+def _check_spend_cap() -> None:
+    with _spend_cap_lock:
+        if time.monotonic() < _spend_cap_until:
+            raise SpendCapExceededError(f"Gemini skipped during spend-cap cooldown: {_spend_cap_message}")
+
+
+def _record_spend_cap(message: str) -> None:
+    global _spend_cap_until, _spend_cap_message, _spend_cap_warned
+    try:
+        seconds = float(os.getenv("GEMINI_SPEND_CAP_COOLDOWN_SECONDS", "600"))
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError
+    except ValueError:
+        seconds = 600.0
+    with _spend_cap_lock:
+        _spend_cap_until = time.monotonic() + seconds
+        _spend_cap_message = message
+        if not _spend_cap_warned:
+            logger.warning("Gemini spending cap reached; provider skipped for %.0f seconds. Review https://ai.studio/spend", seconds)
+            _spend_cap_warned = True
 
 
 class GeminiProvider(LLMProvider):
@@ -38,6 +72,7 @@ class GeminiProvider(LLMProvider):
         self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
     def completion_token_limit(self, max_tokens: int) -> int:
+        _check_spend_cap()
         if self.model.startswith("gemini-3"):
             return min(max_tokens + self.thinking_reserve, output_token_limit(self.model, self.api_key or ""))
         return max_tokens
@@ -69,11 +104,17 @@ class GeminiProvider(LLMProvider):
         if response_format == "json":
             payload["generationConfig"]["responseMimeType"] = "application/json"
         model = quote(self.model, safe="")
-        data, latency_ms = post_json(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key or ''}",
-            payload,
-            timeout=timeout,
-        )
+        try:
+            data, latency_ms = post_json(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key or ''}",
+                payload,
+                timeout=timeout,
+            )
+        except RateLimitError as exc:
+            if any(phrase in str(exc).casefold() for phrase in ("spending cap", "spend cap")):
+                _record_spend_cap(str(exc))
+                raise SpendCapExceededError(str(exc)) from exc
+            raise
         if not isinstance(data, dict):
             self._log_response_error({}, prompt, None)
             raise InvalidProviderResponseError("Gemini response must be a JSON object.")

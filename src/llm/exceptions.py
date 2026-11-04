@@ -15,6 +15,12 @@ class RateLimitError(LLMError):
     """Raised when a provider rejects a request because of rate limits."""
 
 
+class SpendCapExceededError(RateLimitError):
+    """A spending cap, rather than a transient request-rate limit, was reached."""
+
+    failure_reason = "SPEND_CAP_EXCEEDED"
+
+
 class AuthError(LLMError):
     """Raised when a provider rejects credentials."""
 
