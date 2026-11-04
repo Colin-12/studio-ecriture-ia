@@ -7,6 +7,7 @@ import pytest
 
 REAL_USAGE_LOG = Path(__file__).resolve().parents[1] / "logs/llm_usage.jsonl"
 REAL_GEMINI_ERROR_LOG = Path(__file__).resolve().parents[1] / "logs/gemini_errors.jsonl"
+REAL_COST_LEDGER = Path(__file__).resolve().parents[1] / "logs/cost_ledger.jsonl"
 
 
 def _real_log_fingerprint(path=REAL_USAGE_LOG):
@@ -19,12 +20,15 @@ def _real_log_fingerprint(path=REAL_USAGE_LOG):
 def real_usage_log_unchanged():
     before = _real_log_fingerprint()
     gemini_before = _real_log_fingerprint(REAL_GEMINI_ERROR_LOG)
+    cost_before = _real_log_fingerprint(REAL_COST_LEDGER)
     yield
     assert _real_log_fingerprint() == before, "Tests modified the real LLM usage log"
     assert _real_log_fingerprint(REAL_GEMINI_ERROR_LOG) == gemini_before, "Tests modified the real Gemini error log"
+    assert _real_log_fingerprint(REAL_COST_LEDGER) == cost_before, "Tests modified the real cost ledger"
 
 
 @pytest.fixture(autouse=True)
 def isolate_llm_usage_log(monkeypatch, tmp_path):
     monkeypatch.setenv("LLM_USAGE_LOG", str(tmp_path / "logs/llm_usage.jsonl"))
     monkeypatch.setenv("GEMINI_ERROR_LOG", str(tmp_path / "logs/gemini_errors.jsonl"))
+    monkeypatch.setenv("COST_LEDGER_LOG", str(tmp_path / "logs/cost_ledger.jsonl"))

@@ -84,6 +84,10 @@ class TokenBucketLimiter:
     def wait_if_needed(self, provider: str, estimated_tokens: int, model: str = "") -> None:
         self._bucket(provider, model).wait_if_needed(estimated_tokens)
 
+    def tokens_per_minute(self, provider: str, model: str = "") -> int | None:
+        """Read the configured model quota without waiting or consuming tokens."""
+        return self._bucket(provider, model).tpm
+
     def record_usage(self, provider: str, tokens_used: int, model: str = "") -> None:
         self._bucket(provider, model).record_usage(tokens_used)
 

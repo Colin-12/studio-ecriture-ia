@@ -47,6 +47,15 @@ models:
     gemini-3.6-flash:
       tokens_per_minute: 100000
       tokens_per_day: 500000
+      # Introductory USD / million tokens through 31/12/2026: 0.75 input, 3.75 output.
+      # Announced afterwards: 1.50 / 7.50; recheck Google pricing before relying on it:
+      # https://ai.google.dev/gemini-api/docs/pricing (output includes thinking).
+      input_per_million: 0.75
+      output_per_million: 3.75
+      introductory_until: '2026-12-31'
+      after_introductory:
+        input_per_million: 1.50
+        output_per_million: 7.50
   ollama:
     qwen2.5:3b:
       tokens_per_minute: null

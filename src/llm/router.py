@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -11,10 +12,17 @@ import yaml
 from dotenv import load_dotenv
 
 from src.llm.base import LLMProvider, LLMResponse
+from src.llm.cost_ledger import (
+    monthly_budget,
+    read_ledger,
+    record_success,
+    summarize_costs,
+)
 from src.llm.exceptions import (
     InvalidProviderResponseError,
     ProviderUnavailableError,
     RateLimitError,
+    SpendCapExceededError,
 )
 from src.llm.model_registry import resolve_model_config
 from src.llm.rate_limiter import get_rate_limiter
@@ -24,6 +32,27 @@ from src.llm.usage_logger import log_llm_call
 DEFAULT_ROUTING_PATH = Path("configs/llm_routing.yaml")
 PROFILE_DIR = Path("configs/llm_profiles")
 logger = logging.getLogger(__name__)
+_budget_warning_emitted = False
+_budget_warning_lock = threading.Lock()
+
+
+def _warn_monthly_budget() -> None:
+    global _budget_warning_emitted
+    budget = monthly_budget()
+    if budget is None or _budget_warning_emitted:
+        return
+    with _budget_warning_lock:
+        if _budget_warning_emitted:
+            return
+        total = summarize_costs(read_ledger())["month_total_usd"]
+        if total > budget * 80 / 100:
+            logger.warning("Estimated LLM cost for the current month is $%s, above 80%% of the $%s monthly budget.", total, budget)
+            _budget_warning_emitted = True
+
+
+def _estimated_request_tokens(provider: LLMProvider, prompt: str, system: str | None, config: dict[str, Any]) -> int:
+    completion = getattr(provider, "completion_token_limit", lambda tokens: tokens)(config["max_tokens"])
+    return (len(prompt) + len(system or "")) // 3 + completion
 
 
 class ConfiguredLLMProvider(LLMProvider):
@@ -74,35 +103,45 @@ class ConfiguredLLMProvider(LLMProvider):
                 return self._generate_and_log(self.primary, prompt, system, primary_config)
         except (RateLimitError, ProviderUnavailableError, InvalidProviderResponseError) as exc:
             if self.fallback is None:
-                logger.warning("%s provider=%s failed; no fallback configured: %s", self.agent_name,
-                               getattr(self.primary, "provider_name", type(self.primary).__name__), exc)
+                if not isinstance(exc, SpendCapExceededError):
+                    logger.warning("%s provider=%s failed; no fallback configured: %s", self.agent_name,
+                                   getattr(self.primary, "provider_name", type(self.primary).__name__), exc)
                 raise
-            logger.warning(
-                "%s provider=%s failed; using fallback provider=%s model=%s: %s",
-                self.agent_name, getattr(self.primary, "provider_name", type(self.primary).__name__),
-                getattr(self.fallback, "provider_name", type(self.fallback).__name__), self.fallback.model, exc,
-            )
-            fallback_config = {
-                "max_tokens": _as_int(
-                    self.fallback_config.get("max_tokens"),
-                    _as_int(primary_config["max_tokens"], 1000),
-                ),
-                "temperature": _as_float(
-                    self.fallback_config.get("temperature"),
-                    _as_float(primary_config["temperature"], temperature),
-                ),
-                "response_format": self.fallback_config.get("response_format", primary_config["response_format"]),
-                "timeout": _as_int(
-                    self.fallback_config.get("timeout"),
-                    _as_int(primary_config["timeout"], timeout),
-                ),
-            }
-            response = self._generate_and_log(
-                self.fallback,
-                prompt,
-                system,
-                fallback_config,
-            )
+            fallback_name = getattr(self.fallback, "provider_name", type(self.fallback).__name__)
+            try:
+                fallback_config = {
+                    "max_tokens": _as_int(
+                        self.fallback_config.get("max_tokens"),
+                        _as_int(primary_config["max_tokens"], 1000),
+                    ),
+                    "temperature": _as_float(
+                        self.fallback_config.get("temperature"),
+                        _as_float(primary_config["temperature"], temperature),
+                    ),
+                    "response_format": self.fallback_config.get("response_format", primary_config["response_format"]),
+                    "timeout": _as_int(
+                        self.fallback_config.get("timeout"),
+                        _as_int(primary_config["timeout"], timeout),
+                    ),
+                }
+                estimated = _estimated_request_tokens(self.fallback, prompt, system, fallback_config)
+                limit = get_rate_limiter().tokens_per_minute(fallback_name, model=self.fallback.model)
+                if isinstance(limit, int) and estimated > limit:
+                    logger.warning("%s fallback provider=%s model=%s skipped: estimated_tokens=%s exceeds tokens_per_minute=%s.",
+                                   self.agent_name, fallback_name, self.fallback.model, estimated, limit)
+                    raise RateLimitError(f"Fallback request estimate {estimated} exceeds configured model tokens-per-minute quota {limit}.")
+                if not isinstance(exc, SpendCapExceededError):
+                    logger.warning(
+                        "%s provider=%s failed; using fallback provider=%s model=%s: %s",
+                        self.agent_name, getattr(self.primary, "provider_name", type(self.primary).__name__),
+                        fallback_name, self.fallback.model, exc,
+                    )
+                response = self._generate_and_log(self.fallback, prompt, system, fallback_config)
+            except Exception as fallback_exc:
+                raise ProviderUnavailableError(
+                    f"{self.agent_name}: primary provider {getattr(self.primary, 'provider_name', type(self.primary).__name__)} "
+                    f"failed: {exc}; fallback provider {fallback_name} model {self.fallback.model} failed: {fallback_exc}"
+                ) from exc
             response.fallback_used = True
             return response
 
@@ -122,8 +161,8 @@ class ConfiguredLLMProvider(LLMProvider):
                 raise ProviderUnavailableError(
                     f"{provider_name} provider is not configured or available.",
                 )
-            completion_limit = getattr(provider, "completion_token_limit", lambda tokens: tokens)(config["max_tokens"])
-            estimated_tokens = (len(prompt) + len(system or "")) // 3 + completion_limit
+            estimated_tokens = _estimated_request_tokens(provider, prompt, system, config)
+            completion_limit = estimated_tokens - (len(prompt) + len(system or "")) // 3
             limiter.wait_if_needed(provider_name, estimated_tokens, model=model)
             response = provider.generate(
                 prompt=prompt,
@@ -166,6 +205,12 @@ class ConfiguredLLMProvider(LLMProvider):
             + (response.reasoning_tokens or 0),
             model=model,
         )
+        try:
+            record_success(self.agent_name, response, input_estimate=(len(prompt) + len(system or "")) // 3,
+                           completion_estimate=completion_limit)
+            _warn_monthly_budget()
+        except (OSError, ValueError) as ledger_exc:
+            logger.warning("%s could not record/check estimated LLM cost: %s", self.agent_name, ledger_exc)
         return response
 
     def is_available(self) -> bool:
