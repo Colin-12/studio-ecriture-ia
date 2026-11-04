@@ -425,7 +425,10 @@ def test_rhythm_guardian_detects_and_corrects_monotone_pacing(monkeypatch) -> No
     result = rhythm_guardian_node(state)
 
     assert "chapter_plan" in result
-    assert result["chapter_plan"] == normalize_chapter_plan(corrected_plan)
+    expected = normalize_chapter_plan(corrected_plan)
+    for scene in expected:
+        scene["estimated_words"] = 600  # Rhythm edits preserve planned budgets.
+    assert result["chapter_plan"] == expected
 
 
 def test_should_continue_scenes_routing() -> None:

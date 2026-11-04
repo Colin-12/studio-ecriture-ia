@@ -12,10 +12,16 @@ from typing import Any
 from src.agents.continuity_agent import run_continuity_check
 from src.agents.debate_state import DebateState
 from src.agents.plan_validation import (
+    CHAPTER_SOFT_MIN_WORDS,
     ENDING_DIRECTIVES,
     ENDINGS,
+    MAX_SCENE_WORDS,
+    MAX_SCENES,
+    MAX_WORDS,
+    MIN_SCENE_WORDS,
+    MIN_SCENES,
+    derive_length_plan,
     normalize_chapter_plan,
-    repair_chapter_plan,
     validate_chapter_plan,
 )
 from src.agents.scene_state import (
@@ -418,7 +424,10 @@ def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[
                 "Ces attributs physiques sont prioritaires : ne les modifie pas, même si une description récente les contredit.",
             ]))
         previous = ["Déjà raconté (ne pas le raconter à nouveau)"]
-        for earlier in plan[:idx]:
+        for position, earlier in enumerate(plan[:idx]):
+            if len(plan) > 8 and position < idx - 8:
+                previous.append(f"Scène {earlier['scene_number']} — {earlier['title']}")
+                continue
             earlier_draft = next((entry for entry in drafted if entry.get("scene_number") == earlier["scene_number"]), {})
             ending = _last_sentence(earlier_draft.get("prose") or earlier_draft.get("last_words") or "")
             previous.append(
@@ -623,7 +632,7 @@ _CHAPTER_ARCHITECT_SYSTEM = (
     "Tu es un architecte narratif expert. Tu planifies "
     "des chapitres de roman avec une structure de scènes "
     "variée et rythmée. Tu varies intentionnellement : "
-    "- la longueur des scènes (200 à 1500 mots) "
+    "- la longueur des scènes selon le poids des jalons "
     "- le rythme (slow/medium/fast/cut) "
     "- le registre émotionnel de chaque scène "
     "- la façon dont chaque scène se termine "
@@ -633,9 +642,11 @@ _CHAPTER_ARCHITECT_SYSTEM = (
 
 _CHAPTER_PLAN_FORMAT = """\
 {
+  "jalons": [{"id": "j1", "evenement": "événement distinct", "poids": "leger|normal|majeur", "apport": "ce qui est nouveau"}],
   "scenes": [
     {
       "scene_number": 1,
+      "jalons": ["j1"],
       "title": "string",
       "objective": "string — ce que cette scène accomplit",
       "emotional_beat": "string — état émotionnel dominant",
@@ -663,7 +674,7 @@ def chapter_architect_node(
     retry_invalid: bool = True,
     provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
-    """Validate 4-6 scenes, retry once, then repair without further LLM calls.
+    """Derive scenes from beats, retry malformed plans once, then repair locally.
 
     Diagnostics can inject a provider and disable the retry to enforce a call budget.
     """
@@ -678,16 +689,16 @@ def chapter_architect_node(
         "",
         f"Format JSON attendu :\n{_CHAPTER_PLAN_FORMAT}",
         "",
-        "OBJECTIFS DE LONGUEUR :",
-        "- Un chapitre doit faire entre 3500 et 5000 mots au total.",
-        "- Génère entre 4 et 6 scènes.",
-        "- estimated_words minimum par scène : 400 mots.",
-        "- estimated_words maximum par scène : 1200 mots.",
-        "- La somme des estimated_words doit être entre 3500 et 5000.",
-        "- Aucune scène en dessous de 400 mots sauf si pacing = cut"
-        " (dans ce cas minimum 150 mots).",
-        "- Varie les longueurs : pas deux scènes consécutives"
-        " avec le même estimated_words.",
+        "LONGUEUR PILOTÉE PAR LA MATIÈRE :",
+        "- Commence par les jalons narratifs du brief et du contrat : événement distinct, poids et apport nouveau.",
+        "- Chaque jalon est couvert par exactement une scène via son id dans jalons.",
+        f"- Vise {MIN_SCENES} à {MAX_SCENES} scènes ; moins si la matière manque, sans remplissage.",
+        f"- Plancher souple {CHAPTER_SOFT_MIN_WORDS} mots ; plafond absolu {MAX_WORDS} mots.",
+        f"- Chaque scène : {MIN_SCENE_WORDS} à {MAX_SCENE_WORDS} mots, selon le poids de son jalon.",
+        "- majeur : 700 à 1500 mots ; normal : 400 à 800 ; leger : 150 à 350 ou fusionné avec un voisin.",
+        "- Privilégie une scène par jalon : huit jalons distincts appellent au moins huit scènes.",
+        "- Une fusion utilise le plafond du poids le plus élevé, sans additionner les plafonds.",
+        f"- Cible facultative : {state.get('target_words') or 'aucune, longueur déduite des jalons'} ; ±10% seulement si la matière le permet.",
         "",
         "CONTRAINTES DE FORMAT :",
         "- objective : maximum 20 mots",
@@ -702,6 +713,7 @@ def chapter_architect_node(
         "- JSON uniquement, aucun texte avant ou après",
     ])
     scenes: list[Any] = []
+    beats: object = None
     prompt = user_prompt
     for attempt in range(2 if retry_invalid else 1):
         raw = ""
@@ -714,24 +726,28 @@ def chapter_architect_node(
             )
             raw = response.text if isinstance(response, LLMResponse) else str(response)
             parsed = json.loads(raw)
+            beats = parsed.get("jalons") if isinstance(parsed, dict) else None
             candidate = normalize_chapter_plan(parsed.get("scenes") if isinstance(parsed, dict) else parsed)
             violations = validate_chapter_plan(candidate)
             if candidate:
                 scenes = candidate
             if not violations:
-                return {"chapter_plan": candidate, "current_scene_index": 0}
+                break
         except Exception as exc:
             _warn_json_fallback("chapter_architect", raw, exc)
             violations = [f"response must be valid chapter-plan JSON: {exc}"]
         logger.warning("chapter_architect invalid plan (attempt %d): %s", attempt + 1, violations)
         prompt = user_prompt + "\n\nVIOLATIONS EXACTES À CORRIGER :\n" + "\n".join(
             f"- {violation}" for violation in violations
-        ) + "\nIMPÉRATIF : retourne 4 à 6 scènes, avec une somme des estimated_words entre 3500 et 5000. JSON uniquement."
-    repaired = repair_chapter_plan(scenes, _default_chapter_plan(state))
-    remaining = validate_chapter_plan(repaired)
-    if remaining:
-        logger.warning("chapter_architect retaining repaired plan with violations: %s", remaining)
-    return {"chapter_plan": repaired, "current_scene_index": 0}
+        ) + "\nCorrige les bornes impératives et le JSON, sans ajouter de matière pour atteindre le plancher souple."
+    jalons, repaired, plan_warnings = derive_length_plan(beats, scenes, _default_chapter_plan(state), state.get("target_words"))
+    words = sum(scene["estimated_words"] for scene in repaired)
+    logger.info("Chapter planning: %d jalons, %d scènes, %d mots prévus.", len(jalons), len(repaired), words)
+    for warning in plan_warnings:
+        logger.warning("chapter_architect: %s", warning)
+    if words > 8000:
+        logger.warning("Chapitre de plus de 8000 mots : durée et coût plus élevés.")
+    return {"chapter_plan": repaired, "jalons": jalons, "plan_warnings": plan_warnings, "current_scene_index": 0}
 
 
 def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
@@ -749,7 +765,7 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
         "",
         f"Problèmes détectés : {', '.join(issues)}",
         "",
-        "Corrige le plan pour introduire de la variété.",
+        "Corrige uniquement pacing, ends_on et style_directive. Ne change ni les jalons, ni les objectifs, ni les longueurs.",
         "Retourne le plan complet corrigé.",
         '{"scenes": [...]}',
     ])
@@ -765,7 +781,13 @@ def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:
         parsed = json.loads(raw)
         scenes = normalize_chapter_plan(parsed.get("scenes", []))
         if scenes and all(isinstance(scene, dict) for scene in scenes):
-            return {"chapter_plan": scenes}
+            if len(scenes) != len(plan):
+                raise ValueError("rhythm correction changed scene count")
+            corrected = [dict(scene) for scene in plan]
+            for original, change in zip(corrected, scenes):
+                for field in ("pacing", "ends_on", "style_directive"):
+                    original[field] = change.get(field, original[field])
+            return {"chapter_plan": corrected}
         raise ValueError("missing or invalid scenes")
     except Exception as exc:
         _warn_json_fallback("rhythm_guardian", raw, exc)
@@ -855,6 +877,7 @@ def _default_chapter_plan(state: DebateState) -> list[dict]:
     return [
         {
             "scene_number": index,
+            "jalons": [f"j{index}"],
             "title": title,
             "objective": f"{objective} : {brief}",
             "emotional_beat": state.get("tone") or "tension",

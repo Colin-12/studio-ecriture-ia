@@ -42,23 +42,19 @@ def test_valid_plan_unchanged_without_retry():
     assert llm.generate.call_count == 1
 
 
-def test_two_scenes_retry_once_with_exact_violations():
+def test_two_scenes_are_soft_shortfall_without_retry():
     plan = debate_nodes._default_chapter_plan(state())
     short = plan[:2]
     llm = MagicMock()
     llm.generate.side_effect = [response(short), response(plan)]
     result = debate_nodes.chapter_architect_node(state(), provider=llm)
-    assert result["chapter_plan"] == plan
-    assert llm.generate.call_count == 2
-    first_prompt = llm.generate.call_args_list[0].kwargs["prompt"]
-    retry_prompt = llm.generate.call_args_list[1].kwargs["prompt"]
-    assert retry_prompt.startswith(first_prompt)
-    assert all(violation in retry_prompt for violation in validate_chapter_plan(short))
-    assert "4 à 6" in retry_prompt and "3500 et 5000" in retry_prompt
+    assert result["chapter_plan"] == short
+    assert llm.generate.call_count == 1
+    assert any("matière insuffisante" in warning for warning in result["plan_warnings"])
 
 
-@pytest.mark.parametrize("weights,target", [([200, 400], 3500), ([4000, 8000], 5000)])
-def test_persistent_short_plan_scaled_and_preserved(caplog, weights, target):
+@pytest.mark.parametrize("weights,target,calls", [([200, 400], 600, 1), ([4000, 8000], 3000, 2)])
+def test_persistent_short_plan_never_inflated(caplog, weights, target, calls):
     plan = debate_nodes._default_chapter_plan(state())[:2]
     for scene, words in zip(plan, weights):
         scene["estimated_words"] = words
@@ -70,10 +66,8 @@ def test_persistent_short_plan_scaled_and_preserved(caplog, weights, target):
     assert len(repaired) == 2
     assert [scene["title"] for scene in repaired] == [scene["title"] for scene in plan]
     assert sum(scene["estimated_words"] for scene in repaired) == target
-    assert abs(repaired[1]["estimated_words"] - repaired[0]["estimated_words"] * 2) <= 2
-    assert llm.generate.call_count == 2
-    assert "chapter_architect retaining repaired plan with violations" in caplog.text
-    assert "scene count" in caplog.text
+    assert llm.generate.call_count == calls
+    assert "matière insuffisante" in caplog.text
 
 
 def test_quick_numeric_strings_and_numbering_normalized():
@@ -104,15 +98,15 @@ def test_persistent_word_violation_repaired_into_valid_plan(words):
 
 
 def test_too_many_scenes_and_invalid_fields_repaired(caplog):
-    plan = (debate_nodes._default_chapter_plan(state()) * 2)
+    plan = (debate_nodes._default_chapter_plan(state()) * 4)
     plan[0] = {"pacing": "unknown", "estimated_words": -5}
     llm = MagicMock()
     llm.generate.return_value = response(plan)
     with caplog.at_level(logging.WARNING):
         repaired = debate_nodes.chapter_architect_node(state(), provider=llm)["chapter_plan"]
-    assert len(repaired) == 6
+    assert len(repaired) == 12
     assert validate_chapter_plan(repaired) == []
-    assert "scene count must be between 4 and 6; got 8" in caplog.text
+    assert "scene count must be between 1 and 12; got 16" in caplog.text
 
 
 @pytest.mark.parametrize("raw", ["not JSON", "null", "42", '{"scenes":null}', '{"scenes":[null,2]}'])
@@ -164,4 +158,4 @@ def test_check_planner_cost_is_n_calls(monkeypatch, capsys):
     assert llm.generate.call_count == 3
     output = capsys.readouterr().out
     assert output.count("Essai ") == 3
-    assert "3500 mots cibles" in output and "scene count" in output
+    assert "2000 mots cibles" in output and "violations: aucune" in output

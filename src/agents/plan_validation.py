@@ -3,12 +3,29 @@
 Closed endings vocabulary: hook, ambiguous, resolution, cut, cliffhanger.
 """
 
+import os
 from typing import Any
 
-MIN_SCENES = 4
-MAX_SCENES = 6
-MIN_WORDS = 3500
-MAX_WORDS = 5000
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+CHAPTER_SOFT_MIN_WORDS = _env_int("CHAPTER_SOFT_MIN_WORDS", 4000)
+CHAPTER_MAX_WORDS = _env_int("CHAPTER_MAX_WORDS", 12000)
+MIN_SCENES = _env_int("CHAPTER_MIN_SCENES", 4)
+MAX_SCENES = max(MIN_SCENES, _env_int("CHAPTER_MAX_SCENES", 12))
+MIN_SCENE_WORDS = _env_int("CHAPTER_MIN_SCENE_WORDS", 150)
+MAX_SCENE_WORDS = max(MIN_SCENE_WORDS, _env_int("CHAPTER_MAX_SCENE_WORDS", 1500))
+# Compatibility aliases; the minimum is advisory, never a scaling target.
+MIN_WORDS = CHAPTER_SOFT_MIN_WORDS
+MAX_WORDS = CHAPTER_MAX_WORDS
+BEAT_WORDS = {"leger": (150, 350), "normal": (400, 800), "majeur": (700, 1500)}
+
+
 PACING = {"slow", "medium", "fast", "cut"}
 # Plan enums are metadata. Only these French instructions reach the prose prompt.
 ENDING_DIRECTIVES = {
@@ -67,13 +84,13 @@ def normalize_chapter_plan(plan: object) -> list[Any]:
     return normalized
 
 
-def validate_chapter_plan(plan: object) -> list[str]:
+def validate_chapter_plan(plan: object, beats: list[dict] | None = None) -> list[str]:
     """Return all violations, including malformed input; never call an LLM."""
     if not isinstance(plan, list):
         return ["plan must be a list of scenes"]
     violations = []
-    if not MIN_SCENES <= len(plan) <= MAX_SCENES:
-        violations.append(f"scene count must be between {MIN_SCENES} and {MAX_SCENES}; got {len(plan)}")
+    if not plan or len(plan) > MAX_SCENES:
+        violations.append(f"scene count must be between 1 and {MAX_SCENES}; got {len(plan)} (minimum {MIN_SCENES} is advisory)")
     total = 0
     for index, scene in enumerate(plan, 1):
         prefix = f"scene {index}"
@@ -90,6 +107,8 @@ def validate_chapter_plan(plan: object) -> list[str]:
             violations.append(f"{prefix} estimated_words must be a positive integer")
         else:
             total += words
+            if not MIN_SCENE_WORDS <= words <= MAX_SCENE_WORDS:
+                violations.append(f"{prefix} estimated_words must be between {MIN_SCENE_WORDS} and {MAX_SCENE_WORDS}")
         for field in TEXT_FIELDS:
             if not isinstance(scene.get(field), str) or not scene[field].strip():
                 violations.append(f"{prefix} {field} must be a non-empty string")
@@ -97,13 +116,22 @@ def validate_chapter_plan(plan: object) -> list[str]:
             value = scene.get(field)
             if not isinstance(value, str) or value not in allowed:
                 violations.append(f"{prefix} {field} must be one of {', '.join(sorted(allowed))}; got {value!r}")
-    if not MIN_WORDS <= total <= MAX_WORDS:
-        violations.append(f"total estimated_words must be between {MIN_WORDS} and {MAX_WORDS}; got {total}")
+    if total > MAX_WORDS:
+        violations.append(f"total estimated_words must be at most {MAX_WORDS}; got {total}")
+    if beats is not None and all(isinstance(scene, dict) for scene in plan):
+        violations.extend(validate_beat_coverage(beats, plan))
+        weights = {beat["id"]: beat["poids"] for beat in beats}
+        for scene in plan:
+            refs = scene.get("jalons", [])
+            if isinstance(refs, list) and refs and all(isinstance(ref, str) and ref in weights for ref in refs):
+                cap = max(BEAT_WORDS[weights[ref]][1] for ref in refs)
+                if type(scene.get("estimated_words")) is int and scene["estimated_words"] > cap:
+                    violations.append(f"scene {scene['scene_number']} dépasse le plafond de ses jalons ({cap} mots)")
     return violations
 
 
 def repair_chapter_plan(plan: object, defaults: list[dict]) -> list[dict]:
-    """Repair fields and word totals; preserve short plans and cap at six scenes."""
+    """Repair scene fields and hard ceilings; never inflate to the soft minimum."""
     normalized = normalize_chapter_plan(plan)
     if not normalized:
         return [dict(scene) for scene in defaults]
@@ -121,13 +149,139 @@ def repair_chapter_plan(plan: object, defaults: list[dict]) -> list[dict]:
         if type(scene.get("estimated_words")) is not int or scene["estimated_words"] <= 0:
             scene["estimated_words"] = template["estimated_words"]
         repaired.append(scene)
-    total = sum(scene["estimated_words"] for scene in repaired)
-    target = min(MAX_WORDS, max(MIN_WORDS, total))
-    if target != total:
-        weights = [scene["estimated_words"] for scene in repaired]
-        scaled = [max(1, weight * target // total) for weight in weights]
-        # Adjust integer rounding on the largest scene to reach the exact target.
-        scaled[weights.index(max(weights))] += target - sum(scaled)
-        for scene, words in zip(repaired, scaled):
-            scene["estimated_words"] = words
+    for scene in repaired:
+        scene["estimated_words"] = min(MAX_SCENE_WORDS, max(MIN_SCENE_WORDS, scene["estimated_words"]))
+    _scale_words(repaired, [MAX_SCENE_WORDS] * len(repaired), min(MAX_WORDS, sum(s["estimated_words"] for s in repaired)))
     return repaired
+
+
+def _scale_words(scenes: list[dict], caps: list[int], target: int, floors: list[int] | None = None) -> None:
+    """Proportional bounded allocation, with deterministic integer remainder."""
+    if not scenes:
+        return
+    floors = floors or [MIN_SCENE_WORDS] * len(scenes)
+    target = max(sum(floors), min(target, sum(caps)))
+    weights = [scene["estimated_words"] for scene in scenes]
+    total = sum(weights)
+    values = [min(cap, max(floor, weight * target // total)) for weight, cap, floor in zip(weights, caps, floors)]
+    # Redistribution only concerns the unallocated remainder after capped shares.
+    while sum(values) != target:
+        direction = 1 if sum(values) < target else -1
+        eligible = [i for i, value in enumerate(values) if value < caps[i]] if direction > 0 else [i for i, value in enumerate(values) if value > floors[i]]
+        if not eligible:
+            break
+        step = max(1, abs(target - sum(values)) // len(eligible))
+        for i in eligible:
+            delta = min(step, abs(target - sum(values)), caps[i] - values[i] if direction > 0 else values[i] - floors[i])
+            values[i] += direction * delta
+    for scene, value in zip(scenes, values):
+        scene["estimated_words"] = value
+
+
+def validate_beat_coverage(beats: list[dict], scenes: list[dict]) -> list[str]:
+    """Each distinct beat identifier must occur in exactly one scene."""
+    ids = [beat["id"] for beat in beats]
+    assigned = []
+    malformed = False
+    for scene in scenes:
+        references = scene.get("jalons", [])
+        if not isinstance(references, list):
+            malformed = True
+            continue
+        assigned.extend(references)
+    errors = [f"jalon {identifier} doit être couvert exactement une fois" for identifier in ids if assigned.count(identifier) != 1]
+    if malformed or any(identifier not in ids for identifier in assigned):
+        errors.append("une scène référence un jalon inconnu")
+    return errors
+
+
+def derive_length_plan(raw_beats: object, raw_scenes: object, defaults: list[dict], target_words: int | None = None) -> tuple[list[dict], list[dict], list[str]]:
+    """Repair missing/duplicate coverage and allocate words without manufacturing matter.
+
+    A scene covering several beats uses the highest weight's ceiling, never the
+    sum of their ceilings. Legacy plans receive one inferred beat per scene.
+    """
+    scenes = repair_chapter_plan(raw_scenes, defaults)
+    beats: list[dict] = []
+    if isinstance(raw_beats, list):
+        for original in raw_beats:
+            if not isinstance(original, dict):
+                continue
+            identifier = str(original.get("id") or f"j{len(beats) + 1}")
+            if any(beat["id"] == identifier for beat in beats):
+                continue
+            weight = original.get("poids", "normal")
+            beats.append({"id": identifier, "evenement": str(original.get("evenement") or "Événement à préciser"),
+                          "poids": weight if isinstance(weight, str) and weight in BEAT_WORDS else "normal",
+                          "apport": str(original.get("apport") or "Apport à préciser")})
+    warnings = []
+    if not beats:
+        warnings.append("Jalons absents : jalons déduits des objectifs des scènes, à vérifier.")
+        for i, scene in enumerate(scenes, 1):
+            weight = "majeur" if scene["estimated_words"] > 800 else "normal" if scene["estimated_words"] > 350 else "leger"
+            beats.append({"id": f"j{i}", "evenement": scene["objective"], "poids": weight, "apport": scene["objective"]})
+            scene["jalons"] = [f"j{i}"]
+    known = {beat["id"]: beat for beat in beats}
+    if validate_beat_coverage(beats, scenes):
+        warnings.append("Couverture des jalons réparée sans appel LLM : références absentes, inconnues ou répétées.")
+    used: set[str] = set()
+    retained = []
+    for scene in scenes:
+        references = scene.get("jalons", [])
+        references = references if isinstance(references, list) else [references]
+        ids = list(dict.fromkeys(str(ref) for ref in references if isinstance(ref, (str, int)) and str(ref) in known and str(ref) not in used))
+        if ids:
+            scene["jalons"] = ids
+            used.update(ids)
+            retained.append(scene)
+    for beat in beats:
+        if beat["id"] in used:
+            continue
+        if len(retained) < MAX_SCENES:
+            template = dict(scenes[min(len(retained), len(scenes) - 1)])
+            template.update(title=beat["evenement"], objective=beat["evenement"], jalons=[beat["id"]], estimated_words=BEAT_WORDS[beat["poids"]][0])
+            retained.append(template)
+        else:
+            retained[-1]["jalons"].append(beat["id"])
+    # Distinct normal/major events deserve their own scenes where capacity permits.
+    # Light beats may remain fused with a neighbour.
+    for scene in list(retained):
+        for identifier in list(scene["jalons"])[1:]:
+            if len(retained) >= MAX_SCENES or known[identifier]["poids"] == "leger":
+                continue
+            scene["jalons"].remove(identifier)
+            beat = known[identifier]
+            extra = dict(scene, jalons=[identifier], title=beat["evenement"], objective=beat["evenement"], estimated_words=BEAT_WORDS[beat["poids"]][0])
+            retained.insert(retained.index(scene) + 1, extra)
+    order = {beat["id"]: index for index, beat in enumerate(beats)}
+    retained.sort(key=lambda scene: min(order[identifier] for identifier in scene["jalons"]))
+    scenes = normalize_chapter_plan(retained)
+    caps = []
+    floors = []
+    for scene in scenes:
+        ranges = [BEAT_WORDS[known[identifier]["poids"]] for identifier in scene["jalons"]]
+        low, high = max(ranges, key=lambda bounds: bounds[1])
+        cap = min(MAX_SCENE_WORDS, high)
+        caps.append(cap)
+        scene["estimated_words"] = min(cap, max(MIN_SCENE_WORDS, scene["estimated_words"]))
+        # A short supplied scene stays short; scaling cannot shrink a full beat
+        # below its weight's normal range merely to meet a requested target.
+        floors.append(min(scene["estimated_words"], max(MIN_SCENE_WORDS, low)))
+    total = sum(scene["estimated_words"] for scene in scenes)
+    if total > MAX_WORDS:
+        _scale_words(scenes, caps, MAX_WORDS, floors)
+    total = sum(scene["estimated_words"] for scene in scenes)
+    insufficient = total < MIN_WORDS or len(beats) < MIN_SCENES
+    if target_words is not None:
+        target = min(MAX_WORDS, max(1, target_words))
+        # Never stretch an undersupplied brief toward a requested length.
+        if not insufficient or target < total:
+            _scale_words(scenes, caps, target, floors)
+        actual = sum(scene["estimated_words"] for scene in scenes)
+        if not target_words * .9 <= actual <= target_words * 1.1:
+            warnings.append(f"Cible de {target_words} mots inaccessible sans étirement : {actual} mots retenus ; plafonds des jalons et matière disponibles prioritaires.")
+    total = sum(scene["estimated_words"] for scene in scenes)
+    if total < MIN_WORDS or len(beats) < MIN_SCENES:
+        warnings.append(f"matière insuffisante : {len(beats)} jalons, environ {total} mots ; enrichir le brief ou accepter un chapitre plus court")
+    warnings.extend(validate_chapter_plan(scenes, beats))
+    return beats, scenes, warnings

@@ -133,11 +133,14 @@ def run_debate(
     collection_name: str = "",
     initial_hard_constraints: dict | None = None,
     initial_creative_directives: dict | None = None,
+    target_words: int | None = None,
 ) -> DebateState:
     """Run the debate graph and return the final state.
 
     Pass initial_hard_constraints to skip contract_parser re-extraction
     (e.g. when the user has already validated constraints in the UI).
+    target_words is optional: beat weight ceilings and available matter take
+    precedence over the requested length (within ten percent when feasible).
     """
     effective_collection = collection_name or f"novel_{novel_id}"
     initial_state: DebateState = {
@@ -168,6 +171,9 @@ def run_debate(
         "best_revision": {},
         "warnings": [],
         "chapter_plan": [],
+        "target_words": target_words,
+        "jalons": [],
+        "plan_warnings": [],
         "current_scene_index": 0,
         "scenes_drafted": [],
         "chapter_assembled": "",

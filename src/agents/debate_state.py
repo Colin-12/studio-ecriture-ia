@@ -56,10 +56,13 @@ class DebateState(TypedDict):
     warnings: Annotated[list[str], operator.add]
 
     # Multi-scene chapter pipeline
+    target_words: NotRequired[int | None]
+    jalons: NotRequired[list[dict]]
+    plan_warnings: NotRequired[list[str]]
     chapter_plan: list[dict]
     # Plan produit par chapter_architect_node. Chaque dict :
     # {"scene_number": int, "title": str, "objective": str,
-    #  "emotional_beat": str, "estimated_words": int,
+    #  "emotional_beat": str, "estimated_words": int, "jalons": list[str],
     #  "pacing": "slow"|"medium"|"fast"|"cut",
     #  "style_directive": str, "ends_on": "hook"|"ambiguous"|"resolution"|"cut"}
 
