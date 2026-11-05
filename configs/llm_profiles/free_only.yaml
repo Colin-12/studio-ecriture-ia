@@ -3,6 +3,13 @@ default:
   max_tokens: 1000
   role: structured
 agents:
+  fidelity_checker:
+    role: light_json
+    fallback:
+      role: gemini_fast
+    response_format: json
+    max_tokens: 500
+    temperature: 0.1
   beat_extractor:
     role: structured
     fallback:

@@ -175,6 +175,7 @@ def run_debate(
         "jalons": [],
         "plan_warnings": [],
         "plan_suggestions": [],
+        "fidelity_report": {},
         "current_scene_index": 0,
         "scenes_drafted": [],
         "chapter_assembled": "",
@@ -188,6 +189,7 @@ def run_debate(
 
 def _reset_chapter_pass_node(state: DebateState) -> dict[str, Any]:
     return {
+        "fidelity_report": {},
         "scenes_drafted": {"reset": True, "scenes": []},
         "current_scene_index": 0,
         "chapter_plan": [],
@@ -225,6 +227,7 @@ def _record_revision_node(state: DebateState) -> dict[str, Any]:
             "current_scene_index": state.get("current_scene_index", 0),
             "scene_brief": state.get("scene_brief", ""),
             "final_brief": state.get("final_brief", ""),
+            "fidelity_report": state.get("fidelity_report") or {},
         })
     return {"revision_history": [*history, entry], "best_revision": best}
 

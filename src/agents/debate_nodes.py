@@ -19,6 +19,7 @@ from src.agents.contract_attributes import (
     restore_protagonist_gender,
 )
 from src.agents.debate_state import DebateState
+from src.agents.fidelity import aggregate_fidelity, check_scene_fidelity, scene_events
 from src.agents.plan_validation import (
     CHAPTER_SOFT_MIN_WORDS,
     ENDING_DIRECTIVES,
@@ -519,8 +520,16 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             _compact_json(state.get("continuity_report", {})),
         ]
         prose = _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)
-        _, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, 1)
-        return {"draft": prose, "warnings": attribute_warnings}
+        pronoun_counts, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, 1)
+        events = state.get("brief_events") or []
+        beats = [{"id": f"legacy_{event['id']}", "origine": "brief", "evenement_id": event["id"]} for event in events]
+        scene: dict[str, Any] = {"scene_number": 1, "objective": state.get("final_brief") or _current_brief(state), "jalons": [beat["id"] for beat in beats]}
+        verdict = check_scene_fidelity(prose, scene["objective"], events, (state.get("hard_constraints") or {}).get("forbidden") or [],
+                                       profile=state.get("llm_profile", "default"))
+        drafted = {"scene_number": 1, "prose": prose, "word_count": len(prose.split()), "last_words": " ".join(prose.split()[-150:]),
+                   "scene_plan": scene, "fidelity": verdict, "attribute_warnings": attribute_warnings, "pronoun_counts": pronoun_counts}
+        return {"draft": prose, "warnings": attribute_warnings, "scenes_drafted": [drafted],
+                "fidelity_report": aggregate_fidelity(events, beats, [scene], [drafted])}
 
     # Multi-scene path
     idx = state.get("current_scene_index", 0)
@@ -599,7 +608,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     end_state = extracted
     registry, observations, mentions = update_object_registry(previous_scene, extracted.get("attributs_objets") or {}, prose, contract)
     warn_state_stagnation(scene["scene_number"], extracted, previous_end_state, scene)
-    return {
+    fidelity = check_scene_fidelity(prose, scene["objective"], scene_events(scene, state.get("jalons") or [], state.get("brief_events") or []),
+                                    contract.get("forbidden") or [], profile=state.get("llm_profile", "default"))
+    result: dict[str, Any] = {
         "scenes_drafted": [
             {
                 "scene_number": scene["scene_number"],
@@ -607,6 +618,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "word_count": len(words),
                 "pronoun_counts": pronoun_counts,
                 "attribute_warnings": attribute_warnings,
+                "fidelity": fidelity,
+                "scene_plan": dict(scene),
                 "last_words": " ".join(words[-150:]),
                 "end_state": end_state,
                 "object_registry": registry,
@@ -618,6 +631,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             }
         ]
     }
+    result["fidelity_report"] = aggregate_fidelity(state.get("brief_events") or [], state.get("jalons") or [], chapter_plan,
+                                                   [*previous_scenes, *result["scenes_drafted"]])
+    return result
 
 
 def editor_node(state: DebateState) -> dict[str, Any]:

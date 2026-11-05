@@ -47,3 +47,9 @@ def format_suggestions(suggestions: list[str]) -> str:
     return "Suggestions d'événements non retenues :\n\n" + "\n".join(
         f"- {text}" for text in suggestions
     ) + "\n\nPour les intégrer, ajoute-les à ton brief et relance."
+
+
+def format_fidelity_rows(report: dict) -> list[dict]:
+    return [{"Événement du brief": event["evenement"],
+             "Scène": ", ".join(map(str, event.get("scenes") or [])) or "aucune scène associée",
+             "Statut": event["statut"]} for event in report.get("evenements") or []]

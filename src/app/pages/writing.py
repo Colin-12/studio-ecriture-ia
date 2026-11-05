@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from src.agents.debate_nodes import parse_editor_response
 from src.app import novel_manager as nm
 from src.app import ui_state as us
-from src.app.plan_display import format_length, format_plan_rows, format_suggestions
+from src.app.plan_display import (
+    format_fidelity_rows,
+    format_length,
+    format_plan_rows,
+    format_suggestions,
+)
 from src.memory.models import Base, Chapter, Event, Novel
 
 _POV_OPTIONS = [
@@ -558,6 +563,20 @@ def _render_plan_details(debate: dict, prose: str | None = None) -> None:
         st.caption(format_length(words))
 
 
+def _render_fidelity_report(report: dict) -> None:
+    if not report:
+        return
+    with st.expander("Fidélité au brief", expanded=False):
+        rows = format_fidelity_rows(report)
+        if rows:
+            st.table(rows)
+        for warning in [*(report.get("warnings") or []), *(report.get("attribute_warnings") or [])]:
+            st.warning(str(warning))
+        for scene in report.get("scenes") or []:
+            st.caption(f"Scène {scene['scene_number']} — objectif : {scene['statut']}. "
+                       + (scene.get("verdict") or {}).get("raison", ""))
+
+
 def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     st.subheader(f"Chapitre {chapter_number} — Brouillon")
 
@@ -578,6 +597,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     )
     _render_revision_history(debate.get("revision_history") or [])
     _render_plan_details(debate, prose_default)
+    _render_fidelity_report(debate.get("fidelity_report") or {})
 
     prose: str = st.text_area(
         "Prose (éditable)",
@@ -598,7 +618,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     with col_draft:
         if st.button("💾 Sauvegarder en brouillon", key="btn_save_draft"):
             if prose.strip():
-                _save_draft(prose, chapter_number, novel_id)
+                _save_draft(prose, chapter_number, novel_id, debate.get("fidelity_report") or {})
                 st.toast("Brouillon sauvegardé ✓")
             else:
                 st.warning("La prose est vide.")
@@ -608,7 +628,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
             if not prose.strip():
                 st.warning("La prose est vide.")
             else:
-                chapter_id = _validate_chapter(prose, chapter_number, novel_id, engine)
+                chapter_id = _validate_chapter(prose, chapter_number, novel_id, engine, debate.get("fidelity_report") or {})
                 st.session_state["writing_validated_chapter_id"] = chapter_id
                 st.session_state["writing_step"] = "step_4"
                 st.rerun()
@@ -930,17 +950,23 @@ def _extract_events(prose: str, chapter_number: int, llm_profile: str) -> list[d
 # ---------------------------------------------------------------------------
 
 
-def _save_draft(prose: str, chapter_number: int, novel_id: int) -> None:
+def _save_draft(prose: str, chapter_number: int, novel_id: int, fidelity_report: dict | None = None) -> None:
     path = Path(f"manuscript/novels/{novel_id}/drafts/chapter_{chapter_number:02d}_draft.md")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(prose, encoding="utf-8")
+    _save_fidelity_sidecar(path, fidelity_report or {})
 
 
-def _validate_chapter(prose: str, chapter_number: int, novel_id: int, engine: Any) -> int:
+def _save_fidelity_sidecar(path: Path, report: dict) -> None:
+    path.with_suffix(".fidelity.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _validate_chapter(prose: str, chapter_number: int, novel_id: int, engine: Any, fidelity_report: dict | None = None) -> int:
     """Save prose to file + upsert ORM Chapter. Returns the chapter id."""
     path = Path(f"manuscript/novels/{novel_id}/chapter_{chapter_number:02d}.md")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(prose, encoding="utf-8")
+    _save_fidelity_sidecar(path, fidelity_report or {})
 
     with Session(engine) as session:
         chapter = (

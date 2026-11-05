@@ -61,6 +61,7 @@ class DebateState(TypedDict):
     brief_events: NotRequired[list[dict]]
     plan_warnings: NotRequired[list[str]]
     plan_suggestions: NotRequired[list[str]]
+    fidelity_report: NotRequired[dict]
     chapter_plan: list[dict]
     # Plan produit par chapter_architect_node. Chaque dict :
     # {"scene_number": int, "title": str, "objective": str,
@@ -75,7 +76,8 @@ class DebateState(TypedDict):
     # {"scene_number": int, "prose": str, "word_count": int,
     #  "last_words": str, "end_state": dict,
     #  "object_registry": dict, "object_observations": dict, "object_mentions": dict,
-    #  "pronoun_counts": dict[str, int], "attribute_warnings": list[str]}
+    #  "pronoun_counts": dict[str, int], "attribute_warnings": list[str],
+    #  "fidelity": dict, "scene_plan": dict}
     # Registry snapshots live with their pass's scenes, so reset/best-version
     # selection automatically preserves the matching physical attributes.
 

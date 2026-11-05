@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from src.agents import fidelity
+from src.llm.base import LLMResponse
+
 REAL_USAGE_LOG = Path(__file__).resolve().parents[1] / "logs/llm_usage.jsonl"
 REAL_GEMINI_ERROR_LOG = Path(__file__).resolve().parents[1] / "logs/gemini_errors.jsonl"
 REAL_COST_LEDGER = Path(__file__).resolve().parents[1] / "logs/cost_ledger.jsonl"
@@ -32,3 +35,13 @@ def isolate_llm_usage_log(monkeypatch, tmp_path):
     monkeypatch.setenv("LLM_USAGE_LOG", str(tmp_path / "logs/llm_usage.jsonl"))
     monkeypatch.setenv("GEMINI_ERROR_LOG", str(tmp_path / "logs/gemini_errors.jsonl"))
     monkeypatch.setenv("COST_LEDGER_LOG", str(tmp_path / "logs/cost_ledger.jsonl"))
+
+
+@pytest.fixture(autouse=True)
+def simulate_fidelity_provider(monkeypatch):
+    """Existing prose tests must never call the new checker over the network."""
+    class Provider:
+        def generate(self, **kwargs):
+            return LLMResponse('{"objectif_realise":true,"evenements":[],"interdits_violes":[],"raison":"Contrôle simulé."}',
+                               "mock", "mock", 0, 0, 0, None)
+    monkeypatch.setattr(fidelity, "get_llm_for_agent", lambda *a, **kw: Provider())
