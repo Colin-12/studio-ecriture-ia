@@ -757,9 +757,11 @@ def chapter_architect_node(
         prompt = user_prompt + "\n\nVIOLATIONS EXACTES À CORRIGER :\n" + "\n".join(
             f"- {violation}" for violation in violations
         ) + "\nCorrige les bornes impératives et le JSON, sans ajouter de matière pour atteindre le plancher souple."
+    plan_suggestions: list[str] = []
     jalons, repaired, plan_warnings = derive_length_plan(
         beats, scenes, _default_chapter_plan(state), state.get("target_words"),
         imposed_events=events, brief=author_brief, contract=state.get("hard_constraints") or {},
+        plan_suggestions=plan_suggestions,
     )
     plan_warnings = extraction_warnings + plan_warnings
     words = sum(scene["estimated_words"] for scene in repaired)
@@ -768,7 +770,8 @@ def chapter_architect_node(
         logger.warning("chapter_architect: %s", warning)
     if words > 8000:
         logger.warning("Chapitre de plus de 8000 mots : durée et coût plus élevés.")
-    return {"chapter_plan": repaired, "jalons": jalons, "brief_events": events, "plan_warnings": plan_warnings, "current_scene_index": 0}
+    return {"chapter_plan": repaired, "jalons": jalons, "brief_events": events, "plan_warnings": plan_warnings,
+            "plan_suggestions": plan_suggestions, "current_scene_index": 0}
 
 
 def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:

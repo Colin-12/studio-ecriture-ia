@@ -174,6 +174,7 @@ def run_debate(
         "target_words": target_words,
         "jalons": [],
         "plan_warnings": [],
+        "plan_suggestions": [],
         "current_scene_index": 0,
         "scenes_drafted": [],
         "chapter_assembled": "",

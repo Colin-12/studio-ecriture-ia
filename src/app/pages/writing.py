@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from src.agents.debate_nodes import parse_editor_response
 from src.app import novel_manager as nm
 from src.app import ui_state as us
+from src.app.plan_display import format_length, format_plan_rows, format_suggestions
 from src.memory.models import Base, Chapter, Event, Novel
 
 _POV_OPTIONS = [
@@ -435,6 +436,7 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 
     # --- Synthesis ---
     st.subheader("Décision de la writer's room")
+    _render_plan_details(debate)
     critiques: list = debate.get("critiques", [])
     alternatives: list = debate.get("alternatives", [])
     final_brief: str = (debate.get("final_brief") or "").strip()
@@ -540,6 +542,22 @@ def _render_revision_history(history: list[dict]) -> None:
         st.caption(f"Révision automatique : note {scores}, meilleure version conservée")
 
 
+def _render_plan_details(debate: dict, prose: str | None = None) -> None:
+    for warning in debate.get("plan_warnings") or []:
+        st.warning(str(warning))
+    suggestions = format_suggestions(debate.get("plan_suggestions") or [])
+    if suggestions:
+        st.info(suggestions)
+    plan = debate.get("chapter_plan") or []
+    if plan:
+        with st.expander("Plan du chapitre", expanded=False):
+            st.table(format_plan_rows(plan, debate.get("scenes_drafted") or []))
+    chapter = prose if prose is not None else debate.get("chapter_assembled") or debate.get("draft") or ""
+    words = len(chapter.split()) if chapter else sum(scene.get("estimated_words", 0) for scene in plan)
+    if chapter or plan:
+        st.caption(format_length(words))
+
+
 def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     st.subheader(f"Chapitre {chapter_number} — Brouillon")
 
@@ -559,6 +577,7 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
         generated=bool(prose_default or debate.get("scenes_drafted")),
     )
     _render_revision_history(debate.get("revision_history") or [])
+    _render_plan_details(debate, prose_default)
 
     prose: str = st.text_area(
         "Prose (éditable)",
@@ -837,6 +856,8 @@ def _build_base_state(
         "revision_round": 0,
         "warnings": [],
         "chapter_plan": [],
+        "plan_warnings": [],
+        "plan_suggestions": [],
         "current_scene_index": 0,
         "scenes_drafted": [],
         "chapter_assembled": "",

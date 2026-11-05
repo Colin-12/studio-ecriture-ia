@@ -115,6 +115,7 @@ def _run(argv: list[str] | None = None) -> int:
             print(f"  Scène {scene['scene_number']} | jalons {scene['jalons']} | {scene['estimated_words']} mots")
         print(f"Mots prévus : {sum(scene['estimated_words'] for scene in result['chapter_plan'])}")
         print(f"plan_warnings : {result['plan_warnings']}")
+        print(f"plan_suggestions : {result['plan_suggestions']}")
     return 0
 
 

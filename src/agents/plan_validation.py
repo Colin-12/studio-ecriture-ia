@@ -31,13 +31,37 @@ BEAT_WORDS = {"leger": (150, 350), "normal": (400, 800), "majeur": (700, 1500)}
 
 def max_proposed_ratio() -> float:
     try:
-        ratio = float(os.getenv("PLAN_MAX_PROPOSED_RATIO", "0.25"))
-        return ratio if math.isfinite(ratio) and 0 <= ratio <= 1 else .25
+        ratio = float(os.getenv("PLAN_MAX_PROPOSED_RATIO", "0"))
+        return ratio if math.isfinite(ratio) and 0 <= ratio <= 1 else 0
     except ValueError:
-        return .25
+        return 0
 
 
-def repair_event_beats(beats: list[dict], events: list[dict], brief: str, contract: dict) -> tuple[list[dict], list[str]]:
+def filter_proposed_beats(beats: list[dict], warnings: list[str], suggestions: list[str]) -> list[dict]:
+    """Retain only the allowed first proposals; keep excluded texts for the author."""
+    ratio = max_proposed_ratio()
+    brief_count = sum(beat.get("origine") != "propose" for beat in beats)
+    allowed = 2 if ratio == 1 else min(2, math.floor(ratio * brief_count / (1 - ratio)))
+    retained = []
+    proposals = 0
+    removed = 0
+    for beat in beats:
+        if beat.get("origine") == "propose":
+            proposals += 1
+            if proposals > allowed:
+                suggestions.append(beat["evenement"])
+                removed += 1
+                continue
+            warnings.append(f"événement proposé par le système : {beat['evenement']}")
+        retained.append(beat)
+    if removed:
+        warnings.append(f"{removed} suggestion(s) d'événement non retenue(s)")
+        warnings.append(f"Jalons proposés excédentaires supprimés : {removed} (ratio maximal {ratio:g}, au plus 2).")
+    return retained
+
+
+def repair_event_beats(beats: list[dict], events: list[dict], brief: str, contract: dict,
+                       suggestions: list[str] | None = None) -> tuple[list[dict], list[str]]:
     """Bind source events, add uncovered ones, then enforce the final proposal ratio."""
     warnings = []
     sources = {event["id"]: event["evenement"] for event in events}
@@ -58,20 +82,7 @@ def repair_event_beats(beats: list[dict], events: list[dict], brief: str, contra
         beats.append({"id": beat_id, "evenement": text, "poids": "leger", "apport": text,
                       "origine": "brief", "evenement_id": identifier})
         warnings.append(f"Événement imposé non couvert : jalon léger ajouté sans LLM : {text}")
-    ratio = max_proposed_ratio()
-    brief_count = sum(beat["origine"] == "brief" for beat in beats)
-    allowed = 2 if ratio == 1 else min(2, math.floor(ratio * brief_count / (1 - ratio)))
-    retained = []
-    proposals = 0
-    for beat in beats:
-        if beat["origine"] == "propose":
-            proposals += 1
-            if proposals > allowed:
-                continue
-            warnings.append(f"événement proposé par le système : {beat['evenement']}")
-        retained.append(beat)
-    if proposals > allowed:
-        warnings.append(f"Jalons proposés excédentaires supprimés : {proposals - allowed} (ratio maximal {ratio:g}, au plus 2).")
+    retained = filter_proposed_beats(beats, warnings, suggestions if suggestions is not None else [])
     known_words = set(re.findall(r"\w+", brief.casefold() + " " + json.dumps(contract, ensure_ascii=False).casefold()))
     for beat in retained:
         for text in (beat["evenement"], beat["apport"]):
@@ -254,12 +265,14 @@ def validate_beat_coverage(beats: list[dict], scenes: list[dict]) -> list[str]:
 
 
 def derive_length_plan(raw_beats: object, raw_scenes: object, defaults: list[dict], target_words: int | None = None,
-                       *, imposed_events: list[dict] | None = None, brief: str = "", contract: dict | None = None) -> tuple[list[dict], list[dict], list[str]]:
+                       *, imposed_events: list[dict] | None = None, brief: str = "", contract: dict | None = None,
+                       plan_suggestions: list[str] | None = None) -> tuple[list[dict], list[dict], list[str]]:
     """Repair missing/duplicate coverage and allocate words without manufacturing matter.
 
     A scene covering several beats uses the highest weight's ceiling, never the
     sum of their ceilings. Legacy plans receive one inferred beat per scene.
     """
+    suggestions: list[str] = []
     scenes = repair_chapter_plan(raw_scenes, defaults)
     beats: list[dict] = []
     if isinstance(raw_beats, list):
@@ -282,8 +295,10 @@ def derive_length_plan(raw_beats: object, raw_scenes: object, defaults: list[dic
             beats.append({"id": f"j{i}", "evenement": scene["objective"], "poids": weight, "apport": scene["objective"]})
             scene["jalons"] = [f"j{i}"]
     if imposed_events is not None:
-        beats, event_warnings = repair_event_beats(beats, imposed_events, brief, contract or {})
+        beats, event_warnings = repair_event_beats(beats, imposed_events, brief, contract or {}, suggestions)
         warnings.extend(event_warnings)
+    else:
+        beats = filter_proposed_beats(beats, warnings, suggestions)
     known = {beat["id"]: beat for beat in beats}
     if validate_beat_coverage(beats, scenes):
         warnings.append("Couverture des jalons réparée sans appel LLM : références absentes, inconnues ou répétées.")
@@ -339,7 +354,7 @@ def derive_length_plan(raw_beats: object, raw_scenes: object, defaults: list[dic
     if target_words is not None:
         target = min(MAX_WORDS, max(1, target_words))
         # Never stretch an undersupplied brief toward a requested length.
-        if not insufficient or target < total:
+        if (not insufficient and not suggestions) or target < total:
             _scale_words(scenes, caps, target, floors)
         actual = sum(scene["estimated_words"] for scene in scenes)
         if not target_words * .9 <= actual <= target_words * 1.1:
@@ -349,4 +364,6 @@ def derive_length_plan(raw_beats: object, raw_scenes: object, defaults: list[dic
         unit = ("événement imposé" if matter_count == 1 else "événements imposés") if imposed_events is not None else "jalons"
         warnings.append(f"matière insuffisante : {matter_count} {unit}, environ {total} mots ; enrichir le brief ou accepter un chapitre plus court")
     warnings.extend(validate_chapter_plan(scenes, beats))
+    if plan_suggestions is not None:
+        plan_suggestions.extend(suggestions)
     return beats, scenes, warnings

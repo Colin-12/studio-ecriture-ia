@@ -60,6 +60,7 @@ class DebateState(TypedDict):
     jalons: NotRequired[list[dict]]
     brief_events: NotRequired[list[dict]]
     plan_warnings: NotRequired[list[str]]
+    plan_suggestions: NotRequired[list[str]]
     chapter_plan: list[dict]
     # Plan produit par chapter_architect_node. Chaque dict :
     # {"scene_number": int, "title": str, "objective": str,
