@@ -74,7 +74,8 @@ class DebateState(TypedDict):
     # Scènes générées, accumulées :
     # {"scene_number": int, "prose": str, "word_count": int,
     #  "last_words": str, "end_state": dict,
-    #  "object_registry": dict, "object_observations": dict, "object_mentions": dict}
+    #  "object_registry": dict, "object_observations": dict, "object_mentions": dict,
+    #  "pronoun_counts": dict[str, int], "attribute_warnings": list[str]}
     # Registry snapshots live with their pass's scenes, so reset/best-version
     # selection automatically preserves the matching physical attributes.
 

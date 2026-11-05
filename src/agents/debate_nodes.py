@@ -11,6 +11,13 @@ from typing import Any
 
 from src.agents.beat_extraction import extract_brief_events
 from src.agents.continuity_agent import run_continuity_check
+from src.agents.contract_attributes import (
+    character_gender,
+    check_scene_pronouns,
+    fixed_attributes,
+    protagonist,
+    restore_protagonist_gender,
+)
 from src.agents.debate_state import DebateState
 from src.agents.plan_validation import (
     CHAPTER_SOFT_MIN_WORDS,
@@ -54,6 +61,13 @@ _CONTRACT_SYSTEM = (
     "ton, atmosphère, thèmes, zone libre).\n"
     "Le brief peut être simple ou très détaillé. Adapte le schéma à ce qui est réellement "
     "présent dans le brief.\n"
+    "Pour chaque personnage, conserve dans fixed_attributes le genre grammatical : "
+    "'genre : féminin', 'genre : masculin' ou 'genre : non précisé'. Déduis-le des pronoms, "
+    "articles et accords du brief : 'une archiviste' suivie de 'elle' indique féminin ; "
+    "un accord d'adjectif explicite est aussi un indice. Ne choisis jamais un genre par défaut. "
+    "Ajoute l'âge ou la tranche d'âge, la profession et tous les traits physiques ou matériels "
+    "explicitement cités, sans en inventer. Pour les objets imposés, conserve leur matière, "
+    "leur couleur et tout attribut cité dans imposed_elements (par exemple 'boîte en bois').\n"
     "Réponds uniquement en JSON valide, sans markdown, sans explication."
 )
 
@@ -64,7 +78,7 @@ _CONTRACT_FORMAT = """\
       {
         "name": "string",
         "role": "protagoniste|antagoniste|secondaire",
-        "fixed_attributes": ["liste", "d attributs", "imposés"]
+        "fixed_attributes": ["genre : féminin|masculin|non précisé", "âge ou tranche d'âge si cité", "profession si citée", "autres attributs cités"]
       }
     ],
     "core_event": "string ou null",
@@ -89,7 +103,7 @@ _CONTRACT_FORMAT = """\
 }"""
 
 
-def contract_parser_node(state: DebateState) -> dict[str, Any]:
+def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = None) -> dict[str, Any]:
     """Extract hard_constraints and creative_directives from the user brief.
 
     If hard_constraints is already populated (blueprint path where the user
@@ -112,9 +126,9 @@ def contract_parser_node(state: DebateState) -> dict[str, Any]:
             f"Format JSON attendu :\n{_CONTRACT_FORMAT}",
         ]
     )
-    llm = get_llm_for_agent("contract_parser", profile=state.get("llm_profile", "default"))
     raw = ""
     try:
+        llm = provider or get_llm_for_agent("contract_parser", profile=state.get("llm_profile", "default"))
         response = llm.generate(prompt=user_prompt, system=_CONTRACT_SYSTEM, response_format="json")
         raw = response.text if isinstance(response, LLMResponse) else str(response)
         parsed = json.loads(raw)
@@ -129,6 +143,7 @@ def contract_parser_node(state: DebateState) -> dict[str, Any]:
         hard = _default_hard_constraints(state)
         creative = _default_creative_directives(state)
 
+    hard = restore_protagonist_gender(hard, state["scene_idea"])
     return {"hard_constraints": hard, "creative_directives": creative}
 
 
@@ -172,13 +187,20 @@ def _format_hard_constraints(constraints: object) -> str:
         for ch in characters:
             name = ch.get("name", "")
             role = ch.get("role", "")
-            attrs: list[str] = ch.get("fixed_attributes") or []
+            attrs = fixed_attributes(ch)
             char_line = f"  - {name}"
             if role:
                 char_line += f" ({role})"
             if attrs:
                 char_line += f" | attributs fixes : {', '.join(attrs)}"
             lines.append(char_line)
+        main = protagonist(constraints)
+        if main is not None:
+            gender = character_gender(main)
+            lines.append(f"Genre du protagoniste : {gender}")
+            lines.append("Accorde pronoms et accords selon le genre indiqué.")
+            if gender == "non précisé":
+                lines.append("Genre non précisé : utilise le nom ou le rôle plutôt qu'un pronom au début des phrases ; ne choisis jamais un genre par défaut.")
 
     core_event: str = constraints.get("core_event") or ""
     if core_event:
@@ -224,6 +246,8 @@ _CREATIVE_CHALLENGE = (
 
 _STYLIST_CONSTRAINT = (
     "Respecte chaque élément du contrat narratif à la lettre. "
+    "Les attributs fixes du contrat (genre, âge, profession, traits physiques et matière des objets) "
+    "priment sur les micro-briefs, l'état de scène et les descriptions ou attributs d'objets antérieurs. "
     "Le protagoniste, l'événement central et les contraintes de forme sont non négociables "
     "à l'échelle du chapitre. Dans cette scène, ne réalise que son objectif : "
     "ne déclenche pas les événements réservés aux scènes suivantes."
@@ -494,7 +518,9 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             "Respecte les faits acquis de ce rapport de continuité :",
             _compact_json(state.get("continuity_report", {})),
         ]
-        return {"draft": _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)}
+        prose = _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)
+        _, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, 1)
+        return {"draft": prose, "warnings": attribute_warnings}
 
     # Multi-scene path
     idx = state.get("current_scene_index", 0)
@@ -561,6 +587,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             prose = (prose + "\n" + continuation).strip()
 
     prose = _check_scene_prose(prose, scene["scene_number"])
+    pronoun_counts, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, scene["scene_number"])
     words = prose.split()
     previous_scenes = state.get("scenes_drafted") or []
     previous_scene = previous_scenes[-1] if previous_scenes else {}
@@ -578,6 +605,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "scene_number": scene["scene_number"],
                 "prose": prose,
                 "word_count": len(words),
+                "pronoun_counts": pronoun_counts,
+                "attribute_warnings": attribute_warnings,
                 "last_words": " ".join(words[-150:]),
                 "end_state": end_state,
                 "object_registry": registry,
