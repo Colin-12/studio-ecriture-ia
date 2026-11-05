@@ -21,6 +21,7 @@ def revision_environment(monkeypatch):
 
 def _run(monkeypatch, scores):
     monkeypatch.setattr(debate_nodes, "extract_scene_state", lambda prose, personnages, **kw: {})
+    monkeypatch.setattr(debate_nodes, "extract_brief_events", lambda *a, **kw: ([{"id": "e1", "evenement": "Faire avancer le conflit"}], []))
     counts = {"planner": 0, "editor": 0, "stylist": 0, "revise": 0, "arbitrate": 0}
     plans = []
     prompts = []

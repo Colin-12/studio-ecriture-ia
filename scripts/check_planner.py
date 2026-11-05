@@ -1,4 +1,4 @@
-"""Inspect isolated chapter plans with at most N planner calls, without retries."""
+"""Inspect isolated plans with at most N extractions and N planner calls."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import cast
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts.check_length_planning import SingleCallPlanner  # noqa: E402
 from src.agents.debate_nodes import chapter_architect_node  # noqa: E402
 from src.agents.debate_state import DebateState  # noqa: E402
 from src.agents.plan_validation import validate_chapter_plan  # noqa: E402
@@ -31,11 +32,14 @@ def main(argv: list[str] | None = None) -> int:
     })
     provider = get_llm_for_agent("chapter_architect", profile=args.profile)
     if isinstance(provider, ConfiguredLLMProvider):
-        provider.fallback = None
-    print(f"Budget : {args.runs} appels maximum ; retry et fallback désactivés.")
+        provider = SingleCallPlanner(provider.agent_name, provider.primary, provider.config)
+    extractor = get_llm_for_agent("beat_extractor", profile=args.profile)
+    if isinstance(extractor, ConfiguredLLMProvider):
+        extractor = SingleCallPlanner(extractor.agent_name, extractor.primary, extractor.config)
+    print(f"Budget : {2 * args.runs} appels maximum ; retry et fallback désactivés.")
     print("Mesures après normalisation/réparation ; anomalies initiales dans les warnings.")
     for run in range(1, args.runs + 1):
-        result = chapter_architect_node(state, retry_invalid=False, provider=provider)
+        result = chapter_architect_node(state, retry_invalid=False, provider=provider, event_provider=extractor)
         plan = result["chapter_plan"]
         words = sum(scene["estimated_words"] for scene in plan)
         violations = validate_chapter_plan(plan)

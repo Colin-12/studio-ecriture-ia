@@ -379,6 +379,7 @@ def test_chapter_architect_node_produces_valid_plan(monkeypatch) -> None:
 
     state = cast(DebateState, {
         "scene_idea": "Victor retrouve la créature",
+        "brief_events": [{"id": f"e{i}", "evenement": f"Objectif {i}"} for i in range(1, 5)],
         "genre": "gothic", "tone": "sombre", "language": "fr",
         "final_brief": "Victor retrouve la créature dans les glaces",
         "hard_constraints": {}, "continuity_report": {}, "llm_profile": "test",

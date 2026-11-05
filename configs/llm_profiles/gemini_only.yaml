@@ -3,6 +3,11 @@ default:
   max_tokens: 1000
   role: prose
 agents:
+  beat_extractor:
+    role: gemini_fast
+    response_format: json
+    max_tokens: 1200
+    temperature: 0.1
   contract_parser:
     temperature: 0.1
     max_tokens: 600

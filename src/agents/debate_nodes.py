@@ -9,6 +9,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from src.agents.beat_extraction import extract_brief_events
 from src.agents.continuity_agent import run_continuity_check
 from src.agents.debate_state import DebateState
 from src.agents.plan_validation import (
@@ -21,6 +22,7 @@ from src.agents.plan_validation import (
     MIN_SCENE_WORDS,
     MIN_SCENES,
     derive_length_plan,
+    max_proposed_ratio,
     normalize_chapter_plan,
     validate_chapter_plan,
 )
@@ -642,7 +644,7 @@ _CHAPTER_ARCHITECT_SYSTEM = (
 
 _CHAPTER_PLAN_FORMAT = """\
 {
-  "jalons": [{"id": "j1", "evenement": "événement distinct", "poids": "leger|normal|majeur", "apport": "ce qui est nouveau"}],
+  "jalons": [{"id": "j1", "evenement": "événement distinct", "poids": "leger|normal|majeur", "apport": "ce qui est nouveau", "origine": "brief|propose", "evenement_id": "e1 ou null si propose"}],
   "scenes": [
     {
       "scene_number": 1,
@@ -673,14 +675,29 @@ def chapter_architect_node(
     *,
     retry_invalid: bool = True,
     provider: LLMProvider | None = None,
+    event_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     """Derive scenes from beats, retry malformed plans once, then repair locally.
 
     Diagnostics can inject a provider and disable the retry to enforce a call budget.
     """
     brief = state.get("final_brief") or state.get("scene_brief") or state["scene_idea"]
+    author_brief = state["scene_idea"]
+    events = state.get("brief_events")
+    extraction_warnings: list[str] = []
+    if not events:
+        events, extraction_warnings = extract_brief_events(
+            author_brief, state.get("hard_constraints") or {},
+            profile=state.get("llm_profile", "default"), provider=event_provider,
+        )
     user_prompt = "\n".join([
         f"Brief du chapitre : {brief}",
+        f"Événements imposés : {_compact_json(events)}",
+        "Cette liste issue du brief de l'auteur est la référence factuelle ; un brief enrichi ne constitue pas une source de nouveaux faits.",
+        "Chaque jalon reprend un seul événement imposé : origine=brief et evenement_id correspondant. Ne fusionne pas plusieurs événements dans un jalon.",
+        "Tout événement ajouté doit porter origine=propose et evenement_id=null. N'invente aucun nom propre absent du brief de l'auteur et du contrat.",
+        f"Au maximum {max_proposed_ratio():.0%} du total des jalons peuvent être proposés, et jamais plus de deux ; garde uniquement les premiers ajouts utiles.",
+        "Ne découpe pas la même action en plusieurs jalons. Ne gonfle jamais les scènes pour atteindre une longueur.",
         f"Genre : {state['genre']}",
         f"Ton : {state['tone']}",
         f"Langue : {state['language']}",
@@ -740,14 +757,18 @@ def chapter_architect_node(
         prompt = user_prompt + "\n\nVIOLATIONS EXACTES À CORRIGER :\n" + "\n".join(
             f"- {violation}" for violation in violations
         ) + "\nCorrige les bornes impératives et le JSON, sans ajouter de matière pour atteindre le plancher souple."
-    jalons, repaired, plan_warnings = derive_length_plan(beats, scenes, _default_chapter_plan(state), state.get("target_words"))
+    jalons, repaired, plan_warnings = derive_length_plan(
+        beats, scenes, _default_chapter_plan(state), state.get("target_words"),
+        imposed_events=events, brief=author_brief, contract=state.get("hard_constraints") or {},
+    )
+    plan_warnings = extraction_warnings + plan_warnings
     words = sum(scene["estimated_words"] for scene in repaired)
     logger.info("Chapter planning: %d jalons, %d scènes, %d mots prévus.", len(jalons), len(repaired), words)
     for warning in plan_warnings:
         logger.warning("chapter_architect: %s", warning)
     if words > 8000:
         logger.warning("Chapitre de plus de 8000 mots : durée et coût plus élevés.")
-    return {"chapter_plan": repaired, "jalons": jalons, "plan_warnings": plan_warnings, "current_scene_index": 0}
+    return {"chapter_plan": repaired, "jalons": jalons, "brief_events": events, "plan_warnings": plan_warnings, "current_scene_index": 0}
 
 
 def rhythm_guardian_node(state: DebateState) -> dict[str, Any]:

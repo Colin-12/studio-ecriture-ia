@@ -3,6 +3,13 @@ default:
   max_tokens: 1000
   role: structured
 agents:
+  beat_extractor:
+    role: structured
+    fallback:
+      role: gemini_fast
+    response_format: json
+    max_tokens: 1200
+    temperature: 0.1
   stylist:
     temperature: 0.8
     max_tokens: 2000

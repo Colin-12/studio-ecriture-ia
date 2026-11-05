@@ -33,7 +33,8 @@ def payload(count=8, weight="normal", words=600):
 def plan(data, **kwargs):
     llm = MagicMock()
     llm.generate.return_value = LLMResponse(json.dumps(data), "mock", "mock", 0, 0, 0, None)
-    result = debate_nodes.chapter_architect_node(state(**kwargs), provider=llm)
+    events = data.get("jalons") or [{"id": f"e{i}", "evenement": scene["objective"]} for i, scene in enumerate(data["scenes"], 1)]
+    result = debate_nodes.chapter_architect_node(state(brief_events=events, **kwargs), provider=llm)
     expected_calls = 2 if sum(s["estimated_words"] for s in data["scenes"]) > 12000 else 1
     assert llm.generate.call_count == expected_calls
     assert validate_chapter_plan(result["chapter_plan"], result["jalons"]) == []
@@ -43,7 +44,7 @@ def plan(data, **kwargs):
 def test_two_beats_warn_without_inflation():
     result = plan(payload(2, words=500))
     assert sum(s["estimated_words"] for s in result["chapter_plan"]) == 1000
-    assert any("matière insuffisante : 2 jalons, environ 1000 mots" in w for w in result["plan_warnings"])
+    assert any("matière insuffisante : 2 événements imposés, environ 1000 mots" in w for w in result["plan_warnings"])
 
 
 def test_eight_beats_produce_eight_scenes():
@@ -103,6 +104,8 @@ def test_duplicate_unknown_and_missing_references_are_repaired():
 def test_missing_beats_inferred_without_exception():
     data = payload()
     del data["jalons"]
+    for index, scene in enumerate(data["scenes"], 1):
+        scene["objective"] = f"Un événement distinct {index}"
     result = plan(data)
     assert len(result["jalons"]) == 8
     assert any("Jalons absents" in w for w in result["plan_warnings"])
@@ -145,23 +148,25 @@ def test_rhythm_cannot_change_budgets_or_coverage(monkeypatch):
     assert output["chapter_plan"] == original
 
 
-def test_diagnostic_only_calls_planner_four_times(monkeypatch, capsys):
+def test_diagnostic_only_calls_extractor_and_planner_eight_times(monkeypatch, capsys, tmp_path):
     llm = MagicMock()
     llm.generate.return_value = LLMResponse(json.dumps(payload()), "mock", "mock", 0, 0, 0, None)
     monkeypatch.setattr(check_length_planning, "get_llm_for_agent", lambda *a, **k: llm)
+    monkeypatch.setattr(check_length_planning, "OUTPUT_PATH", tmp_path / "out.txt")
     assert check_length_planning.main([]) == 0
-    assert llm.generate.call_count == 4
+    assert llm.generate.call_count == 8
     assert capsys.readouterr().out.count("Mots prévus") == 4
 
 
-def test_diagnostic_bypasses_router_retry(monkeypatch):
+def test_diagnostic_bypasses_router_retry(monkeypatch, tmp_path):
     primary = MagicMock()
     configured = check_length_planning.SingleCallPlanner("chapter_architect", primary, {})
     generate = MagicMock(side_effect=InvalidProviderResponseError("empty"))
     monkeypatch.setattr(check_length_planning.SingleCallPlanner, "_generate_and_log", generate)
     monkeypatch.setattr(check_length_planning, "get_llm_for_agent", lambda *a, **k: configured)
+    monkeypatch.setattr(check_length_planning, "OUTPUT_PATH", tmp_path / "out.txt")
     check_length_planning.main([])
-    assert generate.call_count == 4
+    assert generate.call_count == 8
 
 
 def test_run_debate_exposes_target_without_changing_revision(monkeypatch):

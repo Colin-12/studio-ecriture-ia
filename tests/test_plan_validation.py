@@ -18,11 +18,14 @@ from src.agents.plan_validation import (
 from src.llm.base import LLMResponse
 
 
-def state():
-    return cast(DebateState, {
+def state(plan=None):
+    base = cast(DebateState, {
         "scene_idea": "Une lettre change tout", "genre": "roman", "tone": "tendu", "language": "fr",
         "hard_constraints": {}, "continuity_report": {},
     })
+    plan = plan if plan is not None else debate_nodes._default_chapter_plan(base)
+    base["brief_events"] = [{"id": f"e{i}", "evenement": scene["objective"]} for i, scene in enumerate(plan, 1)]
+    return base
 
 
 def response(plan):
@@ -47,7 +50,7 @@ def test_two_scenes_are_soft_shortfall_without_retry():
     short = plan[:2]
     llm = MagicMock()
     llm.generate.side_effect = [response(short), response(plan)]
-    result = debate_nodes.chapter_architect_node(state(), provider=llm)
+    result = debate_nodes.chapter_architect_node(state(short), provider=llm)
     assert result["chapter_plan"] == short
     assert llm.generate.call_count == 1
     assert any("matière insuffisante" in warning for warning in result["plan_warnings"])
@@ -61,7 +64,7 @@ def test_persistent_short_plan_never_inflated(caplog, weights, target, calls):
     llm = MagicMock()
     llm.generate.return_value = response(plan)
     with caplog.at_level(logging.WARNING):
-        result = debate_nodes.chapter_architect_node(state(), provider=llm)
+        result = debate_nodes.chapter_architect_node(state(plan), provider=llm)
     repaired = result["chapter_plan"]
     assert len(repaired) == 2
     assert [scene["title"] for scene in repaired] == [scene["title"] for scene in plan]
@@ -155,7 +158,7 @@ def test_check_planner_cost_is_n_calls(monkeypatch, capsys):
     llm.generate.return_value = response(debate_nodes._default_chapter_plan(state())[:2])
     monkeypatch.setattr(check_planner, "get_llm_for_agent", lambda *a, **kw: llm)
     assert check_planner.main(["--runs", "3"]) == 0
-    assert llm.generate.call_count == 3
+    assert llm.generate.call_count == 6
     output = capsys.readouterr().out
     assert output.count("Essai ") == 3
-    assert "2000 mots cibles" in output and "violations: aucune" in output
+    assert "150 mots cibles" in output and "violations: aucune" in output
