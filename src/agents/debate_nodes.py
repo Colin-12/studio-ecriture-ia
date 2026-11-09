@@ -43,6 +43,7 @@ from src.agents.scene_state import (
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
 from src.memory.chapter_memory import load_story_context, merge_established_characters
+from src.text_integrity import check_text_integrity
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +387,7 @@ def _without_overlap(previous: str, continuation: str) -> str:
 def _generate_stylist(
     state: DebateState, prompt: str, scene_number: int,
     *, scene_usage: list[LLMResponse] | None = None,
+    integrity_warnings: list[str] | None = None,
 ) -> str:
     """Retry truncated prose once with twice the total completion budget."""
     llm = get_llm_for_agent("stylist", profile=state.get("llm_profile", "default"))
@@ -404,8 +406,13 @@ def _generate_stylist(
     record_source(response)
     if not isinstance(response, LLMResponse):
         return str(response).strip()
-    if response.finish_reason != "MAX_TOKENS":
+    retained = _complete_sentences(response.text)
+    if response.finish_reason != "MAX_TOKENS" and retained:
         return response.text.strip()
+    if response.finish_reason != "MAX_TOKENS":
+        logger.warning("stylist scene=%s no complete sentence; retrying with a larger budget (finish_reason=%s).", scene_number, response.finish_reason)
+        if integrity_warnings is not None:
+            integrity_warnings.append(f"Scène {scene_number} : aucune phrase complète dans le morceau reçu ; nouvelle tentative avec un budget augmenté.")
     if isinstance(llm, ConfiguredLLMProvider):
         budget = int(llm.config.get("max_tokens", 1000))
         primary = llm.primary
@@ -418,14 +425,36 @@ def _generate_stylist(
     total = limit_fn(budget) if callable(limit_fn) else budget + reserve
     total = total if isinstance(total, int) else budget + reserve
     retry_budget = max(1, total * 2 - reserve)
-    logger.warning("stylist scene=%s MAX_TOKENS; retrying once with doubled completion budget.", scene_number)
-    response = llm.generate(prompt=prompt, max_tokens=retry_budget)
+    if response.finish_reason == "MAX_TOKENS":
+        logger.warning("stylist scene=%s MAX_TOKENS; retrying once with doubled completion budget.", scene_number)
+        if integrity_warnings is not None:
+            integrity_warnings.append(f"Scène {scene_number} : morceau signalé MAX_TOKENS ; reprise depuis la dernière phrase complète.")
+    prefix = retained if response.finish_reason == "MAX_TOKENS" else ""
+    retry_prompt = prompt
+    if prefix:
+        retry_prompt += "\nTexte déjà écrit, arrêté à une phrase complète :\n" + " ".join(prefix.split()[-150:]) + "\nContinue après cette dernière phrase complète, sans la répéter."
+    response = llm.generate(prompt=retry_prompt, max_tokens=retry_budget)
     record_source(response)
     text = response.text.strip() if isinstance(response, LLMResponse) else str(response).strip()
     if isinstance(response, LLMResponse) and response.finish_reason == "MAX_TOKENS":
         text = _complete_sentences(text)
         logger.warning("stylist scene=%s still MAX_TOKENS; trimmed to complete sentences, words_retained=%s.", scene_number, len(text.split()))
+        if integrity_warnings is not None:
+            integrity_warnings.append(f"Scène {scene_number} : réponse encore MAX_TOKENS, recoupée à la dernière phrase complète ({len(text.split())} mots).")
+    text = _joinable_piece(text, scene_number, integrity_warnings)
+    if prefix:
+        text = (prefix + "\n" + _without_overlap(prefix, text)).strip()
     return text
+
+
+def _joinable_piece(text: str, scene_number: int, warnings: list[str] | None) -> str:
+    complete = _complete_sentences(text)
+    if complete != text.strip() or not complete:
+        warning = f"Scène {scene_number} : fragment incomplet retiré avant raccord ; {len(complete.split())} mots conservés."
+        logger.warning(warning)
+        if warnings is not None:
+            warnings.append(warning)
+    return complete
 
 
 def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[str]:
@@ -539,6 +568,7 @@ def _stylist_continuity_context(state: DebateState) -> dict:
 def stylist_node(state: DebateState) -> dict[str, Any]:
     """Draft prose scene by scene (multi-scene) or as a single block (legacy)."""
     chapter_plan: list[dict] = state.get("chapter_plan") or []
+    integrity_warnings: list[str] = []
 
     if not chapter_plan:
         # Legacy single-scene path — backward compatible
@@ -556,7 +586,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             "Respecte les faits acquis de ce rapport de continuité :",
             _compact_json(_stylist_continuity_context(state)),
         ]
-        prose = _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)
+        prose = _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1, integrity_warnings=integrity_warnings), 1)
+        integrity_warnings.extend(check_text_integrity(prose))
         pronoun_counts, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, 1)
         events = state.get("brief_events") or []
         beats = [{"id": f"legacy_{event['id']}", "origine": "brief", "evenement_id": event["id"]} for event in events]
@@ -566,6 +597,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
         drafted = {"scene_number": 1, "prose": prose, "word_count": len(prose.split()), "last_words": " ".join(prose.split()[-150:]),
                    "scene_plan": scene, "fidelity": verdict, "attribute_warnings": attribute_warnings, "pronoun_counts": pronoun_counts}
         return {"draft": prose, "warnings": attribute_warnings, "scenes_drafted": [drafted],
+                "text_integrity_warnings": integrity_warnings,
                 "fidelity_report": aggregate_fidelity(events, beats, [scene], [drafted])}
 
     # Multi-scene path
@@ -603,7 +635,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     ]
 
     scene_usage: list[LLMResponse] = []
-    prose = _generate_stylist(state, "\n".join(parts), scene["scene_number"], scene_usage=scene_usage)
+    prose = _generate_stylist(state, "\n".join(parts), scene["scene_number"], scene_usage=scene_usage, integrity_warnings=integrity_warnings)
 
     # Continuation loop for long scenes (≤ 500 words: no continuation)
     if estimated_words > 500:
@@ -612,6 +644,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             words = prose.split()
             if len(words) >= target_min:
                 break
+            prose = _joinable_piece(prose, scene["scene_number"], integrity_warnings)
+            words = prose.split()
             mots_restants = estimated_words - len(words)
             last_150 = " ".join(words[-150:])
             continuation_prompt = "\n".join([*scope,
@@ -626,13 +660,15 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "Continue directement, même registre, même voix.",
                 f"Objectif : encore {mots_restants} mots environ.",
             ])
-            continuation = _generate_stylist(state, continuation_prompt, scene["scene_number"], scene_usage=scene_usage)
+            continuation = _generate_stylist(state, continuation_prompt, scene["scene_number"], scene_usage=scene_usage, integrity_warnings=integrity_warnings)
+            continuation = _joinable_piece(continuation, scene["scene_number"], integrity_warnings)
             continuation = _without_overlap(prose, continuation)
             if not continuation:
                 break
             prose = (prose + "\n" + continuation).strip()
 
     prose = _check_scene_prose(prose, scene["scene_number"])
+    integrity_warnings.extend(f"Scène {scene['scene_number']} — {warning}" for warning in check_text_integrity(prose))
     pronoun_counts, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, scene["scene_number"])
     words = prose.split()
     previous_scenes = state.get("scenes_drafted") or []
@@ -652,6 +688,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "scene_number": scene["scene_number"],
                 "prose": prose,
                 "word_count": len(words),
+                "text_integrity_warnings": integrity_warnings,
                 "pronoun_counts": pronoun_counts,
                 "attribute_warnings": attribute_warnings,
                 "fidelity": fidelity,
@@ -671,6 +708,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     }
     result["fidelity_report"] = aggregate_fidelity(state.get("brief_events") or [], state.get("jalons") or [], chapter_plan,
                                                    [*previous_scenes, *result["scenes_drafted"]])
+    result["text_integrity_warnings"] = [*(state.get("text_integrity_warnings") or []), *integrity_warnings]
     return result
 
 
@@ -955,7 +993,8 @@ def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
     if not scenes_drafted:
         # Legacy: draft already set by single-scene stylist
         existing = state.get("draft", "")
-        return {"chapter_assembled": existing, "draft": existing}
+        return {"chapter_assembled": existing, "draft": existing,
+                "text_integrity_warnings": [*(state.get("text_integrity_warnings") or []), *check_text_integrity(existing)]}
 
     plan: list[dict] = state.get("chapter_plan") or []
     pacing_map: dict[int, str] = {
@@ -970,7 +1009,8 @@ def chapter_assembler_node(state: DebateState) -> dict[str, Any]:
         parts.append(scene["prose"])
 
     assembled = "\n".join(parts)
-    return {"chapter_assembled": assembled, "draft": assembled}
+    integrity_warnings = list(dict.fromkeys([*(state.get("text_integrity_warnings") or []), *check_text_integrity(assembled)]))
+    return {"chapter_assembled": assembled, "draft": assembled, "text_integrity_warnings": integrity_warnings}
 
 
 

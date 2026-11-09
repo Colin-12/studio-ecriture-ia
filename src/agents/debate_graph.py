@@ -178,6 +178,7 @@ def run_debate(
         "plan_warnings": [],
         "plan_suggestions": [],
         "fidelity_report": {},
+        "text_integrity_warnings": [],
         "current_scene_index": 0,
         "scenes_drafted": [],
         "chapter_assembled": "",
@@ -192,6 +193,7 @@ def run_debate(
 def _reset_chapter_pass_node(state: DebateState) -> dict[str, Any]:
     return {
         "fidelity_report": {},
+        "text_integrity_warnings": [],
         "scenes_drafted": {"reset": True, "scenes": []},
         "current_scene_index": 0,
         "chapter_plan": [],
@@ -230,6 +232,7 @@ def _record_revision_node(state: DebateState) -> dict[str, Any]:
             "scene_brief": state.get("scene_brief", ""),
             "final_brief": state.get("final_brief", ""),
             "fidelity_report": state.get("fidelity_report") or {},
+            "text_integrity_warnings": state.get("text_integrity_warnings") or [],
         })
     return {"revision_history": [*history, entry], "best_revision": best}
 
