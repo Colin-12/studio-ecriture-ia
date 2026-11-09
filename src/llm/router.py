@@ -20,6 +20,7 @@ from src.llm.cost_ledger import (
 )
 from src.llm.exceptions import (
     InvalidProviderResponseError,
+    PrepayCreditsDepletedError,
     ProviderUnavailableError,
     RateLimitError,
     SpendCapExceededError,
@@ -103,7 +104,7 @@ class ConfiguredLLMProvider(LLMProvider):
                 return self._generate_and_log(self.primary, prompt, system, primary_config)
         except (RateLimitError, ProviderUnavailableError, InvalidProviderResponseError) as exc:
             if self.fallback is None:
-                if not isinstance(exc, SpendCapExceededError):
+                if not isinstance(exc, (SpendCapExceededError, PrepayCreditsDepletedError)):
                     logger.warning("%s provider=%s failed; no fallback configured: %s", self.agent_name,
                                    getattr(self.primary, "provider_name", type(self.primary).__name__), exc)
                 raise
@@ -130,7 +131,7 @@ class ConfiguredLLMProvider(LLMProvider):
                     logger.warning("%s fallback provider=%s model=%s skipped: estimated_tokens=%s exceeds tokens_per_minute=%s.",
                                    self.agent_name, fallback_name, self.fallback.model, estimated, limit)
                     raise RateLimitError(f"Fallback request estimate {estimated} exceeds configured model tokens-per-minute quota {limit}.")
-                if not isinstance(exc, SpendCapExceededError):
+                if not isinstance(exc, (SpendCapExceededError, PrepayCreditsDepletedError)):
                     logger.warning(
                         "%s provider=%s failed; using fallback provider=%s model=%s: %s",
                         self.agent_name, getattr(self.primary, "provider_name", type(self.primary).__name__),
