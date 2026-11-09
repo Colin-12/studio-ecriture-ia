@@ -221,9 +221,12 @@ def _create_characters(db_path: str, novel_id: int, characters_text: str) -> Non
     )
     Base.metadata.create_all(engine)
     with Session(engine) as session:
+        from src.memory.chapter_memory import ensure_novel
+        ensure_novel(session, novel_id)
         for line in characters_text.strip().splitlines():
             name = line.strip().lstrip("-•*·").strip()
             if not name:
                 continue
-            session.add(Character(novel_id=novel_id, name=name[:255]))
+            name, _, description = name.partition(",")
+            session.add(Character(novel_id=novel_id, name=name.strip()[:255], description=description.strip() or None))
         session.commit()

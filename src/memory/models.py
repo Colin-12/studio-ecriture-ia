@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import List, Optional
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -74,6 +83,28 @@ class Character(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     novel: Mapped["Novel"] = relationship(back_populates="characters")
+
+
+class ChapterMemory(Base):
+    """Author-approved chapter memory; existing tables remain unchanged."""
+
+    __tablename__ = "chapter_memories"
+    __table_args__ = (
+        UniqueConstraint("novel_id", "chapter_number", name="uq_chapter_memory_novel_number"),
+        CheckConstraint("status in ('propose', 'valide', 'ignore')", name="ck_chapter_memory_status"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id"), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="propose")
+    summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    end_state: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    characters: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    open_threads: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    closed_threads: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    facts_revealed: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
 
 class Location(Base):

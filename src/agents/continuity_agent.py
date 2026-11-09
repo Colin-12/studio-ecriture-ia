@@ -9,20 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from src.agents.base import BaseAgent
+from src.memory.chapter_memory import load_story_context
 from src.memory.continuity_checker import answer_with_evidence
 from src.memory.database import get_session
 from src.memory.knowledge import query_character_knowledge
 from src.memory.models import Chapter, Event
 from src.memory.setup_payoff import open_setups_before_chapter
 from src.retrieval.vector_store import semantic_search
-
-MAIN_FRANKENSTEIN_CHARACTERS = [
-    "Victor Frankenstein",
-    "The Creature",
-    "Elizabeth Lavenza",
-    "Robert Walton",
-    "Henry Clerval",
-]
 
 
 def run_continuity_check(
@@ -31,19 +24,31 @@ def run_continuity_check(
     db_path: Path,
     chroma_dir: Path,
     collection_name: str,
+    *, brief: str = "", contract: dict | None = None,
 ) -> dict[str, Any]:
     """Build a continuity report from SQLite memory and semantic retrieval."""
+    context = load_story_context(novel_id, chapter_number, db_path)
+    candidates = [ch.get("name", "") for ch in (contract or {}).get("characters") or []]
+    registry = context["character_registry"]
+    candidates += [ch["name"] for ch in registry if ch["name"].casefold() in brief.casefold()]
+    candidates += [ch["name"] for ch in context["previous_memory"].get("characters") or []]
+    candidates += [ch["name"] for ch in registry]
+    names: list[str] = []
+    for name in candidates:
+        if name and name.casefold() not in {n.casefold() for n in names}:
+            names.append(name)
     open_setups = open_setups_before_chapter(chapter_number, db_path, novel_id)
     character_states = [
         {
             "character": character_name,
             "knowledge": query_character_knowledge(
                 character_name,
-                chapter_number,
+                max(0, chapter_number - 1),
                 db_path,
+                novel_id=novel_id,
             ),
         }
-        for character_name in MAIN_FRANKENSTEIN_CHARACTERS
+        for character_name in names[:8]
     ]
     recent_events = _recent_events_before_chapter(chapter_number, novel_id, db_path)
     semantic_context = _semantic_context_for_previous_chapter(
@@ -51,9 +56,10 @@ def run_continuity_check(
         novel_id,
         db_path,
         chroma_dir,
-        collection_name,
+        f"novel_{novel_id}",
+        brief=brief,
     )
-    warnings = _build_setup_warnings(chapter_number, open_setups)
+    warnings = _build_setup_warnings(chapter_number, open_setups) + context["memory_warnings"]
 
     return {
         "chapter_number": chapter_number,
@@ -62,6 +68,7 @@ def run_continuity_check(
         "recent_events": recent_events,
         "semantic_context": semantic_context,
         "warnings": warnings,
+        **context,
     }
 
 
@@ -107,9 +114,10 @@ def _semantic_context_for_previous_chapter(
     db_path: Path,
     chroma_dir: Path,
     collection_name: str,
+    *, brief: str = "",
 ) -> list[dict[str, Any]]:
-    query = _previous_chapter_query(chapter_number, novel_id, db_path)
-    if not query:
+    query = brief.strip()
+    if not query or chapter_number <= 1:
         return []
 
     try:
@@ -118,6 +126,7 @@ def _semantic_context_for_previous_chapter(
             collection_name=collection_name,
             query=query,
             n_results=3,
+            where={"$and": [{"novel_id": novel_id}, {"chapter_number": {"$lt": chapter_number}}]},
         )
     except Exception:
         return []
@@ -140,31 +149,6 @@ def _semantic_context_for_previous_chapter(
             }
         )
     return passages
-
-
-def _previous_chapter_query(
-    chapter_number: int,
-    novel_id: int,
-    db_path: Path,
-) -> str:
-    previous_chapter_number = chapter_number - 1
-    if previous_chapter_number < 1:
-        return ""
-
-    session = get_session(db_path)
-    try:
-        chapter = session.execute(
-            select(Chapter).where(
-                Chapter.novel_id == novel_id,
-                Chapter.number == previous_chapter_number,
-            )
-        ).scalar_one_or_none()
-        if chapter is None:
-            return f"Frankenstein chapter {previous_chapter_number}"
-        excerpt = chapter.full_text[:1200].strip()
-        return excerpt or f"Frankenstein chapter {previous_chapter_number}"
-    finally:
-        session.close()
 
 
 def _build_setup_warnings(
@@ -218,6 +202,8 @@ class ContinuityAgent(BaseAgent):
             db_path=Path(input_data["db_path"]),
             chroma_dir=Path(input_data["chroma_dir"]),
             collection_name=str(input_data["collection_name"]),
+            brief=str(input_data.get("brief") or input_data.get("scene_idea") or ""),
+            contract=input_data.get("hard_constraints") or {},
         )
         result["agent"] = self.name
         return result

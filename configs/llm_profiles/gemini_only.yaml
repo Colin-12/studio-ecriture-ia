@@ -3,6 +3,11 @@ default:
   max_tokens: 1000
   role: prose
 agents:
+  chapter_memory:
+    role: gemini_fast
+    response_format: json
+    max_tokens: 700
+    temperature: 0.1
   fidelity_checker:
     role: gemini_fast
     response_format: json

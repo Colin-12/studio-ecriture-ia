@@ -16,7 +16,7 @@ from tests.test_scene_isolation import _state
 
 END_STATE = {"lieu": "sur le quai", "moment": "à l'aube", "objets_tenus": ["Léa : montre arrêtée"],
              "etat_objet_central": "montre arrêtée, boîtier fermé", "personnages_presents": ["Léa"],
-             "revele": ["Léa a trouvé la montre dans une boîte"], "attributs_objets": {}}
+             "revele": ["Léa a trouvé la montre dans une boîte"], "attributs_objets": {}, "resume": ""}
 
 
 def _response(text):
@@ -59,7 +59,7 @@ def test_state_word_limit_is_enforced(monkeypatch):
     llm.generate.return_value = _response(json.dumps(value))
     monkeypatch.setattr(extractor, "get_llm_for_agent", lambda *a, **kw: llm)
     result = extractor.extract_scene_state("La scène.", ["Léa"])
-    assert len(json.dumps(result, ensure_ascii=False).split()) <= 120
+    assert len(json.dumps(result, ensure_ascii=False).split()) <= 160
     assert set(result) == set(END_STATE)
 
 

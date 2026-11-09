@@ -13,11 +13,11 @@ from src.llm.base import LLMResponse
 from src.llm.router import get_llm_for_agent
 
 logger = logging.getLogger(__name__)
-STATE_FIELDS = ("lieu", "moment", "objets_tenus", "etat_objet_central", "personnages_presents", "revele", "attributs_objets")
+STATE_FIELDS = ("lieu", "moment", "objets_tenus", "etat_objet_central", "personnages_presents", "revele", "attributs_objets", "resume")
 PHYSICAL_ATTRIBUTES = {"matiere", "couleur", "taille", "marque"}
 
 
-def _limit_words(state: dict[str, Any], limit: int = 120) -> dict[str, Any]:
+def _limit_words(state: dict[str, Any], limit: int = 160) -> dict[str, Any]:
     """Bound the complete serialized JSON while preserving its fields and types."""
     result = deepcopy(state)
     while len(json.dumps(result, ensure_ascii=False).split()) > limit:
@@ -63,11 +63,12 @@ def extract_scene_state(prose: str, personnages: list[str] | None = None, *, pro
         "attributs_objets décrit pour chaque objet nommé ses attributs physiques explicitement établis "
         "par la prose : matiere, couleur, taille, marque. Utilise un nom court et concret pour chaque objet ; "
         "n'invente pas d'attribut, laisse son dictionnaire vide si aucun n'est précisé.\n"
-        "Réponds en JSON uniquement, 120 mots maximum au total, sans commentaire. "
+        "resume est une phrase de résumé factuel de cette scène, 30 mots maximum. "
+        "Réponds en JSON uniquement, 160 mots maximum au total, sans commentaire. "
         "lieu, moment et etat_objet_central sont des chaînes ; objets_tenus est une liste "
         "de chaînes 'personnage : objet' ; personnages_presents et revele sont des listes de chaînes.\n"
         'Champs : {"lieu":"", "moment":"", "objets_tenus":[], "etat_objet_central":"", '
-        '"personnages_presents":[], "revele":[], "attributs_objets":{"objet":{"matiere":""}}}\n'
+        '"personnages_presents":[], "revele":[], "attributs_objets":{"objet":{"matiere":""}}, "resume":""}\n'
         f"Noms des personnages du contrat : {json.dumps(personnages or [], ensure_ascii=False)}\n"
         f"Scène terminée :\n{prose}"
     )
@@ -86,18 +87,19 @@ def extract_scene_state(prose: str, personnages: list[str] | None = None, *, pro
             parsed, _ = json.JSONDecoder().raw_decode(cleaned[start:])
         if not isinstance(parsed, dict) or not any(field in parsed for field in STATE_FIELDS):
             raise ValueError("missing scene-state fields")
-        defaults: dict[str, Any] = {"lieu": "", "moment": "", "objets_tenus": [], "etat_objet_central": "", "personnages_presents": [], "revele": [], "attributs_objets": {}}
+        defaults: dict[str, Any] = {"lieu": "", "moment": "", "objets_tenus": [], "etat_objet_central": "", "personnages_presents": [], "revele": [], "attributs_objets": {}, "resume": ""}
         state = {field: parsed.get(field, default) for field, default in defaults.items()}
-        for field in ("lieu", "moment", "etat_objet_central"):
+        for field in ("lieu", "moment", "etat_objet_central", "resume"):
             if not isinstance(state[field], str):
                 raise ValueError(f"invalid {field}")
         state["attributs_objets"] = normalize_object_attributes(state["attributs_objets"])
+        state["resume"] = " ".join(re.split(r"(?<=[.!?])\s+", state["resume"].strip())[0].split()[:30])
         for field in ("objets_tenus", "personnages_presents", "revele"):
             if not isinstance(state[field], list) or not all(isinstance(item, str) for item in state[field]):
                 raise ValueError(f"invalid {field}")
         bounded = _limit_words(state)
         if bounded != state:
-            logger.warning("scene_state exceeded 120 words; compacted deterministically.")
+            logger.warning("scene_state exceeded 160 words; compacted deterministically.")
         return bounded
     except Exception as exc:
         logger.warning("scene_state extraction failed; returning no new observation, registry preserved by caller | response_length=%d | response[:200]=%r | error=%s",

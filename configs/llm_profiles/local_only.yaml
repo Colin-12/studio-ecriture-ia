@@ -3,6 +3,11 @@ default:
   max_tokens: 1000
   role: local_json
 agents:
+  chapter_memory:
+    role: local_json
+    response_format: json
+    max_tokens: 700
+    temperature: 0.1
   fidelity_checker:
     role: local_json
     response_format: json

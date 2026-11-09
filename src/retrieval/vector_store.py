@@ -7,7 +7,7 @@ from typing import Any
 
 import chromadb
 from chromadb.api.models.Collection import Collection
-from chromadb.api.types import Metadata, QueryResult
+from chromadb.api.types import Metadata, QueryResult, Where
 from sqlalchemy import select
 
 from src.memory.database import get_session
@@ -76,8 +76,28 @@ def semantic_search(
     collection_name: str,
     query: str,
     n_results: int = 5,
+    where: dict | None = None,
 ) -> QueryResult:
     """Query the semantic memory stored in ChromaDB."""
     client = get_chroma_client(persist_dir)
     collection = get_or_create_collection(client, collection_name)
+    if where is not None:
+        return collection.query(query_texts=[query], n_results=n_results, where=where)
     return collection.query(query_texts=[query], n_results=n_results)
+
+
+def index_chapter_text(novel_id: int, chapter_number: int, prose: str, *, persist_dir: str | Path = "data/chroma") -> int:
+    """Replace just this chapter's passages in its per-novel collection."""
+    collection = get_or_create_collection(get_chroma_client(persist_dir), f"novel_{novel_id}")
+    where: Where = {"$and": [{"novel_id": novel_id}, {"chapter_number": chapter_number}]}
+    old_ids = collection.get(where=where, include=[])["ids"]
+    chunks = chunk_text(prose)
+    ids = [f"novel-{novel_id}-chapter-{chapter_number}-chunk-{i}" for i in range(len(chunks))]
+    if chunks:
+        collection.upsert(ids=ids,
+                          documents=chunks,
+                          metadatas=[{"novel_id": novel_id, "chapter_number": chapter_number, "chunk_index": i} for i in range(len(chunks))])
+    stale_ids = [identifier for identifier in old_ids if identifier not in ids]
+    if stale_ids:
+        collection.delete(ids=stale_ids)
+    return len(chunks)

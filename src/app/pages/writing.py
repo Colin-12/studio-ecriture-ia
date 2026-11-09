@@ -28,7 +28,15 @@ from src.llm.error_messages import (
     format_generation_error,
     generation_error_details,
 )
+from src.memory.chapter_memory import (
+    apply_chapter_memory,
+    build_chapter_memory_proposal,
+    ensure_novel,
+    load_chapter_memories,
+    previous_chapter_memory,
+)
 from src.memory.models import Base, Chapter, Event, Novel
+from src.retrieval.vector_store import index_chapter_text
 
 _POV_OPTIONS = [
     "Première personne",
@@ -78,7 +86,8 @@ def render() -> None:
 
     # Determine chapter number once (persisted in session)
     if "writing_chapter_number" not in st.session_state:
-        in_progress = [c for c in chapters if not c.summary]
+        accepted = {memory["chapter_number"] for memory in load_chapter_memories(novel_id, db_path) if memory["status"] in {"valide", "ignore"}}
+        in_progress = [c for c in chapters if not c.summary and c.number not in accepted]
         st.session_state["writing_chapter_number"] = (
             in_progress[0].number or len(chapters) if in_progress else len(chapters) + 1
         )
@@ -654,10 +663,16 @@ def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
             if not prose.strip():
                 st.warning("La prose est vide.")
             else:
-                chapter_id = _validate_chapter(prose, chapter_number, novel_id, engine, debate.get("fidelity_report") or {})
-                st.session_state["writing_validated_chapter_id"] = chapter_id
-                st.session_state["writing_step"] = "step_4"
-                st.rerun()
+                try:
+                    chapter_id = _validate_chapter(prose, chapter_number, novel_id, engine, debate.get("fidelity_report") or {})
+                except Exception as exc:
+                    _render_generation_error(exc)
+                else:
+                    for key in ("writing_memory_proposal", "memory_summary", "memory_threads"):
+                        st.session_state.pop(key, None)
+                    st.session_state["writing_validated_chapter_id"] = chapter_id
+                    st.session_state["writing_step"] = "step_4"
+                    st.rerun()
 
     # Rework section
     with st.expander("Retravailler", expanded=False):
@@ -719,37 +734,57 @@ def _render_step_4(chapter_number: int, novel_id: int, engine: Any) -> None:
     )
 
     prose = (st.session_state.get("writing_prose_edited") or "").strip()
-    chapter_id: int | None = st.session_state.get("writing_validated_chapter_id")
 
-    # Extract events (lazy, cached in session state)
-    if "writing_extracted_events" not in st.session_state:
-        with st.spinner("Extraction des événements narratifs…"):
-            st.session_state["writing_extracted_events"] = _extract_events(
-                prose, chapter_number, us.get_llm_profile()
-            )
-    events: list[dict] = st.session_state.get("writing_extracted_events") or []
+    if "writing_memory_proposal" not in st.session_state:
+        debate = st.session_state.get("writing_debate_state") or {}
+        with st.spinner("Proposition de mémoire du chapitre…"):
+            st.session_state["writing_memory_proposal"] = build_chapter_memory_proposal(
+                prose, debate.get("scenes_drafted") or [], debate.get("chapter_plan") or [],
+                debate.get("hard_constraints") or {}, previous_chapter_memory(novel_id, chapter_number, us.get_db_path()), us.get_llm_profile())
+    proposal = st.session_state["writing_memory_proposal"]
+    if proposal.get("status") == "partiel":
+        st.warning("Mémoire partielle : vérifie la proposition avant de l'appliquer.")
+    for warning in proposal.get("warnings") or []:
+        st.warning(warning)
+    summary = st.text_area("Résumé du chapitre", value=proposal.get("summary", ""), key="memory_summary")
+    events: list[dict] = proposal.get("events") or []
 
     validated_events: list[dict] = []
     if events:
         for i, ev in enumerate(events):
             title = ev.get("title", f"Événement {i + 1}")
             description = ev.get("description", "")
-            label = f"✅ **{title}**" + (f" — {description[:100]}" if description else "")
+            label = f"✅ **{title}**" + (f" — {description}" if description else "")
             if st.checkbox(label, value=True, key=f"ev_chk_{i}"):
                 validated_events.append(ev)
     else:
         st.caption("Aucun événement extrait automatiquement.")
 
+    confirmed = []
+    for index, character in enumerate(proposal.get("characters") or []):
+        attributes = ", ".join(character.get("fixed_attributes") or [])
+        label = f"{character['name']} : {attributes or 'attributs non précisés'}"
+        if character.get("confirmation") == "à confirmer":
+            label += " — à confirmer"
+        if st.checkbox(label, value=character.get("confirmation") != "à confirmer", key=f"mem_char_{index}"):
+            confirmed.append(character)
+    threads = st.text_area("Fils ouverts (un par ligne)", value="\n".join(proposal.get("open_threads") or []), key="memory_threads")
+    st.caption("État de fin du chapitre — lecture seule")
+    st.json(proposal.get("end_state") or {})
+
     col_apply, col_skip = st.columns(2)
 
     with col_apply:
         if st.button(
-            "Appliquer les mises à jour sélectionnées",
+            "Appliquer",
             type="primary",
             key="btn_apply_events",
         ):
-            if validated_events and chapter_id is not None:
-                _insert_events(validated_events, chapter_id, novel_id, engine)
+            applied = apply_chapter_memory(novel_id, chapter_number, prose,
+                {**proposal, "summary": summary, "open_threads": [line.strip() for line in threads.splitlines() if line.strip()]},
+                db_path=us.get_db_path(), selected_events=validated_events, confirmed_characters=confirmed, index_text=False)
+            for warning in applied.get("warnings") or []:
+                st.warning(warning)
             st.success(f"{len(validated_events)} mise(s) à jour appliquée(s).")
             if not st.session_state.get("writing_balloons_done"):
                 st.balloons()
@@ -759,6 +794,7 @@ def _render_step_4(chapter_number: int, novel_id: int, engine: Any) -> None:
 
     with col_skip:
         if st.button("Ignorer toutes les mises à jour", key="btn_skip_events"):
+            apply_chapter_memory(novel_id, chapter_number, prose, {}, db_path=us.get_db_path(), status="ignore", index_text=False)
             st.session_state["writing_show_next"] = True
             st.rerun()
 
@@ -949,30 +985,6 @@ def _save_step0_inputs(brief: str, pov_label: str, tone: str) -> None:
     st.session_state["writing_tone"] = tone
 
 
-def _extract_events(prose: str, chapter_number: int, llm_profile: str) -> list[dict]:
-    """Try to extract narrative events via event_extractor. Returns [] on failure."""
-    try:
-        from src.llm.base import LLMResponse
-        from src.llm.router import get_llm_for_agent
-
-        llm = get_llm_for_agent("event_extractor", profile=llm_profile)
-        if not llm.is_available():
-            return []
-        prompt = (
-            f"Extrait les événements narratifs clés du chapitre {chapter_number} en JSON.\n"
-            f'Format : [{{"title": "...", "description": "..."}}]\n'
-            f"Chapitre :\n{prose[:3000]}"
-        )
-        resp = llm.generate(prompt=prompt, response_format="json", max_tokens=800)
-        raw = resp.text if isinstance(resp, LLMResponse) else str(resp)
-        data = json.loads(raw)
-        if isinstance(data, list):
-            return [d for d in data if isinstance(d, dict) and d.get("title")]
-    except Exception:
-        pass
-    return []
-
-
 # ---------------------------------------------------------------------------
 # Persistence
 # ---------------------------------------------------------------------------
@@ -997,6 +1009,7 @@ def _validate_chapter(prose: str, chapter_number: int, novel_id: int, engine: An
     _save_fidelity_sidecar(path, fidelity_report or {})
 
     with Session(engine) as session:
+        ensure_novel(session, novel_id)
         chapter = (
             session.query(Chapter)
             .filter(Chapter.novel_id == novel_id, Chapter.number == chapter_number)
@@ -1004,7 +1017,7 @@ def _validate_chapter(prose: str, chapter_number: int, novel_id: int, engine: An
         )
         if chapter:
             chapter.full_text = prose
-            chapter.summary = f"Chapitre {chapter_number} — validé."
+            chapter.file_path = str(path)
             chapter.word_count = len(prose.split())
         else:
             chapter = Chapter(
@@ -1014,12 +1027,13 @@ def _validate_chapter(prose: str, chapter_number: int, novel_id: int, engine: An
                 full_text=prose,
                 file_path=str(path),
                 word_count=len(prose.split()),
-                summary=f"Chapitre {chapter_number} — validé.",
+                summary=None,
             )
             session.add(chapter)
         session.flush()
         chapter_id: int = int(chapter.id)
         session.commit()
+    index_chapter_text(novel_id, chapter_number, prose)
     return chapter_id
 
 
@@ -1052,6 +1066,9 @@ def _advance_to_next_chapter() -> None:
         "writing_scene_brief",
         "writing_prose_edited",
         "writing_extracted_events",
+        "writing_memory_proposal",
+        "memory_summary",
+        "memory_threads",
         "writing_validated_chapter_id",
         "writing_show_next",
         "writing_balloons_done",

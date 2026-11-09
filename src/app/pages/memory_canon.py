@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from src.app import ui_state as us
+from src.memory.chapter_memory import ensure_novel, load_chapter_memories
 from src.memory.models import Base, Novel
 
 _BELIEF_COLORS = {
@@ -38,8 +39,8 @@ def render() -> None:
     with Session(engine) as session:
         novel = session.get(Novel, novel_id)
         if novel is None:
-            st.warning("Roman introuvable en base. Commencez par générer un chapitre.")
-            return
+            novel = ensure_novel(session, novel_id)
+            session.commit()
 
         chapters = sorted(novel.chapters, key=lambda c: c.number or 0)
         characters = list(novel.characters)
@@ -49,9 +50,19 @@ def render() -> None:
         # CharacterKnowledge (table externe)
         ck_rows = _load_character_knowledge(session)
 
-    tab_timeline, tab_chars, tab_events, tab_setups, tab_contra = st.tabs(
-        ["Timeline", "Personnages", "Événements", "Setups", "Contradictions"]
+    tab_timeline, tab_chars, tab_events, tab_setups, tab_contra, tab_memories = st.tabs(
+        ["Timeline", "Personnages", "Événements", "Setups", "Contradictions", "Chapitres"]
     )
+    with tab_memories:
+        memories = load_chapter_memories(novel_id, db_path)
+        if not memories:
+            st.caption("Aucune mémoire de chapitre enregistrée.")
+        for memory in memories:
+            with st.expander(f"Chapitre {memory['chapter_number']} — {memory['status']}", expanded=False):
+                st.write(memory["summary"])
+                st.json(memory["end_state"])
+                st.write("Fils ouverts :", memory["open_threads"])
+                st.write("Fils clos :", memory["closed_threads"])
 
     # ------------------------------------------------------------------
     # Timeline

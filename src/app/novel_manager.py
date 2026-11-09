@@ -46,13 +46,29 @@ def create_novel(
 ) -> int:
     """Insert a new novel and return its id."""
     with _connect(db_path) as conn:
+        largest = conn.execute("SELECT coalesce(max(id),0) FROM ui_novels").fetchone()[0]
+        for table in ("novels", "chapters", "characters", "events", "chapter_memories"):
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone():
+                column = "id" if table == "novels" else "novel_id"
+                largest = max(largest, conn.execute(f"SELECT coalesce(max({column}),0) FROM {table}").fetchone()[0])
         cursor = conn.execute(
-            "INSERT INTO ui_novels (title, genre, language, description) VALUES (?, ?, ?, ?)",
-            (title, genre, language, description),
+            "INSERT INTO ui_novels (id, title, genre, language, description) VALUES (?, ?, ?, ?, ?)",
+            (largest + 1, title, genre, language, description),
         )
         conn.commit()
         novel_id = cursor.lastrowid
-    return int(novel_id) if novel_id is not None else -1
+    result = int(novel_id) if novel_id is not None else -1
+    from sqlalchemy.orm import Session
+
+    from src.memory.chapter_memory import ensure_novel
+    from src.memory.database import get_engine
+    from src.memory.models import Base
+    engine = get_engine(db_path)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        ensure_novel(session, result)
+        session.commit()
+    return result
 
 
 def get_novel(db_path: str, novel_id: int) -> dict:

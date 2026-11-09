@@ -1,6 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from src.agents.continuity_agent import run_continuity_check
+
+
+@pytest.fixture(autouse=True)
+def story_context(monkeypatch):
+    monkeypatch.setattr("src.agents.continuity_agent.load_story_context", lambda *a: {
+        "story_so_far": "Récit antérieur", "character_registry": [{"name": "Hélène"}, {"name": "Anselme"}],
+        "previous_memory": {}, "memory_warnings": []})
 
 
 def test_run_continuity_check_returns_expected_keys(monkeypatch) -> None:
@@ -10,7 +19,7 @@ def test_run_continuity_check_returns_expected_keys(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent.query_character_knowledge",
-        lambda character_name, chapter, db_path: [],
+        lambda character_name, chapter, db_path, **kw: [],
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent._recent_events_before_chapter",
@@ -18,7 +27,7 @@ def test_run_continuity_check_returns_expected_keys(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent._semantic_context_for_previous_chapter",
-        lambda chapter_number, novel_id, db_path, chroma_dir, collection_name: [],
+        lambda chapter_number, novel_id, db_path, chroma_dir, collection_name, **kw: [],
     )
 
     report = run_continuity_check(
@@ -30,7 +39,7 @@ def test_run_continuity_check_returns_expected_keys(monkeypatch) -> None:
     )
 
     assert report["chapter_number"] == 10
-    assert set(report) == {
+    assert set(report) >= {
         "chapter_number",
         "open_setups",
         "character_states",
@@ -38,7 +47,7 @@ def test_run_continuity_check_returns_expected_keys(monkeypatch) -> None:
         "semantic_context",
         "warnings",
     }
-    assert len(report["character_states"]) == 5
+    assert [ch["character"] for ch in report["character_states"]] == ["Hélène", "Anselme"]
 
 
 def test_run_continuity_check_warns_for_old_planted_setup(monkeypatch) -> None:
@@ -56,7 +65,7 @@ def test_run_continuity_check_warns_for_old_planted_setup(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent.query_character_knowledge",
-        lambda character_name, chapter, db_path: [],
+        lambda character_name, chapter, db_path, **kw: [],
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent._recent_events_before_chapter",
@@ -64,7 +73,7 @@ def test_run_continuity_check_warns_for_old_planted_setup(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "src.agents.continuity_agent._semantic_context_for_previous_chapter",
-        lambda chapter_number, novel_id, db_path, chroma_dir, collection_name: [],
+        lambda chapter_number, novel_id, db_path, chroma_dir, collection_name, **kw: [],
     )
 
     report = run_continuity_check(

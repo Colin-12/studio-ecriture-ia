@@ -42,6 +42,7 @@ from src.agents.scene_state import (
 )
 from src.llm.base import LLMProvider, LLMResponse
 from src.llm.router import ConfiguredLLMProvider, get_llm_for_agent
+from src.memory.chapter_memory import load_story_context, merge_established_characters
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +113,13 @@ def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = N
     """
     if state.get("hard_constraints"):
         existing_status = state.get("contract_status") or "complet"
-        return {
+        result = {
             "contract_status": existing_status,
             "hard_constraints": restore_protagonist_gender(state["hard_constraints"], state["scene_idea"], create_missing=True)
             if existing_status == "vide" else state["hard_constraints"],
             "creative_directives": state.get("creative_directives") or _default_creative_directives(state),
         }
+        return _with_chapter_characters(state, result)
 
     user_prompt = "\n".join(
         [
@@ -151,7 +153,14 @@ def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = N
         creative = _default_creative_directives(state)
 
     hard = restore_protagonist_gender(hard, state["scene_idea"], create_missing=contract_status == "vide")
-    return {"hard_constraints": hard, "creative_directives": creative, "contract_status": contract_status}
+    return _with_chapter_characters(state, {"hard_constraints": hard, "creative_directives": creative, "contract_status": contract_status})
+
+
+def _with_chapter_characters(state: DebateState, result: dict) -> dict:
+    if state.get("chapter_number", 1) >= 2 and state.get("db_path"):
+        context = load_story_context(state["novel_id"], state["chapter_number"], state["db_path"])
+        result["hard_constraints"] = merge_established_characters(result["hard_constraints"], context["character_registry"], state["scene_idea"])
+    return result
 
 
 def _default_hard_constraints(state: DebateState) -> dict:
@@ -269,6 +278,7 @@ def continuity_node(state: DebateState) -> dict[str, Any]:
         db_path=Path(state["db_path"]),
         chroma_dir=Path(state["chroma_dir"]),
         collection_name=state["collection_name"],
+        brief=state["scene_idea"], contract=state.get("hard_constraints") or {},
     )
     return {
         "continuity_report": report,
@@ -434,6 +444,21 @@ def _scene_scope_blocks(state: DebateState, plan: list[dict], idx: int) -> list[
         "Décris uniquement ce qui se passe dans cette scène. L'objectif et l'émotion ci-dessus "
         "priment sur les suggestions du micro-brief ; ne raconte pas le chapitre entier.",
     ])]
+    report = state.get("continuity_report") or {}
+    previous_memory = report.get("previous_memory") or {}
+    if previous_memory and state.get("chapter_number", 1) >= 2:
+        registry = report.get("character_registry") or []
+        earlier_drafts = state.get("scenes_drafted") or []
+        last_state = (earlier_drafts[-1].get("end_state") or {}) if earlier_drafts else previous_memory.get("end_state") or {}
+        present_names = " ".join(last_state.get("personnages_presents") or []).casefold()
+        present = [ch for ch in registry if ch.get("role") == "protagoniste" or ch.get("name", "").casefold() in
+                   (scene.get("objective", "") + " " + scene.get("title", "")).casefold() or ch.get("name", "").casefold() in present_names]
+        reminder = "Rappel du chapitre précédent (faits établis)\n" + _compact_json({
+            "end_state": previous_memory.get("end_state") or {},
+            "fils_ouverts": previous_memory.get("open_threads") or [], "personnages": present})
+        blocks.append(" ".join(reminder.split()[:250]))
+        if idx == 0:
+            blocks.append("État à la fin de la scène précédente (à respecter)\n" + _compact_json(previous_memory.get("end_state") or {}))
     blocks.append("\n".join([
         "Lieu et moment prévus pour cette scène",
         f"Lieu : {scene.get('lieu') or 'non précisé, conserver le lieu précédent'}",
@@ -505,6 +530,12 @@ def _check_scene_prose(prose: str, scene_number: int) -> str:
     return prose
 
 
+def _stylist_continuity_context(state: DebateState) -> dict:
+    # Full chapter memory is for planning; prose gets the bounded reminder above.
+    return {key: value for key, value in (state.get("continuity_report") or {}).items()
+            if key not in {"story_so_far", "previous_memory", "character_registry", "memory_warnings"}}
+
+
 def stylist_node(state: DebateState) -> dict[str, Any]:
     """Draft prose scene by scene (multi-scene) or as a single block (legacy)."""
     chapter_plan: list[dict] = state.get("chapter_plan") or []
@@ -523,7 +554,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
             f"Point de vue : {state['pov']}",
             f"Langue : {state['language']}",
             "Respecte les faits acquis de ce rapport de continuité :",
-            _compact_json(state.get("continuity_report", {})),
+            _compact_json(_stylist_continuity_context(state)),
         ]
         prose = _check_scene_prose(_generate_stylist(state, "\n".join(parts), 1), 1)
         pronoun_counts, attribute_warnings = check_scene_pronouns(prose, state.get("hard_constraints") or {}, 1)
@@ -568,7 +599,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     ]
     parts += [
         "Respecte les faits acquis de ce rapport de continuité, sans les raconter à nouveau :",
-        _compact_json(state.get("continuity_report", {})),
+        _compact_json(_stylist_continuity_context(state)),
     ]
 
     scene_usage: list[LLMResponse] = []
@@ -627,6 +658,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "scene_plan": dict(scene),
                 "last_words": " ".join(words[-150:]),
                 "end_state": end_state,
+                "resume": extracted.get("resume", ""),
                 "state_extraction_failed": not bool(extracted),
                 "object_registry": registry,
                 "object_observations": observations,
@@ -754,6 +786,7 @@ def chapter_architect_node(
         f"Langue : {state['language']}",
         f"Contraintes : {_compact_json(state.get('hard_constraints') or {})}",
         f"Contexte mémoire : {_compact_json(state.get('continuity_report') or {})}",
+        "Histoire jusqu'ici, à respecter : " + (state.get("continuity_report") or {}).get("story_so_far", ""),
         "",
         f"Format JSON attendu :\n{_CHAPTER_PLAN_FORMAT}",
         "",

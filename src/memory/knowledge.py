@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Float, ForeignKey, Integer, Text, select
+from sqlalchemy import CheckConstraint, Float, ForeignKey, Integer, Text, select, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.memory.models import Base, Character, Event, Novel
@@ -40,6 +40,7 @@ def query_character_knowledge(
     character_name: str,
     chapter: int,
     db_path: Path,
+    *, novel_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """Return facts known by a character by the end of chapter N."""
     from src.memory.database import get_session
@@ -52,6 +53,7 @@ def query_character_knowledge(
                 .join(Character, CharacterKnowledge.character_id == Character.id)
                 .where(
                     Character.name == character_name,
+                    Character.novel_id == novel_id if novel_id is not None else true(),
                     CharacterKnowledge.learned_at_chapter <= chapter,
                 )
                 .order_by(CharacterKnowledge.learned_at_chapter, CharacterKnowledge.id)
