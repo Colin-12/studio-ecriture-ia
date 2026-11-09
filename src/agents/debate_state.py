@@ -63,6 +63,7 @@ class DebateState(TypedDict):
     plan_warnings: NotRequired[list[str]]
     plan_suggestions: NotRequired[list[str]]
     fidelity_report: NotRequired[dict]
+    text_integrity_warnings: NotRequired[list[str]]
     chapter_plan: list[dict]
     # Plan produit par chapter_architect_node. Chaque dict :
     # {"scene_number": int, "title": str, "objective": str,

@@ -570,6 +570,8 @@ def _render_revision_history(history: list[dict]) -> None:
 def _render_plan_details(debate: dict, prose: str | None = None) -> None:
     for warning in debate.get("plan_warnings") or []:
         st.warning(str(warning))
+    for warning in debate.get("text_integrity_warnings") or []:
+        st.warning(str(warning))
     suggestions = format_suggestions(debate.get("plan_suggestions") or [])
     if suggestions:
         st.info(suggestions)
