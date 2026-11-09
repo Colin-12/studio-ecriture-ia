@@ -6,23 +6,10 @@ import json
 import logging
 
 from src.llm.base import LLMProvider, LLMResponse
+from src.llm.json_parsing import parse_json_response as parse_json_response
 from src.llm.router import get_llm_for_agent
 
 logger = logging.getLogger(__name__)
-
-
-def parse_json_response(text: str) -> object:
-    """Accept fenced JSON and a JSON object/array embedded in commentary."""
-    decoder = json.JSONDecoder()
-    for index, character in enumerate(text):
-        if character not in "{[":
-            continue
-        try:
-            value, _ = decoder.raw_decode(text[index:])
-            return value
-        except ValueError:
-            continue
-    raise ValueError("aucun JSON lisible")
 
 
 def extract_brief_events(brief: str, contract: dict, *, profile: str = "default",

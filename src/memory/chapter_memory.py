@@ -11,9 +11,9 @@ from pathlib import Path
 from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.orm import Session
 
-from src.agents.beat_extraction import parse_json_response
-from src.agents.contract_attributes import fixed_attributes
+from src.contract_attributes import fixed_attributes
 from src.llm.base import LLMResponse
+from src.llm.json_parsing import parse_json_response
 from src.llm.router import get_llm_for_agent
 from src.memory.database import get_engine
 from src.memory.models import Base, Chapter, ChapterMemory, Character, Event, Novel

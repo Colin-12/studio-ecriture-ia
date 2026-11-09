@@ -6,8 +6,8 @@ import json
 import logging
 import time
 
-from src.agents.beat_extraction import parse_json_response
 from src.llm.base import LLMProvider, LLMResponse
+from src.llm.json_parsing import parse_json_response
 from src.llm.router import get_llm_for_agent
 
 logger = logging.getLogger(__name__)
