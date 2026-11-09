@@ -76,7 +76,7 @@ def test_partial_objective_keeps_detail_but_has_canonical_report_status():
     raw["objectif_realise"] = "partiel"
     result = check_scene_fidelity("prose", "objectif", [EVENT], [], provider=provider(json.dumps(raw)))
     assert result["objectif_realise"] == "partiel"
-    assert result["statut"] == "non réalisé"
+    assert result["statut"] == "partiel"
 
 
 def test_noncompletion_warning_names_scene_and_preserves_pronoun_warning(caplog):

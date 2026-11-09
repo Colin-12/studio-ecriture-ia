@@ -32,16 +32,18 @@ def protagonist(contract: dict) -> dict | None:
     return next((ch for ch in characters if str(ch.get("role", "")).casefold() in {"protagoniste", "protagonist"}), characters[0] if characters else None)
 
 
-def restore_protagonist_gender(contract: dict, brief: str) -> dict:
+def restore_protagonist_gender(contract: dict, brief: str, *, create_missing: bool = False) -> dict:
     """Only an unambiguous subject pronoun can repair an unspecified gender."""
     character = protagonist(contract)
-    if character is None or character_gender(character) != "non précisé":
+    if (character is None and not create_missing) or (character is not None and character_gender(character) != "non précisé"):
         return contract
     pronouns = set(re.findall(r"\b(?:il|elle)\b", brief.casefold()))
     if len(pronouns) != 1:
         return contract
     gender = "féminin" if "elle" in pronouns else "masculin"
     repaired = deepcopy(contract)
+    if character is None:
+        repaired["characters"] = [{"name": "Protagoniste", "role": "protagoniste", "fixed_attributes": []}]
     character = protagonist(repaired)
     assert character is not None
     attrs = [attr for attr in fixed_attributes(character) if not re.match(r"genre(?: grammatical)?\s*:", attr, re.IGNORECASE)]

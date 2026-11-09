@@ -18,7 +18,9 @@ from src.llm.cost_ledger import (
     record_success,
     summarize_costs,
 )
+from src.llm.error_messages import is_network_denial
 from src.llm.exceptions import (
+    AuthError,
     InvalidProviderResponseError,
     PrepayCreditsDepletedError,
     ProviderUnavailableError,
@@ -102,7 +104,9 @@ class ConfiguredLLMProvider(LLMProvider):
                 )
                 time.sleep(2)
                 return self._generate_and_log(self.primary, prompt, system, primary_config)
-        except (RateLimitError, ProviderUnavailableError, InvalidProviderResponseError) as exc:
+        except (RateLimitError, ProviderUnavailableError, InvalidProviderResponseError, AuthError) as exc:
+            if isinstance(exc, AuthError) and not is_network_denial(exc):
+                raise
             if self.fallback is None:
                 if not isinstance(exc, (SpendCapExceededError, PrepayCreditsDepletedError)):
                     logger.warning("%s provider=%s failed; no fallback configured: %s", self.agent_name,

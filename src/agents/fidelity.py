@@ -74,7 +74,7 @@ def check_scene_fidelity(prose: str, objectif: str, evenements_de_la_scene: list
         result: dict = {"objectif_realise": objective,
                   "evenements": [{"id": event["id"], "realise": verdicts.get(event["id"], UNVERIFIED)} for event in evenements_de_la_scene],
                   "interdits_violes": forbidden, "raison": reason,
-                  "statut": "réalisé" if objective is True else "non réalisé"}
+                  "statut": "réalisé" if objective is True else "partiel" if objective == "partiel" else "non réalisé"}
         if isinstance(response, LLMResponse):
             result.update(provider=response.provider, model=response.model)
     except Exception as exc:
@@ -99,9 +99,9 @@ def aggregate_fidelity(events: list[dict], beats: list[dict], plan: list[dict], 
         attributes = draft.get("attribute_warnings") or []
         pronoun_warnings.extend(attributes)
         scene_reports.append({"scene_number": number, "objectif": scene.get("objective", ""),
-                              "statut": verdict.get("statut", UNVERIFIED), "verdict": verdict,
+                              "statut": "partiel" if verdict.get("objectif_realise") == "partiel" else verdict.get("statut", UNVERIFIED), "verdict": verdict,
                               "attribute_warnings": attributes})
-        if verdict.get("objectif_realise") is False or verdict.get("objectif_realise") == "partiel":
+        if verdict.get("objectif_realise") is False:
             warnings.append(f"La scène {number} n'atteint pas entièrement son objectif : {scene.get('objective', '')}")
         for violation in verdict.get("interdits_violes") or []:
             warnings.append(f"La scène {number} viole un interdit du contrat : {violation}")
@@ -122,4 +122,6 @@ def aggregate_fidelity(events: list[dict], beats: list[dict], plan: list[dict], 
             logger.warning("fidelity_checker: %s", warning)
     return {"scenes": scene_reports, "evenements": event_reports, "warnings": warnings,
             "attribute_warnings": pronoun_warnings,
+            "state_extraction_failures": sum(bool(scene.get("state_extraction_failed")) for scene in drafted),
+            "state_extraction_failed_scenes": [scene["scene_number"] for scene in drafted if scene.get("state_extraction_failed")],
             "latency_ms": sum((scene.get("fidelity") or {}).get("latency_ms", 0) for scene in drafted)}

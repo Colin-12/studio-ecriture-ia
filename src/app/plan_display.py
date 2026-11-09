@@ -5,6 +5,25 @@ from __future__ import annotations
 import math
 import os
 
+CONTRACT_DEGRADED_WARNING = "Contrat non extrait : le genre, l'âge et les attributs du protagoniste ne sont pas garantis. Vérifie le texte ou relance."
+
+
+def contract_status_warning(status: str) -> str:
+    return "" if status == "complet" else CONTRACT_DEGRADED_WARNING
+
+
+def partial_fidelity_messages(report: dict) -> list[str]:
+    return [f"Scène {scene['scene_number']} — objectif partiellement réalisé : {(scene.get('verdict') or {}).get('raison', '')}"
+            for scene in report.get("scenes") or [] if (scene.get("verdict") or {}).get("objectif_realise") == "partiel"]
+
+
+def fidelity_warning_messages(report: dict) -> list[str]:
+    # Old saved reports included partial objectives among hard failures.
+    partial_prefixes = tuple(f"La scène {scene['scene_number']} n'atteint pas entièrement son objectif"
+                             for scene in report.get("scenes") or [] if (scene.get("verdict") or {}).get("objectif_realise") == "partiel")
+    return [warning for warning in [*(report.get("warnings") or []), *(report.get("attribute_warnings") or [])]
+            if not warning.startswith(partial_prefixes)]
+
 
 def estimated_pages(words: int) -> float:
     """Pages are an estimate; invalid WORDS_PER_PAGE falls back to 360."""

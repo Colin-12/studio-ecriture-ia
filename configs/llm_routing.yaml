@@ -29,7 +29,8 @@ agents:
     max_tokens: 600
     response_format: json
     fallback:
-      role: structured
+      role: gemini_fast
+      response_format: json
     role: structured
   stylist:
     temperature: 0.8

@@ -111,8 +111,11 @@ def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = N
     validated constraints in the UI), skip the LLM call and return as-is.
     """
     if state.get("hard_constraints"):
+        existing_status = state.get("contract_status") or "complet"
         return {
-            "hard_constraints": state["hard_constraints"],
+            "contract_status": existing_status,
+            "hard_constraints": restore_protagonist_gender(state["hard_constraints"], state["scene_idea"], create_missing=True)
+            if existing_status == "vide" else state["hard_constraints"],
             "creative_directives": state.get("creative_directives") or _default_creative_directives(state),
         }
 
@@ -128,6 +131,7 @@ def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = N
         ]
     )
     raw = ""
+    contract_status = "vide"
     try:
         llm = provider or get_llm_for_agent("contract_parser", profile=state.get("llm_profile", "default"))
         response = llm.generate(prompt=user_prompt, system=_CONTRACT_SYSTEM, response_format="json")
@@ -139,13 +143,15 @@ def contract_parser_node(state: DebateState, *, provider: LLMProvider | None = N
             hard = {}
         if not isinstance(creative, dict):
             creative = {}
+        if any(isinstance(ch, dict) and ch.get("name") for ch in hard.get("characters") or []):
+            contract_status = "repli" if isinstance(response, LLMResponse) and response.fallback_used else "complet"
     except Exception as exc:
         _warn_json_fallback("contract_parser", raw, exc)
         hard = _default_hard_constraints(state)
         creative = _default_creative_directives(state)
 
-    hard = restore_protagonist_gender(hard, state["scene_idea"])
-    return {"hard_constraints": hard, "creative_directives": creative}
+    hard = restore_protagonist_gender(hard, state["scene_idea"], create_missing=contract_status == "vide")
+    return {"hard_constraints": hard, "creative_directives": creative, "contract_status": contract_status}
 
 
 def _default_hard_constraints(state: DebateState) -> dict:
@@ -603,9 +609,8 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
     previous_end_state = previous_scene.get("end_state") or {}
     contract = state.get("hard_constraints") or {}
     extracted = extract_scene_state(prose, contract_character_names(contract), profile=state.get("llm_profile", "default"))
-    # An unreadable response is an unknown end state, not fresh evidence that
-    # the scene ended at the previous location. Only object facts are carried.
-    end_state = extracted
+    # An unchanged fallback is explicitly flagged, never a fresh observation.
+    end_state = extracted if extracted else dict(previous_end_state)
     registry, observations, mentions = update_object_registry(previous_scene, extracted.get("attributs_objets") or {}, prose, contract)
     warn_state_stagnation(scene["scene_number"], extracted, previous_end_state, scene)
     fidelity = check_scene_fidelity(prose, scene["objective"], scene_events(scene, state.get("jalons") or [], state.get("brief_events") or []),
@@ -622,6 +627,7 @@ def stylist_node(state: DebateState) -> dict[str, Any]:
                 "scene_plan": dict(scene),
                 "last_words": " ".join(words[-150:]),
                 "end_state": end_state,
+                "state_extraction_failed": not bool(extracted),
                 "object_registry": registry,
                 "object_observations": observations,
                 "object_mentions": mentions,

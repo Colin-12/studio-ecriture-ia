@@ -134,6 +134,7 @@ def run_debate(
     initial_hard_constraints: dict | None = None,
     initial_creative_directives: dict | None = None,
     target_words: int | None = None,
+    initial_contract_status: str | None = None,
 ) -> DebateState:
     """Run the debate graph and return the final state.
 
@@ -156,6 +157,7 @@ def run_debate(
         "chroma_dir": chroma_dir,
         "collection_name": effective_collection,
         "hard_constraints": initial_hard_constraints or {},
+        "contract_status": initial_contract_status or ("complet" if initial_hard_constraints else "vide"),
         "creative_directives": initial_creative_directives or {},
         "continuity_report": {},
         "scene_brief": "",

@@ -15,10 +15,18 @@ from src.agents.debate_nodes import parse_editor_response
 from src.app import novel_manager as nm
 from src.app import ui_state as us
 from src.app.plan_display import (
+    contract_status_warning,
+    fidelity_warning_messages,
     format_fidelity_rows,
     format_length,
     format_plan_rows,
     format_suggestions,
+    partial_fidelity_messages,
+)
+from src.llm.error_messages import (
+    KNOWN_ERROR_MESSAGES,
+    format_generation_error,
+    generation_error_details,
 )
 from src.memory.models import Base, Chapter, Event, Novel
 
@@ -191,6 +199,7 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
                         llm_profile=us.get_llm_profile(),
                     )
                     st.session_state["writing_hard_constraints"] = result.get("hard_constraints", {})
+                    st.session_state["writing_contract_status"] = result.get("contract_status", "vide")
                     st.session_state["writing_creative_directives"] = result.get(
                         "creative_directives", {}
                     )
@@ -198,9 +207,7 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
                     st.session_state["writing_step"] = "step_1"
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Erreur blueprint : {exc}")
-                    if us.get_debug_agents():
-                        st.exception(exc)
+                    _render_generation_error(exc)
 
     with col2:
         if st.button("⚡ Générer directement", key="btn_direct"):
@@ -224,9 +231,7 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
                     st.session_state["writing_step"] = "step_3"
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Erreur de génération : {exc}")
-                    if us.get_debug_agents():
-                        st.exception(exc)
+                    _render_generation_error(exc)
 
     with col3:
         if st.button("📋 Voir contexte", key="btn_ctx_col3"):
@@ -243,6 +248,7 @@ def _render_step_0(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 
 def _render_step_1(novel_meta: dict, chapter_number: int) -> None:
     st.subheader(f"Chapitre {chapter_number} — Contrat narratif")
+    _render_contract_status(st.session_state.get("writing_contract_status", "vide"))
     st.caption(
         "Vérifiez et ajustez le contrat avant le débat. "
         "Ces éléments ne seront pas modifiés par les agents."
@@ -413,11 +419,12 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
             llm_profile=us.get_llm_profile(),
         )
         base["hard_constraints"] = st.session_state.get("writing_hard_constraints") or {}
+        base["contract_status"] = st.session_state.get("writing_contract_status", "vide")
         base["creative_directives"] = st.session_state.get("writing_creative_directives") or {}
         base["scene_brief"] = st.session_state.get("writing_scene_brief") or ""
 
         st.session_state.pop("writing_prose_edited", None)
-        error_msg: str | None = None
+        generation_error: Exception | None = None
         try:
             with st.status("La writer's room travaille…", expanded=True) as status:
                 _run_debate_nodes_with_status(base)
@@ -425,12 +432,10 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
             st.session_state["writing_debate_state"] = base
             debate = base
         except Exception as exc:
-            error_msg = str(exc)
-            if us.get_debug_agents():
-                st.exception(exc)
+            generation_error = exc
 
-        if error_msg:
-            st.error(f"Erreur dans le débat : {error_msg}")
+        if generation_error is not None:
+            _render_generation_error(generation_error)
             if st.button("← Retour au contrat", key="btn_s2_back_err"):
                 st.session_state["writing_step"] = "step_1"
                 st.rerun()
@@ -441,6 +446,7 @@ def _render_step_2(novel_meta: dict, chapter_number: int, db_path: str) -> None:
 
     # --- Synthesis ---
     st.subheader("Décision de la writer's room")
+    _render_contract_status(debate.get("contract_status", "vide"))
     _render_plan_details(debate)
     critiques: list = debate.get("critiques", [])
     alternatives: list = debate.get("alternatives", [])
@@ -570,17 +576,37 @@ def _render_fidelity_report(report: dict) -> None:
         rows = format_fidelity_rows(report)
         if rows:
             st.table(rows)
-        for warning in [*(report.get("warnings") or []), *(report.get("attribute_warnings") or [])]:
+        for warning in fidelity_warning_messages(report):
             st.warning(str(warning))
+        for message in partial_fidelity_messages(report):
+            st.info(message)
+        failures = report.get("state_extraction_failures", 0)
+        st.caption(f"Extraction d'état de scène : {failures} échec(s)." +
+                   (" État précédent conservé sans nouvelle vérification ; scènes : " + ", ".join(map(str, report.get("state_extraction_failed_scenes") or [])) if failures else ""))
         for scene in report.get("scenes") or []:
-            st.caption(f"Scène {scene['scene_number']} — objectif : {scene['statut']}. "
+            status = "partiel" if (scene.get("verdict") or {}).get("objectif_realise") == "partiel" else scene["statut"]
+            st.caption(f"Scène {scene['scene_number']} — objectif : {status}. "
                        + (scene.get("verdict") or {}).get("raison", ""))
+
+
+def _render_contract_status(status: str) -> None:
+    warning = contract_status_warning(status)
+    if warning:
+        st.warning(warning)
+
+
+def _render_generation_error(exc: BaseException) -> None:
+    message = format_generation_error(exc)
+    st.error(message if message in KNOWN_ERROR_MESSAGES else "Erreur de génération.")
+    with st.expander("Détails", expanded=False):
+        st.code(generation_error_details(exc), language="text")
 
 
 def _render_step_3(chapter_number: int, novel_id: int, engine: Any) -> None:
     st.subheader(f"Chapitre {chapter_number} — Brouillon")
 
     debate: dict = st.session_state.get("writing_debate_state") or {}
+    _render_contract_status(debate.get("contract_status", "vide"))
     quality_score: int = int(debate.get("quality_score") or 0)
     quality_feedback: str = (debate.get("quality_feedback") or "").strip()
     prose_default: str = (
@@ -831,6 +857,7 @@ def _run_debate_nodes_with_status(state: dict[str, Any]) -> None:
             collection_name=state.get("collection_name", ""),
             initial_hard_constraints=state.get("hard_constraints") or None,
             initial_creative_directives=state.get("creative_directives") or None,
+            initial_contract_status=state.get("contract_status"),
         )
     )
     state.update(result)
@@ -863,6 +890,7 @@ def _build_base_state(
         "chroma_dir": "data/chroma",
         "collection_name": f"novel_{int(novel_meta.get('id', 1))}",
         "hard_constraints": {},
+        "contract_status": "vide",
         "creative_directives": {},
         "continuity_report": {},
         "scene_brief": "",
@@ -1019,6 +1047,7 @@ def _advance_to_next_chapter() -> None:
         "writing_brief",
         "writing_debate_state",
         "writing_hard_constraints",
+        "writing_contract_status",
         "writing_creative_directives",
         "writing_scene_brief",
         "writing_prose_edited",

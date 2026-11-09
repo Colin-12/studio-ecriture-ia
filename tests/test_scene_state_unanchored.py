@@ -120,7 +120,8 @@ def test_non_json_extraction_preserves_scene_object_registry(monkeypatch, caplog
     with caplog.at_level(logging.WARNING):
         [scene] = debate_nodes.stylist_node(state)["scenes_drafted"]
     assert scene["object_registry"] == registry
-    assert scene["end_state"] == {}
+    assert scene["end_state"] == END_STATE
+    assert scene["state_extraction_failed"] is True
     assert state["scenes_drafted"][0]["object_registry"] == registry
     assert "scene_state extraction failed" in caplog.text
     assert extraction.generate.call_count == 1

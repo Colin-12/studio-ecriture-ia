@@ -44,6 +44,7 @@ class DebateState(TypedDict):
     final_brief: str
 
     hard_constraints: dict
+    contract_status: NotRequired[str]
     creative_directives: dict
 
     draft: str

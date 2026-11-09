@@ -151,7 +151,9 @@ def test_unreadable_parser_keeps_existing_fallback_without_exception(raw):
     parser.generate.return_value = response(raw)
     current = state()
     result = debate_nodes.contract_parser_node(current, provider=parser)
-    assert result["hard_constraints"] == debate_nodes._default_hard_constraints(current)
+    assert result["contract_status"] == "vide"
+    assert result["hard_constraints"]["core_event"] == current["scene_idea"]
+    assert result["hard_constraints"]["characters"][0]["fixed_attributes"] == ["genre : féminin"]
     assert parser.generate.call_count == 1
 
 
