@@ -11,7 +11,11 @@ from pathlib import Path
 from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.orm import Session
 
-from src.contract_attributes import fixed_attributes
+from src.contract_attributes import (
+    contract_with_characters,
+    fixed_attributes,
+    without_attribute_statements,
+)
 from src.llm.base import LLMResponse
 from src.llm.json_parsing import parse_json_response
 from src.llm.router import get_llm_for_agent
@@ -21,6 +25,20 @@ from src.retrieval.vector_store import index_chapter_text
 
 logger = logging.getLogger(__name__)
 JSON_FIELDS = ("end_state", "characters", "open_threads", "closed_threads", "facts_revealed")
+
+
+def _thread_key(value: str) -> str:
+    return " ".join(value.casefold().strip(" \t\n-•.?!").split())
+
+
+def reconcile_threads(previous: list[str], opened: list[str], closed: list[str]) -> list[str]:
+    closed_keys = {_thread_key(thread) for thread in closed}
+    result: list[str] = []
+    for thread in [*previous, *opened]:
+        key = _thread_key(thread)
+        if key and key not in closed_keys and key not in {_thread_key(old) for old in result}:
+            result.append(thread.strip())
+    return result
 
 
 def ensure_novel(session: Session, novel_id: int) -> Novel:
@@ -184,10 +202,19 @@ def build_chapter_memory_proposal(prose: str, scenes_drafted: list[dict], chapte
                     names.add(name.casefold())
                     result["characters"].append({"name": name, "role": "secondaire", "fixed_attributes": [], "confirmation": "à confirmer"})
         result["summary"] = " ".join(" ".join(summaries).split()[:150])
-        prompt = ("Résume le chapitre depuis les résumés de scènes uniquement, sans inventer de fait. "
-                  "Résumé : 150 mots maximum. Mets à jour les fils ouverts et clos, sans perdre un fil antérieur sans résolution explicite. "
-                  'JSON uniquement : {"summary":"", "open_threads":[], "closed_threads":[]}.\n'
+        prompt = ("Analyse les résumés et faits observés, sans inventer de fait. Résumé : 150 mots maximum. "
+                  "1. open_threads : découvre les NOUVELLES questions, énigmes ou mystères réellement laissés en suspens. "
+                  "Formule une question précise par entrée ; une action ou une description seule n'est pas un fil ouvert. "
+                  "Une origine inconnue, une cause inexpliquée ou une intention indéterminée sont des questions, même sans point d'interrogation dans le résumé. "
+                  "2. closed_threads : indique quels fils ouverts antérieurs ont reçu une réponse explicite dans ce chapitre. "
+                  "Recopie exactement le libellé du fil antérieur résolu. N'exige pas de résoudre un mystère nouveau. "
+                  "Un fil antérieur non résolu doit rester ouvert. Ne confonds pas absence de nouveaux fils et absence de fils à reporter. "
+                  "3. facts_revealed : liste les faits nouveaux explicitement établis. "
+                  "Le genre, l'âge et la profession d'un personnage sont des attributs ou des faits, jamais des questions en suspens. "
+                  'JSON uniquement : {"summary":"", "open_threads":[], "closed_threads":[], "facts_revealed":[]}.\n'
                   f"Résumés des scènes : {json.dumps(summaries, ensure_ascii=False)}\n"
+                  f"Titres des scènes : {json.dumps([event['title'] for event in result['events']], ensure_ascii=False)}\n"
+                  f"Faits observés : {json.dumps(result['facts_revealed'], ensure_ascii=False)}\n"
                   f"Fils ouverts antérieurs : {json.dumps(previous_memory.get('open_threads') or [], ensure_ascii=False)}\n"
                   f"Personnages du contrat : {json.dumps([ch['name'] for ch in result['characters'] if ch['confirmation'] == 'contrat'], ensure_ascii=False)}")
         llm = get_llm_for_agent("chapter_memory", profile=llm_profile)
@@ -199,13 +226,24 @@ def build_chapter_memory_proposal(prose: str, scenes_drafted: list[dict], chapte
         for field in ("open_threads", "closed_threads"):
             if not isinstance(parsed.get(field), list) or not all(isinstance(item, str) for item in parsed[field]):
                 raise ValueError(f"{field} invalide")
-        result.update(summary=" ".join(parsed["summary"].split()[:150]), open_threads=parsed["open_threads"], closed_threads=parsed["closed_threads"], status="complet")
+        facts = parsed.get("facts_revealed", [])
+        if not isinstance(facts, list) or not all(isinstance(item, str) for item in facts):
+            raise ValueError("facts_revealed invalide")
+        for fact in facts:
+            if fact.strip() and fact not in result["facts_revealed"]:
+                result["facts_revealed"].append(fact)
+        result.update(summary=" ".join(parsed["summary"].split()[:150]),
+                      open_threads=reconcile_threads(previous_memory.get("open_threads") or [], parsed["open_threads"], parsed["closed_threads"]),
+                      closed_threads=list(dict.fromkeys([*(previous_memory.get("closed_threads") or []), *parsed["closed_threads"]])), status="complet")
+        if not any(item.strip() for field in ("open_threads", "closed_threads", "facts_revealed") for item in parsed.get(field, [])):
+            result["status"] = "partiel"
+            result["warnings"].append("Extraction vide, à compléter à la main.")
         failures = sum(bool(scene.get("state_extraction_failed")) for scene in ordered)
         if failures:
             result["status"] = "partiel"
             result["warnings"].append(f"{failures} état(s) de fin de scène non vérifié(s) ; vérifie la mémoire proposée.")
     except Exception as exc:
-        warning = "Mémoire partielle : résumé déterministe et fils antérieurs conservés ; vérifie la proposition."
+        warning = "Extraction vide, à compléter à la main. Mémoire partielle : résumé déterministe et fils antérieurs conservés ; vérifie la proposition."
         result["warnings"].append(warning)
         logger.warning("chapter_memory: %s | longueur=%d | réponse[:200]=%r | erreur=%s", warning, len(raw), raw[:200], exc)
     return result
@@ -219,6 +257,12 @@ def _merge_attributes(established: list[str], incoming: list[str], name: str, wa
         key = attribute.partition(":")[0].strip().casefold()
         prior = next((old for old in result if ":" in old and ":" in attribute and old.partition(":")[0].strip().casefold() == key), None)
         if prior:
+            # An explicit absence of information is not an established attribute.
+            if prior.partition(":")[2].strip().casefold() in {"", "non précisé", "non précisée"}:
+                result[result.index(prior)] = attribute
+                continue
+            if attribute.partition(":")[2].strip().casefold() in {"", "non précisé", "non précisée"}:
+                continue
             warning = f"Attribut établi conservé pour {name} : {prior} ; conflit avec {attribute}."
             warnings.append(warning)
             logger.warning(warning)
@@ -230,12 +274,14 @@ def _merge_attributes(established: list[str], incoming: list[str], name: str, wa
 def apply_chapter_memory(novel_id: int, chapter_number: int, prose: str, proposal: dict, *,
                          db_path: str | Path = "db/novel_memory.sqlite", chroma_dir: str | Path = "data/chroma",
                          selected_events: list[dict] | None = None, confirmed_characters: list[dict] | None = None,
-                         status: str = "valide", index_text: bool = True) -> dict:
+                         status: str = "valide", index_text: bool = True, contract: dict | None = None) -> dict:
     if status not in {"valide", "ignore"}:
         raise ValueError("Le statut appliqué doit être valide ou ignore.")
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)
     warnings: list[str] = []
+    proposal = deepcopy(proposal)
+    proposal["open_threads"] = reconcile_threads([], proposal.get("open_threads") or [], proposal.get("closed_threads") or [])
     with Session(engine) as session:
         ensure_novel(session, novel_id)
         memory = session.scalar(select(ChapterMemory).where(ChapterMemory.novel_id == novel_id, ChapterMemory.chapter_number == chapter_number))
@@ -270,6 +316,7 @@ def apply_chapter_memory(novel_id: int, chapter_number: int, prose: str, proposa
                     established.role = incoming.get("role")
                 established.description = json.dumps({"fixed_attributes": attrs}, ensure_ascii=False)
                 registry.append({"name": established.name, "role": established.role or incoming.get("role"), "fixed_attributes": attrs})
+            proposal["open_threads"] = without_attribute_statements(proposal["open_threads"], registry)
             chapter = session.scalar(select(Chapter).where(Chapter.novel_id == novel_id, Chapter.number == chapter_number))
             if chapter is None:
                 chapter = Chapter(novel_id=novel_id, number=chapter_number, title=f"Chapitre {chapter_number}", full_text=prose, file_path="", word_count=len(prose.split()))
@@ -291,6 +338,11 @@ def apply_chapter_memory(novel_id: int, chapter_number: int, prose: str, proposa
             setattr(memory, field, json.dumps(value, ensure_ascii=False))
         session.commit()
         result = memory_to_dict(memory)
+    if status == "valide" and contract is not None:
+        updated = contract_with_characters(contract, registry)
+        contract.clear()
+        contract.update(updated)
+        result["contract"] = deepcopy(contract)
     if index_text:
         index_chapter_text(novel_id, chapter_number, prose, persist_dir=chroma_dir)
     result["warnings"] = warnings

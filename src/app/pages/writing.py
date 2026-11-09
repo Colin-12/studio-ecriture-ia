@@ -23,6 +23,11 @@ from src.app.plan_display import (
     format_suggestions,
     partial_fidelity_messages,
 )
+from src.contract_attributes import (
+    attribute_fields,
+    fixed_attributes,
+    with_attribute_fields,
+)
 from src.llm.error_messages import (
     KNOWN_ERROR_MESSAGES,
     format_generation_error,
@@ -762,12 +767,24 @@ def _render_step_4(chapter_number: int, novel_id: int, engine: Any) -> None:
 
     confirmed = []
     for index, character in enumerate(proposal.get("characters") or []):
-        attributes = ", ".join(character.get("fixed_attributes") or [])
+        attributes = ", ".join(fixed_attributes(character))
         label = f"{character['name']} : {attributes or 'attributs non précisés'}"
         if character.get("confirmation") == "à confirmer":
             label += " — à confirmer"
-        if st.checkbox(label, value=character.get("confirmation") != "à confirmer", key=f"mem_char_{index}"):
-            confirmed.append(character)
+        st.markdown(f"**{label}**")
+        fields = attribute_fields(character)
+        edited = character
+        if fields["genre"] == "non précisé" or not fields["âge"] or not fields["profession"]:
+            options = ["non précisé", "masculin", "féminin", "autre"]
+            genre = st.selectbox(f"Genre — {character['name']}", options, index=options.index(fields["genre"]) if fields["genre"] in options else 0,
+                                 key=f"memory_char_gender_{index}", disabled=fields["genre"] != "non précisé")
+            age = st.text_input(f"Âge — {character['name']}", value=fields["âge"], key=f"memory_char_age_{index}", disabled=bool(fields["âge"]))
+            profession = st.text_input(f"Profession — {character['name']}", value=fields["profession"], key=f"memory_char_profession_{index}", disabled=bool(fields["profession"]))
+            edited = with_attribute_fields(character, genre, age, profession)
+        if character.get("confirmation") != "à confirmer" or attribute_fields(edited)["genre"] != "non précisé" or attribute_fields(edited)["âge"] or attribute_fields(edited)["profession"]:
+            confirmed.append(edited)
+        else:
+            st.caption("Renseigne au moins un attribut pour confirmer ce personnage.")
     threads = st.text_area("Fils ouverts (un par ligne)", value="\n".join(proposal.get("open_threads") or []), key="memory_threads")
     st.caption("État de fin du chapitre — lecture seule")
     st.json(proposal.get("end_state") or {})
@@ -780,9 +797,14 @@ def _render_step_4(chapter_number: int, novel_id: int, engine: Any) -> None:
             type="primary",
             key="btn_apply_events",
         ):
+            debate = st.session_state.get("writing_debate_state") or {}
+            contract = debate.get("hard_constraints") or st.session_state.get("writing_hard_constraints") or {}
             applied = apply_chapter_memory(novel_id, chapter_number, prose,
                 {**proposal, "summary": summary, "open_threads": [line.strip() for line in threads.splitlines() if line.strip()]},
-                db_path=us.get_db_path(), selected_events=validated_events, confirmed_characters=confirmed, index_text=False)
+                db_path=us.get_db_path(), selected_events=validated_events, confirmed_characters=confirmed, index_text=False, contract=contract)
+            debate["hard_constraints"] = applied.get("contract", contract)
+            st.session_state["writing_debate_state"] = debate
+            st.session_state["writing_hard_constraints"] = debate["hard_constraints"]
             for warning in applied.get("warnings") or []:
                 st.warning(warning)
             st.success(f"{len(validated_events)} mise(s) à jour appliquée(s).")

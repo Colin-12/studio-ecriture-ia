@@ -17,6 +17,7 @@ from src.agents import continuity_agent, debate_nodes, scene_state
 from src.agents.debate_state import DebateState
 from src.app import novel_manager
 from src.app.pages import writing
+from src.contract_attributes import attribute_fields, with_attribute_fields
 from src.llm.base import LLMResponse
 from src.memory import chapter_memory as memory
 from src.memory.database import get_engine
@@ -269,6 +270,8 @@ def test_ui_proposal_is_not_applied_without_click(db, monkeypatch):
     fake.columns.return_value = [MagicMock(), MagicMock()]
     fake.button.return_value = False
     fake.text_area.side_effect = lambda label, value="", **kw: value
+    fake.selectbox.side_effect = lambda label, options, index=0, **kw: options[index]
+    fake.text_input.side_effect = lambda label, value="", **kw: value
     monkeypatch.setattr(writing, "st", fake)
     monkeypatch.setattr(writing.us, "get_db_path", lambda: str(db))
     monkeypatch.setattr(writing, "build_chapter_memory_proposal", lambda *a: proposal())
@@ -362,3 +365,125 @@ def test_diagnostic_keep_preserves_only_its_temporary_novel(db, tmp_path, monkey
         assert session.get(Novel, 9) is not None
         assert session.scalar(select(Chapter).where(Chapter.novel_id == 9001, Chapter.number == 2)).full_text == second["chapter_assembled"]
     client.delete_collection.assert_not_called()
+
+
+def test_threads_extract_new_questions_close_prior_threads_and_merge_facts(db, monkeypatch):
+    llm = MagicMock()
+    llm.generate.return_value = LLMResponse(json.dumps({
+        "summary": "Hélène identifie Anselme, mais ignore l'origine du carnet.",
+        "open_threads": ["D'où vient le carnet ?"],
+        "closed_threads": ["Identifier Anselme"],
+        "facts_revealed": ["Anselme est le signataire."],
+    }), "mock", "mock", 0, 0, 0, None)
+    monkeypatch.setattr(memory, "get_llm_for_agent", lambda *a, **kw: llm)
+    previous = {"open_threads": ["Identifier Anselme", "Pourquoi cette ombre ?"]}
+    result = memory.build_chapter_memory_proposal("PROSE_SECRETE", SCENES, PLAN, CONTRACT, previous, "default")
+    assert result["open_threads"] == ["Pourquoi cette ombre ?", "D'où vient le carnet ?"]
+    assert result["closed_threads"] == ["Identifier Anselme"]
+    assert result["facts_revealed"] == [*END["revele"], "Anselme est le signataire."]
+    prompt = llm.generate.call_args.kwargs["prompt"]
+    assert "Identifier Anselme" in prompt and END["revele"][0] in prompt
+    assert "PROSE_SECRETE" not in prompt
+    assert llm.generate.call_count == 1
+    memory.apply_chapter_memory(9, 2, "texte", result, db_path=db)
+    following = memory.previous_chapter_memory(9, 3, db)
+    assert following["open_threads"] == result["open_threads"]
+    assert "Identifier Anselme" not in following["open_threads"]
+
+
+@pytest.mark.parametrize("raw", ["", "{}", "illisible", '{"summary":"Résumé.","open_threads":[],"closed_threads":[],"facts_revealed":[]}'])
+def test_empty_extraction_is_visible_and_preserves_prior_threads(monkeypatch, raw):
+    llm = MagicMock()
+    llm.generate.return_value = LLMResponse(raw, "mock", "mock", 0, 0, 0, None)
+    monkeypatch.setattr(memory, "get_llm_for_agent", lambda *a, **kw: llm)
+    result = memory.build_chapter_memory_proposal("secret", SCENES, PLAN, CONTRACT, {"open_threads": ["Un mystère ?"]}, "default")
+    assert result["status"] == "partiel"
+    assert result["open_threads"] == ["Un mystère ?"]
+    assert any("extraction vide, à compléter à la main" in warning.casefold() for warning in result["warnings"])
+
+
+def test_apply_removes_closed_threads_even_after_manual_edit(db):
+    result = memory.apply_chapter_memory(9, 1, "texte", {
+        **proposal(), "open_threads": ["Identifier Anselme", "Origine du carnet ?"],
+        "closed_threads": ["identifier anselme."],
+    }, db_path=db)
+    assert result["open_threads"] == ["Origine du carnet ?"]
+
+
+@pytest.mark.parametrize("gender", ["non précisé", "masculin", "féminin", "autre"])
+def test_character_fields_preserve_other_attributes(gender):
+    original = {"name": "Thomas", "fixed_attributes": ["manteau : bleu", "genre : non précisé"]}
+    edited = with_attribute_fields(original, gender, " 32 ans ", " archiviste ")
+    assert attribute_fields(edited) == {"genre": gender, "âge": "32 ans", "profession": "archiviste"}
+    assert "manteau : bleu" in edited["fixed_attributes"]
+    assert original["fixed_attributes"] == ["manteau : bleu", "genre : non précisé"]
+    assert attribute_fields({"fixed_attributes": ["Genre : Féminin"]})["genre"] == "féminin"
+
+
+def test_apply_attributes_updates_contract_and_memory_without_thread_pollution(db):
+    contract = {"characters": [{"name": "Thomas", "role": "protagoniste", "fixed_attributes": []}], "forbidden": ["magie"]}
+    confirmed = with_attribute_fields(contract["characters"][0], "masculin", "32 ans", "archiviste")
+    pending = {**proposal(), "characters": [], "open_threads": ["THOMAS est un homme", "D'où vient le carnet ?", "Thomas est-il un homme ?"]}
+    result = memory.apply_chapter_memory(9, 1, "texte", pending, db_path=db,
+                                         confirmed_characters=[confirmed], contract=contract)
+    assert contract["characters"][0]["fixed_attributes"] == confirmed["fixed_attributes"]
+    assert result["contract"] == contract and contract["forbidden"] == ["magie"]
+    saved = memory.load_chapter_memories(9, db)[0]
+    assert saved["characters"][0]["fixed_attributes"] == confirmed["fixed_attributes"]
+    assert saved["open_threads"] == ["D'où vient le carnet ?", "Thomas est-il un homme ?"]
+    assert "THOMAS est un homme" not in saved["closed_threads"]
+
+
+def test_ui_attribute_fields_write_only_on_apply_and_show_empty_extraction(db, monkeypatch):
+    pending = {**proposal(), "characters": [{"name": "Thomas", "fixed_attributes": [], "confirmation": "à confirmer"}],
+               "status": "partiel", "warnings": ["Extraction vide, à compléter à la main."], "open_threads": ["Origine du carnet ?"]}
+    fake = MagicMock()
+    fake.session_state = {"writing_prose_edited": "texte", "writing_memory_proposal": pending,
+                          "writing_debate_state": {"hard_constraints": {"characters": []}}}
+    fake.columns.return_value = [MagicMock(), MagicMock()]
+    fake.button.return_value = False
+    fake.text_area.side_effect = lambda label, value="", **kw: value
+    fake.selectbox.return_value = "masculin"
+    fake.text_input.side_effect = lambda label, **kw: "32 ans" if label.startswith("Âge") else "archiviste"
+    monkeypatch.setattr(writing, "st", fake)
+    monkeypatch.setattr(writing.us, "get_db_path", lambda: str(db))
+    writing._render_step_4(1, 9, get_engine(db))
+    assert memory.load_chapter_memories(9, db) == []
+    assert fake.session_state["writing_debate_state"]["hard_constraints"] == {"characters": []}
+    assert any("Extraction vide" in str(call) for call in fake.warning.call_args_list)
+    assert fake.selectbox.call_args.args[1] == ["non précisé", "masculin", "féminin", "autre"]
+    fake.button.side_effect = lambda label, **kw: label == "Appliquer"
+    writing._render_step_4(1, 9, get_engine(db))
+    result = memory.load_chapter_memories(9, db)[0]
+    attributes = ["genre : masculin", "âge : 32 ans", "profession : archiviste"]
+    assert result["characters"][0]["fixed_attributes"] == attributes
+    assert fake.session_state["writing_hard_constraints"]["characters"][0]["fixed_attributes"] == attributes
+    assert result["open_threads"] == ["Origine du carnet ?"]
+
+
+def test_ui_unknown_character_is_not_confirmed_with_empty_fields(db, monkeypatch):
+    fake = MagicMock()
+    fake.session_state = {"writing_prose_edited": "texte", "writing_memory_proposal": {
+        **proposal(), "characters": [{"name": "Thomas", "fixed_attributes": [], "confirmation": "à confirmer"}]}}
+    fake.columns.return_value = [MagicMock(), MagicMock()]
+    fake.button.side_effect = lambda label, **kw: label == "Appliquer"
+    fake.text_area.side_effect = lambda label, value="", **kw: value
+    fake.selectbox.return_value = "non précisé"
+    fake.text_input.return_value = ""
+    monkeypatch.setattr(writing, "st", fake)
+    monkeypatch.setattr(writing.us, "get_db_path", lambda: str(db))
+    writing._render_step_4(1, 9, get_engine(db))
+    assert memory.load_chapter_memories(9, db)[0]["characters"] == []
+
+
+def test_previously_unspecified_gender_can_be_completed_without_overwriting_established_values(db):
+    character = {"name": "Thomas", "fixed_attributes": ["genre : non précisé"]}
+    memory.apply_chapter_memory(9, 1, "texte", {**proposal(), "characters": [character]}, db_path=db)
+    edited = with_attribute_fields(character, "masculin", "32 ans", "archiviste")
+    result = memory.apply_chapter_memory(9, 1, "texte", proposal(), confirmed_characters=[edited], db_path=db)
+    assert result["characters"][0]["fixed_attributes"] == edited["fixed_attributes"]
+    assert result["warnings"] == []
+    conflict = with_attribute_fields(character, "féminin", "32 ans", "archiviste")
+    result = memory.apply_chapter_memory(9, 1, "texte", proposal(), confirmed_characters=[conflict], db_path=db)
+    assert "genre : masculin" in result["characters"][0]["fixed_attributes"]
+    assert result["warnings"]

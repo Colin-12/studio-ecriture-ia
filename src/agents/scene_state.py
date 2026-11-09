@@ -64,6 +64,8 @@ def extract_scene_state(prose: str, personnages: list[str] | None = None, *, pro
         "par la prose : matiere, couleur, taille, marque. Utilise un nom court et concret pour chaque objet ; "
         "n'invente pas d'attribut, laisse son dictionnaire vide si aucun n'est précisé.\n"
         "resume est une phrase de résumé factuel de cette scène, 30 mots maximum. "
+        "Dans ce résumé, conserve prioritairement les révélations et les inconnues explicites laissées en suspens "
+        "(question sans réponse, cause ou origine inconnue), plutôt qu'une simple posture physique ; n'invente aucun mystère. "
         "Réponds en JSON uniquement, 160 mots maximum au total, sans commentaire. "
         "lieu, moment et etat_objet_central sont des chaînes ; objets_tenus est une liste "
         "de chaînes 'personnage : objet' ; personnages_presents et revele sont des listes de chaînes.\n"
