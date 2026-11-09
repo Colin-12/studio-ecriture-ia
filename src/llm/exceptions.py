@@ -21,6 +21,16 @@ class SpendCapExceededError(RateLimitError):
     failure_reason = "SPEND_CAP_EXCEEDED"
 
 
+class PrepayCreditsDepletedError(RateLimitError):
+    """Prepaid Gemini credits require a manual top-up in AI Studio."""
+
+    failure_reason = "PREPAY_CREDITS_DEPLETED"
+    guidance = "Crédits Gemini épuisés : recharge sur AI Studio, page Facturation (https://ai.studio/projects)"
+
+    def __init__(self, message: str = "") -> None:
+        super().__init__(message if self.guidance in message else f"{self.guidance}. {message}".rstrip())
+
+
 class AuthError(LLMError):
     """Raised when a provider rejects credentials."""
 

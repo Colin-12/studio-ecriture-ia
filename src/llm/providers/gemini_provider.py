@@ -11,6 +11,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote
 
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ from src.llm.base import LLMProvider, LLMResponse
 from src.llm.exceptions import (
     EmptyProviderResponseError,
     InvalidProviderResponseError,
+    LLMError,
+    PrepayCreditsDepletedError,
     RateLimitError,
     SpendCapExceededError,
 )
@@ -31,6 +34,45 @@ _spend_cap_until = 0.0
 _spend_cap_message = ""
 _spend_cap_warned = False
 _spend_cap_lock = threading.Lock()
+_prepay_until = 0.0
+_prepay_message = ""
+_prepay_lock = threading.Lock()
+
+
+def _check_prepay_credits() -> None:
+    with _prepay_lock:
+        if time.monotonic() < _prepay_until:
+            raise PrepayCreditsDepletedError(f"Gemini ignoré pendant la suspension prépayée : {_prepay_message}")
+
+
+def _record_prepay_depleted(message: str) -> None:
+    global _prepay_until, _prepay_message
+    try:
+        seconds = float(os.getenv("GEMINI_PREPAY_COOLDOWN_SECONDS", "600"))
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError
+    except ValueError:
+        seconds = 600.0
+    with _prepay_lock:
+        now = time.monotonic()
+        if now < _prepay_until:
+            return
+        _prepay_until = now + seconds
+        _prepay_message = message
+        logger.warning("%s ; fournisseur suspendu pendant %.0f secondes.", PrepayCreditsDepletedError.guidance, seconds)
+
+
+def _is_prepay_depleted(exc: BaseException) -> bool:
+    if any(phrase in str(exc).casefold() for phrase in ("prepayment credits", "credits are depleted")):
+        return True
+    cause: BaseException | None = exc
+    visited: set[int] = set()
+    while cause is not None and id(cause) not in visited:
+        visited.add(id(cause))
+        if isinstance(cause, HTTPError) and cause.code == 402:
+            return True
+        cause = cause.__cause__
+    return False
 
 
 def _check_spend_cap() -> None:
@@ -72,6 +114,7 @@ class GeminiProvider(LLMProvider):
         self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
     def completion_token_limit(self, max_tokens: int) -> int:
+        _check_prepay_credits()
         _check_spend_cap()
         if self.model.startswith("gemini-3"):
             return min(max_tokens + self.thinking_reserve, output_token_limit(self.model, self.api_key or ""))
@@ -110,8 +153,11 @@ class GeminiProvider(LLMProvider):
                 payload,
                 timeout=timeout,
             )
-        except RateLimitError as exc:
-            if any(phrase in str(exc).casefold() for phrase in ("spending cap", "spend cap")):
+        except (LLMError, HTTPError) as exc:
+            if _is_prepay_depleted(exc):
+                _record_prepay_depleted(str(exc))
+                raise PrepayCreditsDepletedError(str(exc)) from exc
+            if isinstance(exc, RateLimitError) and any(phrase in str(exc).casefold() for phrase in ("spending cap", "spend cap")):
                 _record_spend_cap(str(exc))
                 raise SpendCapExceededError(str(exc)) from exc
             raise
